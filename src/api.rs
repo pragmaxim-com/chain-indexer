@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tokio::task::JoinHandle;
+use tokio::sync::broadcast::error::SendError;
 
 pub type Height = u64;
 pub type Address = String;
@@ -65,7 +65,10 @@ pub trait BlockProcessor {
 
 pub trait BlockBatchIndexer: Send + Sync {
     fn get_last_height(&self) -> u64;
-    fn index(&self, block_batch: Arc<Vec<(Height, CiBlock)>>) -> Vec<JoinHandle<()>>;
+    fn index(
+        &self,
+        block_batch: Arc<Vec<(Height, CiBlock)>>,
+    ) -> Result<usize, SendError<Arc<Vec<(Height, CiBlock)>>>>;
 }
 
 pub trait Syncable {

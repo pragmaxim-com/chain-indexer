@@ -2,11 +2,7 @@ use crate::api::{BlockBatchIndexer, CiBlock, Height};
 use crate::rocks::rocks_io_indexer;
 use rocksdb::{MultiThreaded, Options, TransactionDB, TransactionDBOptions};
 use std::sync::Arc;
-use tokio::sync::broadcast::error::SendError;
-use tokio::sync::{broadcast, Barrier};
-use tokio::task::{self, JoinHandle};
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::StreamExt;
+use tokio::task::JoinHandle;
 
 pub const ADDRESS_CF: &str = "ADDRESS_CF";
 pub const CACHE_CF: &str = "CACHE_CF";
@@ -14,19 +10,12 @@ pub const META_CF: &str = "META_CF";
 
 pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 
-const CHANNEL_CAPACITY: usize = 100;
-
 pub struct RocksIndexer {
     db: Arc<TransactionDB<MultiThreaded>>,
-    tx: broadcast::Sender<Arc<Vec<(u64, CiBlock)>>>,
 }
 
 impl RocksIndexer {
-    pub fn new(
-        num_cores: i32,
-        db_path: &str,
-        cfs: Vec<&str>,
-    ) -> Result<(Vec<JoinHandle<()>>, Self), String> {
+    pub fn new(num_cores: i32, db_path: &str, cfs: Vec<&str>) -> Result<Self, String> {
         if cfs.is_empty() {
             panic!("Column Families must be non-empty");
         }
@@ -63,33 +52,8 @@ impl RocksIndexer {
             }
         }
         let db = Arc::new(instance);
-
-        // Create tokio broadcast channel
-        let (tx, _rx) = broadcast::channel::<Arc<Vec<(u64, CiBlock)>>>(CHANNEL_CAPACITY);
-
-        // Barrier to synchronize all consumers
-        let cf_names = vec![1];
-        let barrier = Arc::new(Barrier::new(cf_names.len()));
-
-        // Spawn consumer tasks
-        let consumers: Vec<JoinHandle<()>> = cf_names
-            .into_iter()
-            .map(|cf_name| {
-                let barrier_clone = Arc::clone(&barrier);
-                let rx = tx.subscribe();
-
-                let db_clone = Arc::clone(&db);
-                task::spawn(async move {
-                    let mut stream = BroadcastStream::new(rx);
-                    while let Some(Ok(blocks_clone)) = stream.next().await {
-                        rocks_io_indexer::index_blocks(db_clone.clone(), &blocks_clone);
-                        barrier_clone.wait().await;
-                    }
-                })
-            })
-            .collect();
-
-        Ok((consumers, RocksIndexer { db, tx }))
+        use crossbeam::channel::{bounded, Sender};
+        Ok(RocksIndexer { db })
     }
 }
 
@@ -99,10 +63,18 @@ impl BlockBatchIndexer for RocksIndexer {
         let db_clone = Arc::clone(&self.db);
         rocks_io_indexer::get_last_height(db_clone)
     }
-    fn index(
-        &self,
-        block_batch: Arc<Vec<(Height, CiBlock)>>,
-    ) -> Result<usize, SendError<Arc<Vec<(Height, CiBlock)>>>> {
-        self.tx.send(block_batch)
+    fn index(&self, block_batch: Arc<Vec<(Height, CiBlock)>>) -> Vec<JoinHandle<()>> {
+        let mut tasks = vec![];
+
+        // ADDRESS + META
+        let db_clone = Arc::clone(&self.db);
+        let blocks_clone = Arc::clone(&block_batch);
+
+        let task = tokio::task::spawn(async move {
+            rocks_io_indexer::index_blocks(db_clone, blocks_clone);
+        });
+
+        tasks.push(task);
+        tasks
     }
 }

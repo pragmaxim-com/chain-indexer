@@ -1,6 +1,5 @@
 use crate::api::{BlockBatchIndexer, BlockProcessor, BlockchainClient, ChainSyncer, Height};
 use crate::log;
-use futures::future::join_all;
 use futures::stream::StreamExt;
 use min_batch::MinBatchExt;
 use std::sync::Arc;
@@ -50,25 +49,21 @@ impl<B: Send + 'static, BH: 'static> ChainSyncer<B, BH> {
                 tokio::task::spawn_blocking(move || processor.process(blocks))
             })
             .buffered(512)
-            .then(|res| async move {
-                match res {
-                    Ok(ci_blocks) => {
-                        let tx_count =
-                            ci_blocks.iter().fold(0, |acc, b| acc + b.1.txs.len()) as u64;
-                        let indexer = self.indexer.clone();
-                        let blocks = Arc::new(ci_blocks);
-                        join_all(indexer.index(blocks)).await;
-                        tx_count
-                    }
-                    Err(e) => panic!("Error: {:?}", e),
+            .map(|res| match res {
+                Ok(ci_blocks) => {
+                    let tx_count = ci_blocks.iter().fold(0, |acc, b| acc + b.1.txs.len()) as u64;
+                    let blocks = Arc::new(ci_blocks);
+                    self.indexer.index(blocks).unwrap();
+                    tx_count
                 }
+                Err(e) => panic!("Error: {:?}", e),
             })
             .fold(
                 (0 as u64, 0 as u64),
                 |(total_tx_count, last_report_batches), tx_count| async move {
                     let total_time = start_time.elapsed().as_secs();
                     let txs_per_sec = format!("{:.1}", total_tx_count as f64 / total_time as f64);
-                    if last_report_batches % 1000 == 0 {
+                    if last_report_batches >= 100 && last_report_batches % 100 == 0 {
                         log!(
                             "Processed {} with indexing Speed: {} txs/sec",
                             tx_count,

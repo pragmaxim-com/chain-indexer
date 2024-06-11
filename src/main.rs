@@ -9,6 +9,7 @@ use ci::{
     rocks::rocks_indexer::{RocksIndexer, ADDRESS_CF, CACHE_CF, META_CF},
 };
 use clap::{Arg, ArgAction, Command};
+use futures::future::join_all;
 
 fn cli() -> Command {
     Command::new("indexBTC")
@@ -76,16 +77,15 @@ async fn main() -> Result<(), std::io::Error> {
 
     let processor = Arc::new(BtcProcessor {});
 
-    let indexer = Arc::new(
-        RocksIndexer::new(
-            num_cores as i32,
-            &full_db_path,
-            vec![ADDRESS_CF, CACHE_CF, META_CF],
-        )
-        .unwrap(),
-    );
+    let (consumers, indexer) = RocksIndexer::new(
+        num_cores as i32,
+        &full_db_path,
+        vec![ADDRESS_CF, CACHE_CF, META_CF],
+    )
+    .unwrap();
 
-    let syncer = ChainSyncer::new(client, processor, indexer);
-    syncer.sync(844566, 50, 1000).await;
+    let syncer = ChainSyncer::new(client, processor, Arc::new(indexer));
+    syncer.sync(844566, 50, 500).await;
+    join_all(consumers).await;
     Ok(())
 }

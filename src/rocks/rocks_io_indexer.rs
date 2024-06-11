@@ -91,7 +91,7 @@ pub fn get_last_height(db: Arc<TransactionDB<MultiThreaded>>) -> u64 {
         .map_or(0, |height| bytes_to_u64(&height))
 }
 
-pub fn index_blocks(db: Arc<TransactionDB<MultiThreaded>>, blocks: Arc<Vec<(Height, CiBlock)>>) {
+pub fn index_blocks(db: Arc<TransactionDB<MultiThreaded>>, blocks: &Vec<(Height, CiBlock)>) {
     let address_cf = db.cf_handle(ADDRESS_CF).unwrap();
     let cache_cf = db.cf_handle(CACHE_CF).unwrap();
     let meta_cf = db.cf_handle(META_CF).unwrap();
