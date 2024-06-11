@@ -86,6 +86,6 @@ async fn main() -> Result<(), std::io::Error> {
     );
 
     let syncer = ChainSyncer::new(client, processor, indexer);
-    syncer.sync(844566, 1000).await;
+    syncer.sync(844566, 50, 1000).await;
     Ok(())
 }
