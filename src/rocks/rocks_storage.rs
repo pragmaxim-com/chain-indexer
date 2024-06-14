@@ -1,8 +1,9 @@
-use crate::api::{BlockBatchIndexer, CiBlock, Height};
+use crate::api::{CiBlock, Height};
 use crate::rocks::rocks_io_indexer;
+use crate::{api::Storage, rocks::rocks_io_indexer::RocksIoIndexer};
+use broadcast_sink::Consumer;
 use rocksdb::{MultiThreaded, Options, TransactionDB, TransactionDBOptions};
 use std::sync::Arc;
-use tokio::task::JoinHandle;
 
 pub const ADDRESS_CF: &str = "ADDRESS_CF";
 pub const CACHE_CF: &str = "CACHE_CF";
@@ -10,11 +11,11 @@ pub const META_CF: &str = "META_CF";
 
 pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 
-pub struct RocksIndexer {
+pub struct RocksStorage {
     db: Arc<TransactionDB<MultiThreaded>>,
 }
 
-impl RocksIndexer {
+impl RocksStorage {
     pub fn new(num_cores: i32, db_path: &str, cfs: Vec<&str>) -> Result<Self, String> {
         if cfs.is_empty() {
             panic!("Column Families must be non-empty");
@@ -47,34 +48,25 @@ impl RocksIndexer {
 
         if existing_cfs.is_empty() {
             let options = rocksdb::Options::default();
-            for cf in cfs.iter() {
+            for cf in cfs.into_iter() {
                 instance.create_cf(cf, &options).unwrap();
             }
         }
-        let db = Arc::new(instance);
-        use crossbeam::channel::{bounded, Sender};
-        Ok(RocksIndexer { db })
+
+        Ok(RocksStorage {
+            db: Arc::new(instance),
+        })
     }
 }
 
 // implement BlockBatchIndexer trait
-impl BlockBatchIndexer for RocksIndexer {
+impl Storage for RocksStorage {
     fn get_last_height(&self) -> u64 {
         let db_clone = Arc::clone(&self.db);
         rocks_io_indexer::get_last_height(db_clone)
     }
-    fn index(&self, block_batch: Arc<Vec<(Height, CiBlock)>>) -> Vec<JoinHandle<()>> {
-        let mut tasks = vec![];
 
-        // ADDRESS + META
-        let db_clone = Arc::clone(&self.db);
-        let blocks_clone = Arc::clone(&block_batch);
-
-        let task = tokio::task::spawn(async move {
-            rocks_io_indexer::index_blocks(db_clone, blocks_clone);
-        });
-
-        tasks.push(task);
-        tasks
+    fn get_indexers(&self) -> Vec<Arc<dyn Consumer<Vec<(Height, CiBlock)>>>> {
+        vec![Arc::new(RocksIoIndexer::new(Arc::clone(&self.db)))]
     }
 }

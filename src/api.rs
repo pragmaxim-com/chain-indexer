@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tokio::sync::broadcast::error::SendError;
+use broadcast_sink::Consumer;
 
 pub type Height = u64;
 pub type Address = String;
@@ -63,12 +63,9 @@ pub trait BlockProcessor {
     fn process(&self, block_batch: Vec<(Height, Self::Block, usize)>) -> Vec<(Height, CiBlock)>;
 }
 
-pub trait BlockBatchIndexer: Send + Sync {
+pub trait Storage: Send + Sync {
     fn get_last_height(&self) -> u64;
-    fn index(
-        &self,
-        block_batch: Arc<Vec<(Height, CiBlock)>>,
-    ) -> Result<usize, SendError<Arc<Vec<(Height, CiBlock)>>>>;
+    fn get_indexers(&self) -> Vec<Arc<dyn Consumer<Vec<(Height, CiBlock)>>>>;
 }
 
 pub trait Syncable {
@@ -78,5 +75,5 @@ pub trait Syncable {
 pub struct ChainSyncer<B: Send, BH> {
     pub client: Arc<dyn BlockchainClient<Block = B, BlockHash = BH> + Send + Sync>,
     pub processor: Arc<dyn BlockProcessor<Block = B> + Send + Sync>,
-    pub indexer: Arc<dyn BlockBatchIndexer>,
+    pub storage: Arc<dyn Storage>,
 }

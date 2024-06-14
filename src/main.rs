@@ -6,10 +6,9 @@ mod logger;
 use ci::{
     api::ChainSyncer,
     btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
-    rocks::rocks_indexer::{RocksIndexer, ADDRESS_CF, CACHE_CF, META_CF},
+    rocks::rocks_storage::{RocksStorage, ADDRESS_CF, CACHE_CF, META_CF},
 };
 use clap::{Arg, ArgAction, Command};
-use futures::future::join_all;
 
 fn cli() -> Command {
     Command::new("indexBTC")
@@ -77,15 +76,14 @@ async fn main() -> Result<(), std::io::Error> {
 
     let processor = Arc::new(BtcProcessor {});
 
-    let (consumers, indexer) = RocksIndexer::new(
+    let storage = RocksStorage::new(
         num_cores as i32,
         &full_db_path,
         vec![ADDRESS_CF, CACHE_CF, META_CF],
     )
     .unwrap();
 
-    let syncer = ChainSyncer::new(client, processor, Arc::new(indexer));
-    syncer.sync(844566, 50, 500).await;
-    join_all(consumers).await;
+    let syncer = ChainSyncer::new(client, processor, Arc::new(storage));
+    syncer.sync(844566, 50).await;
     Ok(())
 }
