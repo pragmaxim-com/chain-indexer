@@ -1,14 +1,16 @@
 mod api;
-use std::{env, ops::Deref, sync::Arc};
-
+mod btc;
 mod logger;
+mod rocks;
+mod syncer;
 
-use ci::{
+use clap::{Arg, ArgAction, Command};
+use std::{env, ops::Deref, sync::Arc};
+use {
     api::ChainSyncer,
     btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
     rocks::rocks_storage::{RocksStorage, ADDRESS_CF, CACHE_CF, META_CF},
 };
-use clap::{Arg, ArgAction, Command};
 
 fn cli() -> Command {
     Command::new("indexBTC")
