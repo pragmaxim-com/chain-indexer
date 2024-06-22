@@ -47,7 +47,7 @@ impl From<bitcoin::Transaction> for CiTx {
                 .iter()
                 .map(|input| CiIndexedTxid {
                     tx_id: input.previous_output.txid.to_byte_array(),
-                    utxo_index: input.previous_output.vout as usize,
+                    utxo_index: input.previous_output.vout as u8,
                 })
                 .collect(),
             outs: tx
@@ -58,11 +58,12 @@ impl From<bitcoin::Transaction> for CiTx {
                     let address = if let Ok(address) =
                         Address::from_script(out.script_pubkey.as_script(), Network::Bitcoin)
                     {
-                        Some(address.to_string())
+                        Some(address.to_string().into_bytes())
                     } else if let Some(pk) = out.script_pubkey.p2pk_public_key() {
                         Some(
                             bitcoin::Address::p2pkh(pk.pubkey_hash(), bitcoin::Network::Bitcoin)
-                                .to_string(),
+                                .to_string()
+                                .into_bytes(),
                         )
                     } else if out.script_pubkey.is_op_return() {
                         None
@@ -72,7 +73,7 @@ impl From<bitcoin::Transaction> for CiTx {
                     let script_hash: [u8; 32] =
                         sha256::Hash::hash(out.script_pubkey.as_bytes()).to_byte_array();
                     CiUtxo {
-                        index: out_index,
+                        index: out_index as u8,
                         address,
                         script_hash,
                         value: out.value.to_sat(),

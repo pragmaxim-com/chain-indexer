@@ -3,11 +3,11 @@ use std::sync::Arc;
 use broadcast_sink::Consumer;
 
 pub type Height = u64;
-pub type Address = String;
+pub type Address = Vec<u8>;
 pub type ScriptHash = [u8; 32];
 pub type TxId = [u8; 32];
 pub type Amount = u64;
-pub type UtxoIndex = usize;
+pub type UtxoIndex = u8;
 pub type BlockHash = String;
 pub type Time = i64;
 

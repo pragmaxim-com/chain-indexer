@@ -24,3 +24,4 @@ serde = { version = "1.0.203", features = ["derive"] }
 clap = "4.5.4"
 num_cpus = "1.16.0"
 crossbeam = "0.8.4"
+rayon = "1.10"

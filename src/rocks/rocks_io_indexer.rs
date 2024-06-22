@@ -1,13 +1,9 @@
+use super::rocks_storage::{ADDRESS_CF, CACHE_CF, LAST_ADDRESS_HEIGHT_KEY, META_CF};
 use crate::api::{CiBlock, CiTx, Height};
 use broadcast_sink::Consumer;
 use rocksdb::{MultiThreaded, TransactionDB, WriteBatchWithTransaction};
 use std::sync::Arc;
 
-use super::rocks_storage::{ADDRESS_CF, CACHE_CF, LAST_ADDRESS_HEIGHT_KEY, META_CF};
-
-fn usize_to_bytes(n: usize) -> [u8; std::mem::size_of::<usize>()] {
-    n.to_ne_bytes()
-}
 fn u64_to_bytes(n: u64) -> [u8; std::mem::size_of::<u64>()] {
     n.to_ne_bytes()
 }
@@ -27,29 +23,34 @@ fn process_outputs(
     cache_cf: &Arc<rocksdb::BoundColumnFamily>,
 ) {
     for utxo in tx.outs.iter() {
-        let mut tx_id_with_index = Vec::new();
+        let mut tx_id_with_index = Vec::with_capacity(tx.tx_id.len() + 2);
         tx_id_with_index.extend_from_slice(&tx.tx_id);
         tx_id_with_index.push(b'|');
-        tx_id_with_index.extend_from_slice(&usize_to_bytes(utxo.index));
+        tx_id_with_index.push(utxo.index);
 
-        let mut utxo_hash_with_value = Vec::new();
+        let mut utxo_hash_with_value = Vec::with_capacity(utxo.script_hash.len() + 9);
         utxo_hash_with_value.extend_from_slice(&utxo.script_hash);
         utxo_hash_with_value.push(b'|');
         utxo_hash_with_value.extend_from_slice(&u64_to_bytes(utxo.value));
 
-        let mut address_key = Vec::new();
+        db_tx
+            .put_cf(cache_cf, &tx_id_with_index, &utxo_hash_with_value)
+            .unwrap();
+
+        let mut address_key = Vec::with_capacity(utxo.script_hash.len() + tx.tx_id.len() + 14);
         address_key.extend_from_slice(&utxo.script_hash);
+        address_key.push(b'|');
+        address_key.extend_from_slice(utxo.address.as_ref().unwrap_or(&Vec::new()));
         address_key.push(b'|');
         address_key.push(b'O');
         address_key.push(b'|');
         address_key.extend_from_slice(&tx.tx_id);
         address_key.push(b'|');
-        address_key.extend_from_slice(&usize_to_bytes(utxo.index));
+        address_key.push(utxo.index);
+        address_key.push(b'|');
+        address_key.extend_from_slice(&u64_to_bytes(utxo.value));
 
-        db_tx
-            .put_cf(cache_cf, &tx_id_with_index, &utxo_hash_with_value)
-            .unwrap();
-        batch.put_cf(address_cf, &address_key, &u64_to_bytes(utxo.value));
+        batch.put_cf(address_cf, &address_key, &[]);
     }
 }
 
@@ -62,26 +63,44 @@ fn process_inputs(
     cache_cf: &Arc<rocksdb::BoundColumnFamily>,
 ) {
     for indexed_txid in &tx.ins {
-        let mut tx_cache_key = Vec::new();
+        let mut tx_cache_key = Vec::with_capacity(indexed_txid.tx_id.len() + 2);
         tx_cache_key.extend_from_slice(&indexed_txid.tx_id);
         tx_cache_key.push(b'|'); // Adding the delimiter '|'
-        tx_cache_key.extend_from_slice(&usize_to_bytes(indexed_txid.utxo_index));
+        tx_cache_key.push(indexed_txid.utxo_index);
 
         let utxo_str = db_tx.get_cf(cache_cf, &tx_cache_key).unwrap().unwrap();
         let splits: Vec<&[u8]> = utxo_str.split(|&byte| byte == b'|').collect();
-        let hash = splits[0];
+        let script_hash = splits[0];
         let value = splits[1];
+        let mut iter = db_tx.prefix_iterator_cf(address_cf, &script_hash);
 
-        let mut address_key = Vec::new();
-        address_key.extend_from_slice(hash);
+        let first_address = iter.next().and_then(|result| {
+            match result {
+                Ok((key, _)) => {
+                    let parts: Vec<&[u8]> = key.split(|&byte| byte == b'|').collect();
+                    if parts.len() > 1 {
+                        Some(parts[1].to_vec())
+                    } else {
+                        Some(vec![]) // Return an empty vector if the address is empty
+                    }
+                }
+                Err(_) => None,
+            }
+        });
+        let mut address_key = Vec::with_capacity(script_hash.len() + indexed_txid.tx_id.len() + 14);
+        address_key.extend_from_slice(script_hash);
+        address_key.push(b'|');
+        address_key.extend_from_slice(first_address.as_ref().unwrap_or(&Vec::new()));
         address_key.push(b'|'); // Adding the delimiter '|'
         address_key.push(b'I');
         address_key.push(b'|'); // Adding the delimiter '|'
         address_key.extend_from_slice(&indexed_txid.tx_id);
         address_key.push(b'|'); // Adding the delimiter '|'
-        address_key.extend_from_slice(&usize_to_bytes(indexed_txid.utxo_index));
+        address_key.push(indexed_txid.utxo_index);
+        address_key.push(b'|');
+        address_key.extend_from_slice(value);
 
-        batch.put_cf(address_cf, address_key, value);
+        batch.put_cf(address_cf, address_key, &[]);
     }
 }
 

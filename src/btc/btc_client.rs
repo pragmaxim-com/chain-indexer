@@ -1,7 +1,6 @@
-use std::sync::Arc;
-
 use crate::api::BlockchainClient;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
+use std::sync::Arc;
 
 pub struct BtcClient {
     rpc_client: Arc<Client>,
