@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use broadcast_sink::Consumer;
+use tokio::sync::Mutex;
 
 pub type Height = u64;
 pub type Address = Vec<u8>;
@@ -65,7 +66,7 @@ pub trait BlockProcessor {
 
 pub trait Storage: Send + Sync {
     fn get_last_height(&self) -> u64;
-    fn get_indexers(&self) -> Vec<Arc<dyn Consumer<Vec<(Height, CiBlock)>>>>;
+    fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<(Height, CiBlock)>>>>>;
 }
 
 pub trait Syncable {

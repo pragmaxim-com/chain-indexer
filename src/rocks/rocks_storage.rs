@@ -4,6 +4,7 @@ use crate::{api::Storage, rocks::rocks_io_indexer::RocksIoIndexer};
 use broadcast_sink::Consumer;
 use rocksdb::{MultiThreaded, Options, TransactionDB, TransactionDBOptions};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub const ADDRESS_CF: &str = "ADDRESS_CF";
 pub const CACHE_CF: &str = "CACHE_CF";
@@ -66,7 +67,9 @@ impl Storage for RocksStorage {
         rocks_io_indexer::get_last_height(db_clone)
     }
 
-    fn get_indexers(&self) -> Vec<Arc<dyn Consumer<Vec<(Height, CiBlock)>>>> {
-        vec![Arc::new(RocksIoIndexer::new(Arc::clone(&self.db)))]
+    fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<(Height, CiBlock)>>>>> {
+        vec![Arc::new(Mutex::new(RocksIoIndexer::new(Arc::clone(
+            &self.db,
+        ))))]
     }
 }
