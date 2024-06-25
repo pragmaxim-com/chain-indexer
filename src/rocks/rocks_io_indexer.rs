@@ -144,8 +144,8 @@ impl RocksIoIndexer {
         }
     }
 }
-impl Consumer<Vec<(Height, CiBlock)>> for RocksIoIndexer {
-    fn consume(&mut self, blocks: &Vec<(Height, CiBlock)>) {
+impl Consumer<Vec<CiBlock>> for RocksIoIndexer {
+    fn consume(&mut self, blocks: &Vec<CiBlock>) {
         let address_cf = self.db.cf_handle(ADDRESS_CF).unwrap();
         let cache_cf = self.db.cf_handle(CACHE_CF).unwrap();
         let meta_cf = self.db.cf_handle(META_CF).unwrap();
@@ -153,7 +153,7 @@ impl Consumer<Vec<(Height, CiBlock)>> for RocksIoIndexer {
         let db_tx = self.db.transaction();
         let mut batch: WriteBatchWithTransaction<true> = db_tx.get_writebatch();
 
-        for (_, block) in blocks.iter() {
+        for block in blocks.iter() {
             for sum_tx in block.txs.iter() {
                 process_outputs(
                     sum_tx,
@@ -178,7 +178,7 @@ impl Consumer<Vec<(Height, CiBlock)>> for RocksIoIndexer {
             }
         }
         // let get last height
-        let last_height = blocks.iter().last().unwrap().0;
+        let last_height = blocks.iter().last().unwrap().height;
         db_tx
             .put_cf(&meta_cf, LAST_ADDRESS_HEIGHT_KEY, u64_to_bytes(last_height))
             .unwrap();

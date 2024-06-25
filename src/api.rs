@@ -4,6 +4,7 @@ use broadcast_sink::Consumer;
 use tokio::sync::Mutex;
 
 pub type Height = u64;
+pub type TxIndex = u16;
 pub type Address = Vec<u8>;
 pub type ScriptHash = [u8; 32];
 pub type TxId = [u8; 32];
@@ -30,6 +31,7 @@ pub struct CiIndexedTxid {
 pub struct CiTx {
     pub is_coinbase: bool,
     pub tx_id: TxId,
+    pub tx_index: TxIndex,
     pub ins: Vec<CiIndexedTxid>,
     pub outs: Vec<CiUtxo>,
 }
@@ -61,12 +63,12 @@ pub trait BlockchainClient {
 
 pub trait BlockProcessor {
     type Block: Send;
-    fn process(&self, block_batch: Vec<(Height, Self::Block, usize)>) -> Vec<(Height, CiBlock)>;
+    fn process(&self, block_batch: Vec<(Height, Self::Block, usize)>) -> Vec<CiBlock>;
 }
 
 pub trait Storage: Send + Sync {
     fn get_last_height(&self) -> u64;
-    fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<(Height, CiBlock)>>>>>;
+    fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<CiBlock>>>>>;
 }
 
 pub trait Syncable {

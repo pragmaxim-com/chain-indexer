@@ -67,7 +67,7 @@ impl Storage for RocksStorage {
         rocks_io_indexer::get_last_height(db_clone)
     }
 
-    fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<(Height, CiBlock)>>>>> {
+    fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<CiBlock>>>>> {
         vec![Arc::new(Mutex::new(RocksIoIndexer::new(Arc::clone(
             &self.db,
         ))))]

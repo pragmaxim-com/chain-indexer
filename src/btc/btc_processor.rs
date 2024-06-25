@@ -1,4 +1,4 @@
-use crate::api::BlockProcessor;
+use crate::api::{BlockProcessor, TxIndex};
 use crate::api::{CiBlock, CiIndexedTxid, CiTx, CiUtxo, Height};
 use crate::log;
 use bitcoin::{Address, Network};
@@ -9,18 +9,22 @@ use chrono::DateTime;
 pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {
     type Block = bitcoin::Block;
-    fn process(&self, block_batch: Vec<(Height, Self::Block, usize)>) -> Vec<(Height, CiBlock)> {
+    fn process(&self, block_batch: Vec<(Height, Self::Block, usize)>) -> Vec<CiBlock> {
         block_batch
             .into_iter()
             .map(|height_block| {
-                let height = height_block.0;
                 let ci_block: CiBlock = height_block.into();
-                if height % 1000 == 0 {
+                if ci_block.height % 1000 == 0 {
                     let datetime = DateTime::from_timestamp(ci_block.time as i64, 0).unwrap();
                     let readable_date = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
-                    log!("Block @ {} : {} : {}", height, readable_date, ci_block.hash);
+                    log!(
+                        "Block @ {} : {} : {}",
+                        ci_block.height,
+                        readable_date,
+                        ci_block.hash
+                    );
                 }
-                (height, ci_block)
+                ci_block
             })
             .collect()
     }
@@ -32,17 +36,25 @@ impl From<(Height, bitcoin::Block, usize)> for CiBlock {
             hash: block.1.block_hash().to_string(),
             time: block.1.header.time as i64,
             height: block.0,
-            txs: block.1.txdata.into_iter().map(|tx| tx.into()).collect(),
+            txs: block
+                .1
+                .txdata
+                .into_iter()
+                .enumerate()
+                .map(|(tx_index, tx)| (tx_index as u16, tx).into())
+                .collect(),
         }
     }
 }
 
-impl From<bitcoin::Transaction> for CiTx {
-    fn from(tx: bitcoin::Transaction) -> Self {
+impl From<(TxIndex, bitcoin::Transaction)> for CiTx {
+    fn from(tx: (TxIndex, bitcoin::Transaction)) -> Self {
         CiTx {
-            is_coinbase: tx.is_coinbase(),
-            tx_id: tx.compute_txid().to_byte_array(), //TODO make this more efficient
+            is_coinbase: tx.1.is_coinbase(),
+            tx_id: tx.1.compute_txid().to_byte_array(), //TODO make this more efficient
+            tx_index: tx.0,
             ins: tx
+                .1
                 .input
                 .iter()
                 .map(|input| CiIndexedTxid {
@@ -51,6 +63,7 @@ impl From<bitcoin::Transaction> for CiTx {
                 })
                 .collect(),
             outs: tx
+                .1
                 .output
                 .iter()
                 .enumerate()
