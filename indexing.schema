@@ -1,0 +1,27 @@
+getBlockHashByHeight:
+    block_height -> block_hash
+
+getBlockHeightByHash:
+    block_hash -> block_height
+
+getTxHashByBlockHeightAndTxIndex:
+    block_height|tx_index -> tx_hash
+
+getBlockHeightAndTxIndexByTxHash:
+    tx_hash -> block_height|tx_index
+
+getUtxoByTxInputIndex:
+    block_height|tx_index|input_index -> block_height|tx_index|utxo_index
+
+--- 
+
+getContractByTxUtxoIndex:
+    block_height|tx_index|utxo_index -> {contract}
+
+getContractByHash:
+    contract_hash -> block_height|tx_index|utxo_index
+
+getContractByAddress:     
+    contract_address -> block_height|tx_index|utxo_index
+
+
