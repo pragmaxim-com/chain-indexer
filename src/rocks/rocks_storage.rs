@@ -1,4 +1,4 @@
-use crate::api::{CiBlock, Height};
+use crate::api::CiBlock;
 use crate::rocks::rocks_io_indexer;
 use crate::{api::Storage, rocks::rocks_io_indexer::RocksIoIndexer};
 use broadcast_sink::Consumer;

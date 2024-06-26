@@ -1,5 +1,6 @@
 mod api;
 mod btc;
+mod codec;
 mod logger;
 mod rocks;
 mod syncer;

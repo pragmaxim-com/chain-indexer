@@ -9,7 +9,7 @@ pub type Address = Vec<u8>;
 pub type ScriptHash = [u8; 32];
 pub type TxId = [u8; 32];
 pub type Amount = u64;
-pub type UtxoIndex = u8;
+pub type UtxoIndex = u16;
 pub type BlockHash = String;
 pub type Time = i64;
 

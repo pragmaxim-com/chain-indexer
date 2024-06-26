@@ -59,7 +59,7 @@ impl From<(TxIndex, bitcoin::Transaction)> for CiTx {
                 .iter()
                 .map(|input| CiIndexedTxid {
                     tx_id: input.previous_output.txid.to_byte_array(),
-                    utxo_index: input.previous_output.vout as u8,
+                    utxo_index: input.previous_output.vout as u16,
                 })
                 .collect(),
             outs: tx
@@ -86,7 +86,7 @@ impl From<(TxIndex, bitcoin::Transaction)> for CiTx {
                     let script_hash: [u8; 32] =
                         sha256::Hash::hash(out.script_pubkey.as_bytes()).to_byte_array();
                     CiUtxo {
-                        index: out_index as u8,
+                        index: out_index as u16,
                         address,
                         script_hash,
                         value: out.value.to_sat(),
