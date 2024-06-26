@@ -4,15 +4,12 @@ mod codec;
 mod logger;
 mod syncer;
 
+use btc::btc_storage::BtcStorage;
 use clap::{Arg, ArgAction, Command};
 use std::{env, ops::Deref, sync::Arc};
 use {
     api::ChainSyncer,
-    btc::{
-        btc_client::BtcClient,
-        btc_processor::BtcProcessor,
-        btc_storage::{BtcStorage, ADDRESS_CF, CACHE_CF, META_CF},
-    },
+    btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
 };
 
 fn cli() -> Command {
@@ -81,12 +78,7 @@ async fn main() -> Result<(), std::io::Error> {
 
     let processor = Arc::new(BtcProcessor {});
 
-    let storage = BtcStorage::new(
-        num_cores as i32,
-        &full_db_path,
-        vec![ADDRESS_CF, CACHE_CF, META_CF],
-    )
-    .unwrap();
+    let storage = BtcStorage::new(num_cores as i32, &full_db_path).unwrap();
 
     let syncer = ChainSyncer::new(client, processor, Arc::new(storage));
     syncer.sync(844566, 50).await;

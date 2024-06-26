@@ -6,21 +6,12 @@ use rocksdb::{MultiThreaded, Options, TransactionDB, TransactionDBOptions};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub const ADDRESS_CF: &str = "ADDRESS_CF";
-pub const CACHE_CF: &str = "CACHE_CF";
-pub const META_CF: &str = "META_CF";
-
-pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
-
 pub struct BtcStorage {
     db: Arc<TransactionDB<MultiThreaded>>,
 }
 
 impl BtcStorage {
-    pub fn new(num_cores: i32, db_path: &str, cfs: Vec<&str>) -> Result<Self, String> {
-        if cfs.is_empty() {
-            panic!("Column Families must be non-empty");
-        }
+    pub fn new(num_cores: i32, db_path: &str) -> Result<Self, String> {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         // Increase parallelism: setting the number of background threads
@@ -49,7 +40,7 @@ impl BtcStorage {
 
         if existing_cfs.is_empty() {
             let options = rocksdb::Options::default();
-            for cf in cfs.into_iter() {
+            for cf in btc::btc_input_indexer::get_column_families().into_iter() {
                 instance.create_cf(cf, &options).unwrap();
             }
         }

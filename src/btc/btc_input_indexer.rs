@@ -1,9 +1,14 @@
 use crate::api::{CiBlock, CiTx};
-use crate::btc::btc_storage::{ADDRESS_CF, CACHE_CF, LAST_ADDRESS_HEIGHT_KEY, META_CF};
 use broadcast_sink::Consumer;
 use lru::LruCache;
 use rocksdb::{MultiThreaded, TransactionDB, WriteBatchWithTransaction};
 use std::{num::NonZeroUsize, sync::Arc};
+
+pub const ADDRESS_CF: &str = "ADDRESS_CF";
+pub const CACHE_CF: &str = "CACHE_CF";
+pub const META_CF: &str = "META_CF";
+
+pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 
 fn u64_to_bytes(n: u64) -> [u8; std::mem::size_of::<u64>()] {
     n.to_ne_bytes()
@@ -43,6 +48,10 @@ fn process_inputs(
     for indexed_txid in &tx.ins {
         //...
     }
+}
+
+pub fn get_column_families() -> Vec<&'static str> {
+    vec![ADDRESS_CF, CACHE_CF, META_CF]
 }
 
 pub fn get_last_height(db: Arc<TransactionDB<MultiThreaded>>) -> u64 {
