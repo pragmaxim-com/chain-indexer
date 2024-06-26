@@ -2,15 +2,17 @@ mod api;
 mod btc;
 mod codec;
 mod logger;
-mod rocks;
 mod syncer;
 
 use clap::{Arg, ArgAction, Command};
 use std::{env, ops::Deref, sync::Arc};
 use {
     api::ChainSyncer,
-    btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
-    rocks::rocks_storage::{RocksStorage, ADDRESS_CF, CACHE_CF, META_CF},
+    btc::{
+        btc_client::BtcClient,
+        btc_processor::BtcProcessor,
+        btc_storage::{BtcStorage, ADDRESS_CF, CACHE_CF, META_CF},
+    },
 };
 
 fn cli() -> Command {
@@ -79,7 +81,7 @@ async fn main() -> Result<(), std::io::Error> {
 
     let processor = Arc::new(BtcProcessor {});
 
-    let storage = RocksStorage::new(
+    let storage = BtcStorage::new(
         num_cores as i32,
         &full_db_path,
         vec![ADDRESS_CF, CACHE_CF, META_CF],

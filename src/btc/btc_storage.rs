@@ -1,6 +1,6 @@
 use crate::api::CiBlock;
-use crate::rocks::rocks_io_indexer;
-use crate::{api::Storage, rocks::rocks_io_indexer::RocksIoIndexer};
+use crate::api::Storage;
+use crate::btc;
 use broadcast_sink::Consumer;
 use rocksdb::{MultiThreaded, Options, TransactionDB, TransactionDBOptions};
 use std::sync::Arc;
@@ -12,11 +12,11 @@ pub const META_CF: &str = "META_CF";
 
 pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 
-pub struct RocksStorage {
+pub struct BtcStorage {
     db: Arc<TransactionDB<MultiThreaded>>,
 }
 
-impl RocksStorage {
+impl BtcStorage {
     pub fn new(num_cores: i32, db_path: &str, cfs: Vec<&str>) -> Result<Self, String> {
         if cfs.is_empty() {
             panic!("Column Families must be non-empty");
@@ -54,22 +54,22 @@ impl RocksStorage {
             }
         }
 
-        Ok(RocksStorage {
+        Ok(BtcStorage {
             db: Arc::new(instance),
         })
     }
 }
 
 // implement BlockBatchIndexer trait
-impl Storage for RocksStorage {
+impl Storage for BtcStorage {
     fn get_last_height(&self) -> u64 {
         let db_clone = Arc::clone(&self.db);
-        rocks_io_indexer::get_last_height(db_clone)
+        btc::btc_input_indexer::get_last_height(db_clone)
     }
 
     fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<CiBlock>>>>> {
-        vec![Arc::new(Mutex::new(RocksIoIndexer::new(Arc::clone(
-            &self.db,
-        ))))]
+        vec![Arc::new(Mutex::new(
+            btc::btc_input_indexer::BtcInputIndexer::new(Arc::clone(&self.db)),
+        ))]
     }
 }

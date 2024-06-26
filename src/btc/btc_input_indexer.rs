@@ -1,5 +1,5 @@
-use super::rocks_storage::{ADDRESS_CF, CACHE_CF, LAST_ADDRESS_HEIGHT_KEY, META_CF};
 use crate::api::{CiBlock, CiTx};
+use crate::btc::btc_storage::{ADDRESS_CF, CACHE_CF, LAST_ADDRESS_HEIGHT_KEY, META_CF};
 use broadcast_sink::Consumer;
 use lru::LruCache;
 use rocksdb::{MultiThreaded, TransactionDB, WriteBatchWithTransaction};
@@ -52,12 +52,12 @@ pub fn get_last_height(db: Arc<TransactionDB<MultiThreaded>>) -> u64 {
         .map_or(0, |height| bytes_to_u64(&height))
 }
 
-pub struct RocksIoIndexer {
+pub struct BtcInputIndexer {
     db: Arc<TransactionDB<MultiThreaded>>,
     address_by_hash_lru_cache: LruCache<Vec<u8>, Vec<u8>>,
     hash_by_tx_lru_cache: LruCache<Vec<u8>, Vec<u8>>,
 }
-impl RocksIoIndexer {
+impl BtcInputIndexer {
     pub fn new(db: Arc<TransactionDB<MultiThreaded>>) -> Self {
         Self {
             db,
@@ -66,7 +66,7 @@ impl RocksIoIndexer {
         }
     }
 }
-impl Consumer<Vec<CiBlock>> for RocksIoIndexer {
+impl Consumer<Vec<CiBlock>> for BtcInputIndexer {
     fn consume(&mut self, blocks: &Vec<CiBlock>) {
         let address_cf = self.db.cf_handle(ADDRESS_CF).unwrap();
         let cache_cf = self.db.cf_handle(CACHE_CF).unwrap();
