@@ -7,9 +7,9 @@ pub struct BtcClient {
 }
 
 impl BtcClient {
-    pub fn new(rpc_url: &str, username: &str, password: &str) -> Self {
-        let user_pass = Auth::UserPass(username.to_string(), password.to_string());
-        let rpc_client = Arc::new(Client::new(rpc_url, user_pass).unwrap());
+    pub fn new(api_host: &str, api_username: &str, api_password: &str) -> Self {
+        let user_pass = Auth::UserPass(api_username.to_string(), api_password.to_string());
+        let rpc_client = Arc::new(Client::new(api_host, user_pass).unwrap());
         BtcClient { rpc_client }
     }
 }
