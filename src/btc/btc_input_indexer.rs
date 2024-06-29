@@ -10,14 +10,14 @@ pub const META_CF: &str = "META_CF";
 
 pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 
-fn u64_to_bytes(n: u64) -> [u8; std::mem::size_of::<u64>()] {
+fn u32_to_bytes(n: u32) -> [u8; std::mem::size_of::<u32>()] {
     n.to_ne_bytes()
 }
 
-fn bytes_to_u64(bytes: &[u8]) -> u64 {
-    let mut array = [0u8; std::mem::size_of::<u64>()];
+fn bytes_to_u32(bytes: &[u8]) -> u32 {
+    let mut array = [0u8; std::mem::size_of::<u32>()];
     array.copy_from_slice(bytes);
-    u64::from_ne_bytes(array)
+    u32::from_ne_bytes(array)
 }
 
 // Method to process the outputs of a transaction
@@ -54,11 +54,11 @@ pub fn get_column_families() -> Vec<&'static str> {
     vec![ADDRESS_CF, CACHE_CF, META_CF]
 }
 
-pub fn get_last_height(db: Arc<TransactionDB<MultiThreaded>>) -> u64 {
+pub fn get_last_height(db: Arc<TransactionDB<MultiThreaded>>) -> u32 {
     let meta_cf = db.cf_handle(META_CF).unwrap();
     db.get_cf(&meta_cf, LAST_ADDRESS_HEIGHT_KEY)
         .unwrap()
-        .map_or(0, |height| bytes_to_u64(&height))
+        .map_or(0, |height| bytes_to_u32(&height))
 }
 
 pub struct BtcInputIndexer {
@@ -111,7 +111,7 @@ impl Consumer<Vec<CiBlock>> for BtcInputIndexer {
         // let get last height
         let last_height = blocks.iter().last().unwrap().height;
         db_tx
-            .put_cf(&meta_cf, LAST_ADDRESS_HEIGHT_KEY, u64_to_bytes(last_height))
+            .put_cf(&meta_cf, LAST_ADDRESS_HEIGHT_KEY, u32_to_bytes(last_height))
             .unwrap();
 
         db_tx.commit().unwrap();

@@ -57,7 +57,7 @@ impl BtcStorage {
 
 // implement BlockBatchIndexer trait
 impl Storage for BtcStorage {
-    fn get_last_height(&self) -> u64 {
+    fn get_last_height(&self) -> u32 {
         let db_clone = Arc::clone(&self.db);
         btc::btc_input_indexer::get_last_height(db_clone)
     }

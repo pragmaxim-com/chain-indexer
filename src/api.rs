@@ -3,7 +3,7 @@ use std::{borrow::Cow, sync::Arc};
 use broadcast_sink::Consumer;
 use tokio::sync::Mutex;
 
-pub type Height = u64;
+pub type Height = u32;
 pub type TxIndex = u16;
 pub type TxId = [u8; 32];
 pub type Amount = u64;
@@ -55,7 +55,7 @@ pub trait BlockchainClient {
 
     fn get_block_with_tx_count_for_height(
         &self,
-        height: u64,
+        height: u32,
     ) -> Result<(Self::Block, usize), String>;
 
     fn get_block_hash(&self, height: u64) -> Result<Self::BlockHash, String>;
@@ -72,7 +72,7 @@ pub trait BlockProcessor {
 }
 
 pub trait Storage: Send + Sync {
-    fn get_last_height(&self) -> u64;
+    fn get_last_height(&self) -> u32;
     fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<CiBlock>>>>>;
 }
 
