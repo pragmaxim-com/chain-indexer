@@ -1,23 +1,28 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use broadcast_sink::Consumer;
 use tokio::sync::Mutex;
 
 pub type Height = u64;
 pub type TxIndex = u16;
-pub type Address = Vec<u8>;
-pub type ScriptHash = [u8; 32];
 pub type TxId = [u8; 32];
 pub type Amount = u64;
 pub type UtxoIndex = u16;
 pub type BlockHash = String;
 pub type Time = i64;
+pub type TokenId = String;
+pub type IndexName = Cow<'static, str>;
+pub type IndexValue = Vec<u8>;
+
+// define constant for address and script_hash
+pub const ADDRESS_INDEX: &str = "address";
+pub const SCRIPT_HASH_INDEX: &str = "script_hash";
 
 #[derive(Debug, Clone)]
 pub struct CiUtxo {
     pub index: UtxoIndex,
-    pub address: Option<Address>,
-    pub script_hash: ScriptHash,
+    pub db_indexes: Vec<(IndexName, IndexValue)>,
+    pub assets: Vec<(TokenId, u64)>,
     pub value: Amount,
 }
 

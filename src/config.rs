@@ -28,13 +28,11 @@ impl AppConfig {
                             .keep_prefix(true)
                             .separator("."),
                     );
-                builder.build()?.try_deserialize()
+                let config = builder.build()?.try_deserialize();
+                println!("{:#?}", config);
+                config
             }
             Err(_) => panic!("Error loading .env file"),
         }
-    }
-    // Method to pretty-print the configuration
-    pub fn print(&self) {
-        println!("{:#?}", self);
     }
 }

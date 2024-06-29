@@ -1,8 +1,13 @@
+## Block
+
 getBlockHashByHeight:
     block_height -> block_hash
 
 getBlockHeightByHash:
     block_hash -> block_height
+
+
+## Transactions
 
 getTxHashByBlockHeightAndTxIndex:
     block_height|tx_index -> tx_hash
@@ -10,19 +15,31 @@ getTxHashByBlockHeightAndTxIndex:
 getBlockHeightAndTxIndexByTxHash:
     tx_hash -> block_height|tx_index
 
+
+## Utxo
+
 getUtxoByTxInputIndex:
     block_height|tx_index|input_index -> block_height|tx_index|utxo_index
 
---- 
-
-getContractByTxUtxoIndex:
-    block_height|tx_index|utxo_index -> {contract}
-
-getContractByHash:
-    contract_hash -> block_height|tx_index|utxo_index
-
-getContractByAddress:     
-    contract_address -> block_height|tx_index|utxo_index
+getValueByTxUtxoIndex:
+    block_height|tx_index|utxo_index -> value
 
 
+## Utxo indexes
 
+getContractByIndex:
+    indexA -> [block_height|tx_index|utxo_index,block_height|tx_index|utxo_index]
+    indexB -> [block_height|tx_index|utxo_index]
+
+
+## Assets
+
+getAssetValueByTxUtxoAssetIndex:
+    block_height|tx_index|utxo_index|asset_index -> value
+
+
+## Asset indexes
+
+getContractByTokenId
+    tokenA -> [block_height|tx_index|utxo_index|asset_index,block_height|tx_index|utxo_index|asset_index]
+    tokenB -> [block_height|tx_index|utxo_index|asset_index]

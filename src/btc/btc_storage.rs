@@ -1,6 +1,7 @@
 use crate::api::CiBlock;
 use crate::api::Storage;
 use crate::btc;
+use crate::log;
 use broadcast_sink::Consumer;
 use rocksdb::{MultiThreaded, Options, TransactionDB, TransactionDBOptions};
 use std::sync::Arc;
@@ -11,7 +12,10 @@ pub struct BtcStorage {
 }
 
 impl BtcStorage {
-    pub fn new(num_cores: i32, db_path: &str) -> Result<Self, String> {
+    pub fn new(db_path: &str) -> Result<Self, String> {
+        let num_cores = num_cpus::get() as i32;
+        log!("Number of CPU cores: {}", num_cores);
+
         let mut opts = Options::default();
         opts.create_if_missing(true);
         // Increase parallelism: setting the number of background threads

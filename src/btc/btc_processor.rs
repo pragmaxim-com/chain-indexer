@@ -1,5 +1,9 @@
-use crate::api::{BlockProcessor, TxIndex};
-use crate::api::{CiBlock, CiIndexedTxid, CiTx, CiUtxo, Height};
+use std::borrow::Cow;
+
+use crate::api::{
+    BlockProcessor, CiBlock, CiIndexedTxid, CiTx, CiUtxo, Height, IndexValue, TxIndex,
+};
+use crate::api::{ADDRESS_INDEX, SCRIPT_HASH_INDEX};
 use crate::log;
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
@@ -47,6 +51,18 @@ impl From<(Height, bitcoin::Block, usize)> for CiBlock {
     }
 }
 
+fn get_indexes(
+    address: Option<IndexValue>,
+    script_hash: IndexValue,
+) -> Vec<(Cow<'static, str>, IndexValue)> {
+    let mut vec = Vec::with_capacity(2); // Pre-allocate capacity for 2 elements
+    vec.push((Cow::Borrowed(SCRIPT_HASH_INDEX), script_hash));
+    if let Some(address) = address {
+        vec.push((Cow::Borrowed(ADDRESS_INDEX), address));
+    }
+    vec
+}
+
 impl From<(TxIndex, bitcoin::Transaction)> for CiTx {
     fn from(tx: (TxIndex, bitcoin::Transaction)) -> Self {
         CiTx {
@@ -83,12 +99,15 @@ impl From<(TxIndex, bitcoin::Transaction)> for CiTx {
                     } else {
                         None
                     };
-                    let script_hash: [u8; 32] =
-                        sha256::Hash::hash(out.script_pubkey.as_bytes()).to_byte_array();
+                    let script_hash = sha256::Hash::hash(out.script_pubkey.as_bytes())
+                        .as_byte_array()
+                        .to_vec();
+                    let db_indexes = get_indexes(address, script_hash.to_vec());
+
                     CiUtxo {
                         index: out_index as u16,
-                        address,
-                        script_hash,
+                        db_indexes,
+                        assets: vec![],
                         value: out.value.to_sat(),
                     }
                 })
