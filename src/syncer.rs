@@ -1,4 +1,4 @@
-use crate::api::{BlockProcessor, BlockchainClient, ChainSyncer, Height, Storage};
+use crate::api::{BlockHeight, BlockProcessor, BlockchainClient, ChainSyncer, Storage};
 use crate::log;
 use broadcast_sink::StreamBroadcastSinkExt;
 use futures::stream::StreamExt;
@@ -18,7 +18,7 @@ impl<B: Send + 'static, BH: 'static> ChainSyncer<B, BH> {
         }
     }
 
-    pub async fn sync(&self, end_height: Height, min_batch_size: usize) -> () {
+    pub async fn sync(&self, end_height: BlockHeight, min_batch_size: usize) -> () {
         let start_time = std::time::Instant::now();
         let total_tx_count = Arc::new(Mutex::new(0));
         let last_height = self.storage.get_last_height() + 1;

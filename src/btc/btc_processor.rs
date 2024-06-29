@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::api::{
-    BlockProcessor, CiBlock, CiIndexedTxid, CiTx, CiUtxo, Height, IndexValue, TxIndex,
+    BlockHeight, BlockProcessor, CiBlock, CiIndexedTxid, CiTx, CiUtxo, IndexValue, TxIndex,
 };
 use crate::api::{ADDRESS_INDEX, SCRIPT_HASH_INDEX};
 use crate::log;
@@ -13,7 +13,7 @@ use chrono::DateTime;
 pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {
     type Block = bitcoin::Block;
-    fn process(&self, block_batch: Vec<(Height, Self::Block, usize)>) -> Vec<CiBlock> {
+    fn process(&self, block_batch: Vec<(BlockHeight, Self::Block, usize)>) -> Vec<CiBlock> {
         block_batch
             .into_iter()
             .map(|height_block| {
@@ -25,7 +25,7 @@ impl BlockProcessor for BtcProcessor {
                         "Block @ {} : {} : {}",
                         ci_block.height,
                         readable_date,
-                        ci_block.hash
+                        String::from_utf8(ci_block.hash.clone()).unwrap()
                     );
                 }
                 ci_block
@@ -34,10 +34,10 @@ impl BlockProcessor for BtcProcessor {
     }
 }
 
-impl From<(Height, bitcoin::Block, usize)> for CiBlock {
-    fn from(block: (Height, bitcoin::Block, usize)) -> Self {
+impl From<(BlockHeight, bitcoin::Block, usize)> for CiBlock {
+    fn from(block: (BlockHeight, bitcoin::Block, usize)) -> Self {
         CiBlock {
-            hash: block.1.block_hash().to_string(),
+            hash: block.1.block_hash().as_byte_array().to_vec(),
             time: block.1.header.time as i64,
             height: block.0,
             txs: block
@@ -67,14 +67,14 @@ impl From<(TxIndex, bitcoin::Transaction)> for CiTx {
     fn from(tx: (TxIndex, bitcoin::Transaction)) -> Self {
         CiTx {
             is_coinbase: tx.1.is_coinbase(),
-            tx_id: tx.1.compute_txid().to_byte_array(), //TODO make this more efficient
+            tx_id: tx.1.compute_txid().as_byte_array().to_vec(),
             tx_index: tx.0,
             ins: tx
                 .1
                 .input
                 .iter()
                 .map(|input| CiIndexedTxid {
-                    tx_id: input.previous_output.txid.to_byte_array(),
+                    tx_id: input.previous_output.txid.as_byte_array().to_vec(),
                     utxo_index: input.previous_output.vout as u16,
                 })
                 .collect(),

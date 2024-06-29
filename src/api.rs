@@ -3,14 +3,15 @@ use std::{borrow::Cow, sync::Arc};
 use broadcast_sink::Consumer;
 use tokio::sync::Mutex;
 
-pub type Height = u32;
+pub type BlockHeight = u32;
+pub type BlockHash = Vec<u8>;
 pub type TxIndex = u16;
-pub type TxId = [u8; 32];
-pub type Amount = u64;
+pub type TxId = Vec<u8>;
+pub type Value = u64;
 pub type UtxoIndex = u16;
-pub type BlockHash = String;
 pub type Time = i64;
-pub type TokenId = String;
+pub type TokenId = Vec<u8>;
+pub type TokenValue = u64;
 pub type IndexName = Cow<'static, str>;
 pub type IndexValue = Vec<u8>;
 
@@ -22,8 +23,8 @@ pub const SCRIPT_HASH_INDEX: &str = "script_hash";
 pub struct CiUtxo {
     pub index: UtxoIndex,
     pub db_indexes: Vec<(IndexName, IndexValue)>,
-    pub assets: Vec<(TokenId, u64)>,
-    pub value: Amount,
+    pub assets: Vec<(TokenId, TokenValue)>,
+    pub value: Value,
 }
 
 #[derive(Debug, Clone)]
@@ -44,7 +45,7 @@ pub struct CiTx {
 #[derive(Debug, Clone)]
 pub struct CiBlock {
     pub hash: BlockHash,
-    pub height: Height,
+    pub height: BlockHeight,
     pub time: Time,
     pub txs: Vec<CiTx>,
 }
@@ -68,7 +69,7 @@ pub trait BlockchainClient {
 
 pub trait BlockProcessor {
     type Block: Send;
-    fn process(&self, block_batch: Vec<(Height, Self::Block, usize)>) -> Vec<CiBlock>;
+    fn process(&self, block_batch: Vec<(BlockHeight, Self::Block, usize)>) -> Vec<CiBlock>;
 }
 
 pub trait Storage: Send + Sync {
@@ -77,7 +78,7 @@ pub trait Storage: Send + Sync {
 }
 
 pub trait Syncable {
-    fn sync(&self, start_height: Height, end_height: Height) -> Result<(), String>;
+    fn sync(&self, start_height: BlockHeight, end_height: BlockHeight) -> Result<(), String>;
 }
 
 pub struct ChainSyncer<B: Send, BH> {
