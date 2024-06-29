@@ -1,4 +1,3 @@
-use crate::btc;
 use crate::eutxo::eutxo_api::CiBlock;
 use crate::log;
 use crate::{api::Storage, eutxo};

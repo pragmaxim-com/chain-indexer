@@ -1,5 +1,4 @@
 mod api;
-mod codec;
 mod config;
 mod eutxo;
 mod logger;
