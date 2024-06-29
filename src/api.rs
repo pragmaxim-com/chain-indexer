@@ -29,7 +29,7 @@ pub trait BlockProcessor {
         -> Vec<Self::OutBlock>;
 }
 
-pub trait Storage {
+pub trait Indexers {
     type OutBlock: Send;
     fn get_last_height(&self) -> u32;
     fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<Self::OutBlock>>>>>;
@@ -42,5 +42,5 @@ pub trait Syncable {
 pub struct ChainSyncer<InBlock: Send, OutBlock: Send> {
     pub client: Arc<dyn BlockchainClient<Block = InBlock> + Send + Sync>,
     pub processor: Arc<dyn BlockProcessor<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
-    pub storage: Arc<dyn Storage<OutBlock = OutBlock>>,
+    pub indexers: Arc<dyn Indexers<OutBlock = OutBlock>>,
 }

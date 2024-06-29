@@ -109,11 +109,16 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
                 }
             }
         }
-        // let get last height
-        let last_height = blocks.iter().last().unwrap().height;
-        db_tx
-            .put_cf(&meta_cf, LAST_ADDRESS_HEIGHT_KEY, u32_to_bytes(last_height))
-            .unwrap();
+        // persist last height to db_tx if Some
+        blocks.last().map(|block| {
+            db_tx
+                .put_cf(
+                    &meta_cf,
+                    LAST_ADDRESS_HEIGHT_KEY,
+                    u32_to_bytes(block.height),
+                )
+                .unwrap();
+        });
 
         db_tx.commit().unwrap();
     }

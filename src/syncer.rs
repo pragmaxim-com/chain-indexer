@@ -1,4 +1,4 @@
-use crate::api::{BlockProcessor, BlockchainClient, ChainSyncer, Storage};
+use crate::api::{BlockProcessor, BlockchainClient, ChainSyncer, Indexers};
 use crate::log;
 use broadcast_sink::StreamBroadcastSinkExt;
 use futures::stream::StreamExt;
@@ -11,19 +11,19 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
     pub fn new(
         client: Arc<dyn BlockchainClient<Block = InBlock> + Send + Sync>,
         processor: Arc<dyn BlockProcessor<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
-        storage: Arc<dyn Storage<OutBlock = OutBlock> + Send + Sync>,
+        indexers: Arc<dyn Indexers<OutBlock = OutBlock> + Send + Sync>,
     ) -> Self {
         ChainSyncer {
             client,
             processor,
-            storage,
+            indexers,
         }
     }
 
     pub async fn sync(&self, end_height: u32, min_batch_size: usize) -> () {
         let start_time = std::time::Instant::now();
         let total_tx_count = Arc::new(Mutex::new(0));
-        let last_height = self.storage.get_last_height() + 1;
+        let last_height = self.indexers.get_last_height() + 1;
         let heights = last_height..=end_height;
         tokio_stream::iter(heights)
             .map(|height| {
@@ -64,7 +64,7 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
                 Ok(blocks) => blocks,
                 Err(e) => panic!("Error: {:?}", e),
             })
-            .broadcast(100, self.storage.get_indexers())
+            .broadcast(100, self.indexers.get_indexers())
             .await;
     }
 }

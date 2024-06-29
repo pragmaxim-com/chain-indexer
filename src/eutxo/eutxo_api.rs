@@ -17,7 +17,7 @@ pub struct CiUtxo {
 }
 
 #[derive(Debug, Clone)]
-pub struct CiIndexedTxid {
+pub struct CiTxInput {
     pub tx_hash: TxHash,
     pub utxo_index: UtxoIndex,
 }
@@ -27,7 +27,7 @@ pub struct CiTx {
     pub is_coinbase: bool,
     pub tx_hash: TxHash,
     pub tx_index: TxIndex,
-    pub ins: Vec<CiIndexedTxid>,
+    pub ins: Vec<CiTxInput>,
     pub outs: Vec<CiUtxo>,
 }
 

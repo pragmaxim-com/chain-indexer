@@ -8,7 +8,7 @@ use api::ChainSyncer;
 use btc::{btc_client::BtcClient, btc_processor::BtcProcessor};
 use config::AppConfig;
 use eutxo::btc;
-use eutxo::eutxo_storage::EutxoStorage;
+use eutxo::eutxo_indexers::EutxoIndexers;
 use std::sync::Arc;
 
 #[tokio::main]
@@ -27,7 +27,7 @@ async fn main() -> Result<(), std::io::Error> {
                 "btc" => {
                     let client = Arc::new(BtcClient::new(&api_host, &api_username, &api_password));
                     let processor = Arc::new(BtcProcessor {});
-                    let storage = EutxoStorage::new(&full_db_path).unwrap();
+                    let storage = EutxoIndexers::new(&full_db_path).unwrap();
                     let syncer = ChainSyncer::new(client, processor, Arc::new(storage));
                     syncer.sync(844566, 50).await;
                     Ok(())

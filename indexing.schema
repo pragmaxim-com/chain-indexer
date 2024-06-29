@@ -35,11 +35,11 @@ TxPk_by_txHash:
 
 ## Utxo
 
-UtxoPk_by_InputPk:
-    block_height|tx_index|input_index -> block_height|tx_index|utxo_index
-
 UtxoValue_by_UtxoPk:
     block_height|tx_index|utxo_index -> utxo_value
+
+UtxoPk_by_InputPk:
+    block_height|tx_index|input_index -> block_height|tx_index|utxo_index
 
 
 ## Utxo indexes

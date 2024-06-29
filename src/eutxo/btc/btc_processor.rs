@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::api::{BlockHeight, BlockProcessor, TxIndex};
-use crate::eutxo::eutxo_api::{CiBlock, CiIndexedTxid, CiTx, CiUtxo, UtxoIndexValue};
+use crate::eutxo::eutxo_api::{CiBlock, CiTx, CiTxInput, CiUtxo, UtxoIndexValue};
 use crate::log;
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
@@ -76,7 +76,7 @@ impl From<(TxIndex, bitcoin::Transaction)> for CiTx {
                 .1
                 .input
                 .iter()
-                .map(|input| CiIndexedTxid {
+                .map(|input| CiTxInput {
                     tx_hash: input.previous_output.txid.as_byte_array().to_vec(),
                     utxo_index: input.previous_output.vout as u16,
                 })

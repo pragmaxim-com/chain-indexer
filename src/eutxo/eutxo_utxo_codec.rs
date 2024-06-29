@@ -1,22 +1,47 @@
 use byteorder::{BigEndian, ByteOrder};
 
+use crate::api::{BlockHeight, TxIndex};
+
+use super::eutxo_api::{UtxoIndex, UtxoValue};
+
 type EutxoPkBytes = [u8; 8];
 
 #[derive(Debug, PartialEq, Clone)]
 struct EutxoPk {
-    pub block_height: u32,
-    pub tx_index: u16,
-    pub utxo_index: u16,
+    pub block_height: BlockHeight,
+    pub tx_index: TxIndex,
+    pub utxo_index: UtxoIndex,
+}
+
+pub fn utxo_value_to_bytes(utxo_value: UtxoValue) -> [u8; std::mem::size_of::<UtxoValue>()] {
+    let mut bytes = [0u8; 8];
+    BigEndian::write_u64(&mut bytes, utxo_value);
+    bytes
+}
+
+pub fn utxo_pk_bytes(
+    block_height: BlockHeight,
+    tx_index: TxIndex,
+    utxo_index: UtxoIndex,
+) -> EutxoPkBytes {
+    let mut bytes: EutxoPkBytes = [0u8; 8];
+    BigEndian::write_u32(&mut bytes[0..4], block_height);
+    BigEndian::write_u16(&mut bytes[4..6], tx_index);
+    BigEndian::write_u16(&mut bytes[6..8], utxo_index);
+    bytes
+}
+
+pub fn utxo_pk_bytes_from(tx_pk_bytes: Vec<u8>, utxo_index: UtxoIndex) -> EutxoPkBytes {
+    let mut bytes: EutxoPkBytes = [0u8; 8];
+    bytes[0..6].copy_from_slice(&tx_pk_bytes);
+    BigEndian::write_u16(&mut bytes[6..8], utxo_index);
+    bytes
 }
 
 // Implementing From trait for CiUtxoId to UtxoIdBytes conversion
 impl From<EutxoPk> for EutxoPkBytes {
     fn from(utxo_id: EutxoPk) -> EutxoPkBytes {
-        let mut bytes: EutxoPkBytes = [0u8; 8];
-        BigEndian::write_u32(&mut bytes[0..4], utxo_id.block_height);
-        BigEndian::write_u16(&mut bytes[4..6], utxo_id.tx_index);
-        BigEndian::write_u16(&mut bytes[6..8], utxo_id.utxo_index);
-        bytes
+        utxo_pk_bytes(utxo_id.block_height, utxo_id.tx_index, utxo_id.utxo_index)
     }
 }
 
@@ -72,5 +97,12 @@ mod tests {
         let encoded: EutxoPkBytes = utxo_id.clone().into();
         let decoded: EutxoPk = encoded.into();
         assert_eq!(utxo_id, decoded);
+    }
+    #[test]
+    fn test_utxo_value_to_bytes() {
+        let value: u64 = 12345678901234567890;
+        let expected_bytes = [1, 115, 205, 21, 205, 91, 205, 210];
+        let bytes = utxo_value_to_bytes(value);
+        assert_eq!(bytes, expected_bytes);
     }
 }
