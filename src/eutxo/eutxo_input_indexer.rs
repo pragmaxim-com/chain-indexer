@@ -1,8 +1,9 @@
-use crate::api::{CiBlock, CiTx};
 use broadcast_sink::Consumer;
 use lru::LruCache;
 use rocksdb::{MultiThreaded, TransactionDB, WriteBatchWithTransaction};
 use std::{num::NonZeroUsize, sync::Arc};
+
+use crate::eutxo::eutxo_api::{CiBlock, CiTx};
 
 pub const ADDRESS_CF: &str = "ADDRESS_CF";
 pub const CACHE_CF: &str = "CACHE_CF";
@@ -61,12 +62,12 @@ pub fn get_last_height(db: Arc<TransactionDB<MultiThreaded>>) -> u32 {
         .map_or(0, |height| bytes_to_u32(&height))
 }
 
-pub struct BtcInputIndexer {
+pub struct EutxoInputIndexer {
     db: Arc<TransactionDB<MultiThreaded>>,
     address_by_hash_lru_cache: LruCache<Vec<u8>, Vec<u8>>,
     hash_by_tx_lru_cache: LruCache<Vec<u8>, Vec<u8>>,
 }
-impl BtcInputIndexer {
+impl EutxoInputIndexer {
     pub fn new(db: Arc<TransactionDB<MultiThreaded>>) -> Self {
         Self {
             db,
@@ -75,7 +76,7 @@ impl BtcInputIndexer {
         }
     }
 }
-impl Consumer<Vec<CiBlock>> for BtcInputIndexer {
+impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
     fn consume(&mut self, blocks: &Vec<CiBlock>) {
         let address_cf = self.db.cf_handle(ADDRESS_CF).unwrap();
         let cache_cf = self.db.cf_handle(CACHE_CF).unwrap();

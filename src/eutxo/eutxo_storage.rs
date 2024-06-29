@@ -1,17 +1,17 @@
-use crate::api::CiBlock;
-use crate::api::Storage;
 use crate::btc;
+use crate::eutxo::eutxo_api::CiBlock;
 use crate::log;
+use crate::{api::Storage, eutxo};
 use broadcast_sink::Consumer;
 use rocksdb::{MultiThreaded, Options, TransactionDB, TransactionDBOptions};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub struct BtcStorage {
+pub struct EutxoStorage {
     db: Arc<TransactionDB<MultiThreaded>>,
 }
 
-impl BtcStorage {
+impl EutxoStorage {
     pub fn new(db_path: &str) -> Result<Self, String> {
         let num_cores = num_cpus::get() as i32;
         log!("Number of CPU cores: {}", num_cores);
@@ -44,27 +44,28 @@ impl BtcStorage {
 
         if existing_cfs.is_empty() {
             let options = rocksdb::Options::default();
-            for cf in btc::btc_input_indexer::get_column_families().into_iter() {
+            for cf in eutxo::eutxo_input_indexer::get_column_families().into_iter() {
                 instance.create_cf(cf, &options).unwrap();
             }
         }
 
-        Ok(BtcStorage {
+        Ok(EutxoStorage {
             db: Arc::new(instance),
         })
     }
 }
 
 // implement BlockBatchIndexer trait
-impl Storage for BtcStorage {
+impl Storage for EutxoStorage {
+    type OutBlock = CiBlock;
     fn get_last_height(&self) -> u32 {
         let db_clone = Arc::clone(&self.db);
-        btc::btc_input_indexer::get_last_height(db_clone)
+        eutxo::eutxo_input_indexer::get_last_height(db_clone)
     }
 
     fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<CiBlock>>>>> {
         vec![Arc::new(Mutex::new(
-            btc::btc_input_indexer::BtcInputIndexer::new(Arc::clone(&self.db)),
+            eutxo::eutxo_input_indexer::EutxoInputIndexer::new(Arc::clone(&self.db)),
         ))]
     }
 }

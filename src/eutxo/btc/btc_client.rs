@@ -14,9 +14,17 @@ impl BtcClient {
     }
 }
 
+fn get_block_with_tx_count(
+    rpc_client: Arc<Client>,
+    hash: &bitcoin::BlockHash,
+) -> Result<(bitcoin::Block, usize), String> {
+    let block = rpc_client.get_block(hash).map_err(|e| e.to_string())?;
+    let tx_count = block.txdata.len();
+    Ok((block, tx_count))
+}
+
 impl BlockchainClient for BtcClient {
     type Block = bitcoin::Block;
-    type BlockHash = bitcoin::BlockHash;
 
     fn get_block_with_tx_count_for_height(
         &self,
@@ -26,25 +34,8 @@ impl BlockchainClient for BtcClient {
             .get_block_hash(height as u64)
             .map_err(|e| e.to_string())
             .and_then(|hash| {
-                self.get_block_with_tx_count(&hash)
+                get_block_with_tx_count(Arc::clone(&self.rpc_client), &hash)
                     .map_err(|e| e.to_string())
             })
-    }
-
-    fn get_block_hash(&self, height: u64) -> Result<bitcoin::BlockHash, String> {
-        let block_hash = self
-            .rpc_client
-            .get_block_hash(height)
-            .map_err(|e| e.to_string())?;
-        Ok(block_hash)
-    }
-
-    fn get_block_with_tx_count(
-        &self,
-        hash: &bitcoin::BlockHash,
-    ) -> Result<(bitcoin::Block, usize), String> {
-        let block = self.rpc_client.get_block(hash).map_err(|e| e.to_string())?;
-        let tx_count = block.txdata.len();
-        Ok((block, tx_count))
     }
 }

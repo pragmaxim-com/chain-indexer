@@ -8,9 +8,11 @@ InputPk     = block_height|tx_index|input_index
 UtxoPk      = block_height|tx_index|utxo_index
 AssetPk     = block_height|tx_index|utxo_index|asset_index
 
-UtxoIndex   = address/script_hash   -> UtxoPks
-AssetIndex  = token_id/asset_id     -> AssetPks
+UtxoIndexes = address, script_hash, ...   -> UtxoPks
 
+AssetIndex  = asset_id                    -> AssetPks
+
+Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one
 ------------------------------------------------------------
 
 ## Block
@@ -53,8 +55,8 @@ AssetValue_by_AssetPk:
     block_height|tx_index|utxo_index|asset_index -> value
 
 
-## Asset indexes
+## Asset index
 
 AssetPks_by_AssetIndex:
-    token_1 -> [block_height|tx_index|utxo_index|asset_index,block_height|tx_index|utxo_index|asset_index]
-    token_2 -> [block_height|tx_index|utxo_index|asset_index]
+    asset_1 -> [block_height|tx_index|utxo_index|asset_index,block_height|tx_index|utxo_index|asset_index]
+    asset_2 -> [block_height|tx_index|utxo_index|asset_index]

@@ -1,19 +1,22 @@
 use std::borrow::Cow;
 
-use crate::api::{
-    BlockHeight, BlockProcessor, CiBlock, CiIndexedTxid, CiTx, CiUtxo, IndexValue, TxIndex,
-};
-use crate::api::{ADDRESS_INDEX, SCRIPT_HASH_INDEX};
+use crate::api::{BlockHeight, BlockProcessor, TxIndex};
+use crate::eutxo::eutxo_api::{CiBlock, CiIndexedTxid, CiTx, CiUtxo, UtxoIndexValue};
 use crate::log;
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
 use bitcoin_hashes::Hash;
 use chrono::DateTime;
 
+// define constant for address and script_hash
+pub const ADDRESS_INDEX: &str = "address";
+pub const SCRIPT_HASH_INDEX: &str = "script_hash";
+
 pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {
-    type Block = bitcoin::Block;
-    fn process(&self, block_batch: Vec<(BlockHeight, Self::Block, usize)>) -> Vec<CiBlock> {
+    type InBlock = bitcoin::Block;
+    type OutBlock = CiBlock;
+    fn process(&self, block_batch: Vec<(BlockHeight, Self::InBlock, usize)>) -> Vec<CiBlock> {
         block_batch
             .into_iter()
             .map(|height_block| {
@@ -52,9 +55,9 @@ impl From<(BlockHeight, bitcoin::Block, usize)> for CiBlock {
 }
 
 fn get_indexes(
-    address: Option<IndexValue>,
-    script_hash: IndexValue,
-) -> Vec<(Cow<'static, str>, IndexValue)> {
+    address: Option<UtxoIndexValue>,
+    script_hash: UtxoIndexValue,
+) -> Vec<(Cow<'static, str>, UtxoIndexValue)> {
     let mut vec = Vec::with_capacity(2); // Pre-allocate capacity for 2 elements
     vec.push((Cow::Borrowed(SCRIPT_HASH_INDEX), script_hash));
     if let Some(address) = address {
@@ -67,14 +70,14 @@ impl From<(TxIndex, bitcoin::Transaction)> for CiTx {
     fn from(tx: (TxIndex, bitcoin::Transaction)) -> Self {
         CiTx {
             is_coinbase: tx.1.is_coinbase(),
-            tx_id: tx.1.compute_txid().as_byte_array().to_vec(),
+            tx_hash: tx.1.compute_txid().as_byte_array().to_vec(),
             tx_index: tx.0,
             ins: tx
                 .1
                 .input
                 .iter()
                 .map(|input| CiIndexedTxid {
-                    tx_id: input.previous_output.txid.as_byte_array().to_vec(),
+                    tx_hash: input.previous_output.txid.as_byte_array().to_vec(),
                     utxo_index: input.previous_output.vout as u16,
                 })
                 .collect(),

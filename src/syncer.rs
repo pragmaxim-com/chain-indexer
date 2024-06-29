@@ -1,15 +1,17 @@
-use crate::api::{BlockHeight, BlockProcessor, BlockchainClient, ChainSyncer, Storage};
+use crate::api::{BlockProcessor, BlockchainClient, ChainSyncer, Storage};
 use crate::log;
 use broadcast_sink::StreamBroadcastSinkExt;
 use futures::stream::StreamExt;
 use min_batch::MinBatchExt;
 use std::sync::{Arc, Mutex};
 
-impl<B: Send + 'static, BH: 'static> ChainSyncer<B, BH> {
+impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
+    ChainSyncer<InBlock, OutBlock>
+{
     pub fn new(
-        client: Arc<dyn BlockchainClient<Block = B, BlockHash = BH> + Send + Sync>,
-        processor: Arc<dyn BlockProcessor<Block = B> + Send + Sync>,
-        storage: Arc<dyn Storage + Send + Sync>,
+        client: Arc<dyn BlockchainClient<Block = InBlock> + Send + Sync>,
+        processor: Arc<dyn BlockProcessor<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
+        storage: Arc<dyn Storage<OutBlock = OutBlock> + Send + Sync>,
     ) -> Self {
         ChainSyncer {
             client,
@@ -18,7 +20,7 @@ impl<B: Send + 'static, BH: 'static> ChainSyncer<B, BH> {
         }
     }
 
-    pub async fn sync(&self, end_height: BlockHeight, min_batch_size: usize) -> () {
+    pub async fn sync(&self, end_height: u32, min_batch_size: usize) -> () {
         let start_time = std::time::Instant::now();
         let total_tx_count = Arc::new(Mutex::new(0));
         let last_height = self.storage.get_last_height() + 1;
