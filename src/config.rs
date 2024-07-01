@@ -21,7 +21,8 @@ impl AppConfig {
         match dotenv() {
             Ok(_) => {
                 let builder = Config::builder()
-                    .add_source(File::with_name("config/settings").required(false))
+                    .add_source(File::with_name("config/settings").required(true))
+                    .add_source(File::with_name("config/local-settings").required(false))
                     .add_source(
                         Environment::with_prefix("BLOCKCHAIN")
                             .try_parsing(true)

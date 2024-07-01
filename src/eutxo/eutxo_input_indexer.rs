@@ -1,4 +1,4 @@
-use broadcast_sink::Consumer;
+use broadcast_sink::{BroadcastSinkError, Consumer};
 use lru::LruCache;
 use rocksdb::{MultiThreaded, TransactionDB, WriteBatchWithTransaction};
 use std::{num::NonZeroUsize, sync::Arc};
@@ -129,7 +129,7 @@ impl EutxoInputIndexer {
     }
 }
 impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
-    fn consume(&mut self, blocks: &Vec<CiBlock>) {
+    fn consume(&mut self, blocks: &Vec<CiBlock>) -> Result<(), BroadcastSinkError> {
         let tx_hash_by_pk_cf = self.db.cf_handle(TX_HASH_BY_PK_CF).unwrap();
         let tx_pk_by_hash_cf = self.db.cf_handle(TX_PK_BY_HASH_CF).unwrap();
         let utxo_value_by_pk_cf = self.db.cf_handle(UTXO_VALUE_BY_PK_CF).unwrap();
@@ -150,10 +150,7 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
                     &tx_pk_by_hash_cf,
                     &mut self.tx_pk_by_tx_hash_lru_cache,
                 )
-                .expect(&format!(
-                    "Unable to process tx {}",
-                    hex::encode(ci_tx.tx_hash)
-                ));
+                .map_err(|e| BroadcastSinkError::new(e.as_ref()))?;
                 process_outputs(&block.height, ci_tx, &mut batch, &utxo_value_by_pk_cf);
                 if !ci_tx.is_coinbase {
                     process_inputs(
@@ -176,8 +173,11 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
                     LAST_ADDRESS_HEIGHT_KEY,
                     u32_to_bytes(block.height),
                 )
-                .expect(&format!("Failed to persist last height {}", block.height));
+                .map_err(|e| BroadcastSinkError::new(e.as_ref()))?;
         }
-        db_tx.commit().expect("Unable to commit db tx");
+        db_tx
+            .commit()
+            .map_err(|e| BroadcastSinkError::new(e.as_ref()))?;
+        Ok(())
     }
 }
