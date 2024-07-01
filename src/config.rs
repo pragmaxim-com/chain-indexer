@@ -26,7 +26,7 @@ impl AppConfig {
                         Environment::with_prefix("BLOCKCHAIN")
                             .try_parsing(true)
                             .keep_prefix(true)
-                            .separator("."),
+                            .separator("__"),
                     );
                 let config = builder.build()?.try_deserialize();
                 println!("{:#?}", config);

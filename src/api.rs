@@ -8,7 +8,7 @@ pub type BlockHeight = u32;
 pub type BlockHash = Vec<u8>;
 
 pub type TxIndex = u16;
-pub type TxHash = Vec<u8>;
+pub type TxHash = [u8; 32];
 
 pub type AssetId = Vec<u8>;
 pub type AssetValue = u64;

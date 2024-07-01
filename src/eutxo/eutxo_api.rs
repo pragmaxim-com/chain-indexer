@@ -2,6 +2,8 @@ use std::borrow::Cow;
 
 use crate::api::{AssetId, AssetValue, BlockHash, BlockHeight, BlockTimestamp, TxHash, TxIndex};
 
+pub type InputIndex = u16;
+
 pub type UtxoIndex = u16;
 pub type UtxoValue = u64;
 

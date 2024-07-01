@@ -19,15 +19,11 @@ pub fn utxo_value_to_bytes(utxo_value: UtxoValue) -> [u8; std::mem::size_of::<Ut
     bytes
 }
 
-pub fn utxo_pk_bytes(
-    block_height: BlockHeight,
-    tx_index: TxIndex,
-    utxo_index: UtxoIndex,
-) -> EutxoPkBytes {
+pub fn pk_bytes(block_height: BlockHeight, tx_index: TxIndex, box_index: u16) -> EutxoPkBytes {
     let mut bytes: EutxoPkBytes = [0u8; 8];
     BigEndian::write_u32(&mut bytes[0..4], block_height);
     BigEndian::write_u16(&mut bytes[4..6], tx_index);
-    BigEndian::write_u16(&mut bytes[6..8], utxo_index);
+    BigEndian::write_u16(&mut bytes[6..8], box_index);
     bytes
 }
 
@@ -41,7 +37,7 @@ pub fn utxo_pk_bytes_from(tx_pk_bytes: Vec<u8>, utxo_index: UtxoIndex) -> EutxoP
 // Implementing From trait for CiUtxoId to UtxoIdBytes conversion
 impl From<EutxoPk> for EutxoPkBytes {
     fn from(utxo_id: EutxoPk) -> EutxoPkBytes {
-        utxo_pk_bytes(utxo_id.block_height, utxo_id.tx_index, utxo_id.utxo_index)
+        pk_bytes(utxo_id.block_height, utxo_id.tx_index, utxo_id.utxo_index)
     }
 }
 

@@ -70,14 +70,14 @@ impl From<(TxIndex, bitcoin::Transaction)> for CiTx {
     fn from(tx: (TxIndex, bitcoin::Transaction)) -> Self {
         CiTx {
             is_coinbase: tx.1.is_coinbase(),
-            tx_hash: tx.1.compute_txid().as_byte_array().to_vec(),
+            tx_hash: tx.1.compute_txid().to_byte_array(),
             tx_index: tx.0,
             ins: tx
                 .1
                 .input
                 .iter()
                 .map(|input| CiTxInput {
-                    tx_hash: input.previous_output.txid.as_byte_array().to_vec(),
+                    tx_hash: input.previous_output.txid.to_byte_array(),
                     utxo_index: input.previous_output.vout as u16,
                 })
                 .collect(),
