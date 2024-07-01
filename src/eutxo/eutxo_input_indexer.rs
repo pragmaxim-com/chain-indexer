@@ -1,14 +1,14 @@
 use broadcast_sink::{BroadcastSinkError, Consumer};
 use lru::LruCache;
-use rocksdb::{MultiThreaded, TransactionDB, WriteBatchWithTransaction};
-use std::{num::NonZeroUsize, sync::Arc};
+use rocksdb::{BoundColumnFamily, MultiThreaded, TransactionDB, WriteBatchWithTransaction};
+use std::{collections::HashSet, num::NonZeroUsize, sync::Arc};
 
 use crate::{
     api::BlockHeight,
     eutxo::eutxo_api::{CiBlock, CiTx},
 };
 
-use super::eutxo_storage;
+use super::{eutxo_api::UtxoIndexName, eutxo_storage};
 
 pub const TX_HASH_BY_PK_CF: &str = "TX_HASH_BY_PK_CF";
 pub const TX_PK_BY_HASH_CF: &str = "TX_PK_BY_HASH_CF";
@@ -61,6 +61,7 @@ fn process_outputs(
     tx: &CiTx,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
     utxo_value_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
+    utxo_indexes: &Vec<(UtxoIndexName, Arc<rocksdb::BoundColumnFamily>)>,
 ) {
     for utxo in tx.outs.iter() {
         eutxo_storage::persist_utxo_value_by_pk(
@@ -69,8 +70,23 @@ fn process_outputs(
             &utxo.index,
             &utxo.value,
             batch,
-            utxo_value_by_pk_cf,
-        )
+            &utxo_value_by_pk_cf,
+        );
+
+        for (db_index_name, db_index_value) in utxo.db_indexes.iter() {
+            eutxo_storage::persist_utxo_index(
+                &db_index_value,
+                &block_height,
+                &tx.tx_index,
+                &utxo.index,
+                batch,
+                &utxo_indexes
+                    .iter()
+                    .find(|&i| db_index_name == &i.0)
+                    .unwrap()
+                    .1,
+            )
+        }
     }
 }
 
@@ -119,12 +135,17 @@ pub fn get_last_height(db: Arc<TransactionDB<MultiThreaded>>) -> u32 {
 pub struct EutxoInputIndexer {
     db: Arc<TransactionDB<MultiThreaded>>,
     tx_pk_by_tx_hash_lru_cache: LruCache<[u8; 32], [u8; 6]>,
+    utxo_indexes: HashSet<UtxoIndexName>,
 }
 impl EutxoInputIndexer {
-    pub fn new(db: Arc<TransactionDB<MultiThreaded>>) -> Self {
+    pub fn new(
+        db: Arc<TransactionDB<MultiThreaded>>,
+        utxo_indexes: HashSet<UtxoIndexName>,
+    ) -> Self {
         Self {
             db,
             tx_pk_by_tx_hash_lru_cache: LruCache::new(NonZeroUsize::new(10_000_000).unwrap()),
+            utxo_indexes,
         }
     }
 }
@@ -135,6 +156,12 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
         let utxo_value_by_pk_cf = self.db.cf_handle(UTXO_VALUE_BY_PK_CF).unwrap();
         let utxo_pk_by_input_pk_cf = self.db.cf_handle(UTXO_PK_BY_INPUT_PK_CF).unwrap();
         let meta_cf = self.db.cf_handle(META_CF).unwrap();
+
+        let index_cf_by_name: &Vec<(UtxoIndexName, Arc<BoundColumnFamily>)> = &self
+            .utxo_indexes
+            .iter()
+            .map(|index_name| (index_name.clone(), self.db.cf_handle(&index_name).unwrap()))
+            .collect();
 
         let db_tx = self.db.transaction();
         let mut batch: WriteBatchWithTransaction<true> = db_tx.get_writebatch();
@@ -151,7 +178,13 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
                     &mut self.tx_pk_by_tx_hash_lru_cache,
                 )
                 .map_err(|e| BroadcastSinkError::new(e.as_ref()))?;
-                process_outputs(&block.height, ci_tx, &mut batch, &utxo_value_by_pk_cf);
+                process_outputs(
+                    &block.height,
+                    ci_tx,
+                    &mut batch,
+                    &utxo_value_by_pk_cf,
+                    &index_cf_by_name,
+                );
                 if !ci_tx.is_coinbase {
                     process_inputs(
                         block.height,

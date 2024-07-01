@@ -3,15 +3,19 @@ use crate::info;
 use crate::{api::Indexers, eutxo};
 use broadcast_sink::Consumer;
 use rocksdb::{MultiThreaded, Options, TransactionDB, TransactionDBOptions};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use super::eutxo_api::UtxoIndexName;
+
 pub struct EutxoIndexers {
     db: Arc<TransactionDB<MultiThreaded>>,
+    utxo_indexes: HashSet<UtxoIndexName>,
 }
 
 impl EutxoIndexers {
-    pub fn new(db_path: &str) -> Result<Self, String> {
+    pub fn new(db_path: &str, utxo_indexes: Vec<UtxoIndexName>) -> Result<Self, String> {
         let num_cores = num_cpus::get() as i32;
         info!("Number of CPU cores: {}", num_cores);
 
@@ -44,12 +48,18 @@ impl EutxoIndexers {
         if existing_cfs.is_empty() {
             let options = rocksdb::Options::default();
             for cf in eutxo::eutxo_input_indexer::get_column_families().into_iter() {
+                info!("Creating column family: {}", cf);
+                instance.create_cf(cf, &options).unwrap();
+            }
+            for cf in utxo_indexes.iter() {
+                info!("Creating column family: {}", cf);
                 instance.create_cf(cf, &options).unwrap();
             }
         }
 
         Ok(EutxoIndexers {
             db: Arc::new(instance),
+            utxo_indexes: HashSet::from_iter(utxo_indexes),
         })
     }
 }
@@ -64,7 +74,10 @@ impl Indexers for EutxoIndexers {
 
     fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<CiBlock>>>>> {
         vec![Arc::new(Mutex::new(
-            eutxo::eutxo_input_indexer::EutxoInputIndexer::new(Arc::clone(&self.db)),
+            eutxo::eutxo_input_indexer::EutxoInputIndexer::new(
+                Arc::clone(&self.db),
+                self.utxo_indexes.clone(),
+            ),
         ))]
     }
 }

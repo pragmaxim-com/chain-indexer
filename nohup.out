@@ -1,0 +1,51 @@
+    Finished dev [unoptimized + debuginfo] target(s) in 0.08s
+     Running `target/debug/ci`
+Ok(
+    AppConfig {
+        blockchain: BlockchainSettings {
+            name: "btc",
+            db_path: "/home/lisak/.chain-indexer",
+            api_host: "http://127.0.0.1:8332",
+            api_username: "pragmaxim",
+            api_password: "W4t3rf0rd1985",
+        },
+        indexer: IndexerSettings {
+            utxo_indexes: [
+                "address",
+                "script_hash",
+            ],
+        },
+    },
+)
+[2024-07-01 23:11:29] INFO Number of CPU cores: 52
+[2024-07-01 23:11:32] INFO Indexing from 137218 to 844566
+[2024-07-01 23:11:50] INFO Processed 42623 txs with indexing Speed: 2507.2 txs/sec
+[2024-07-01 23:11:55] INFO Block @ 138000 : 2011-07-25 18:17:58 : 86b83ba2bbf71cf35380acccab45c54ee62a0b1c51a5b6c74400000000000000
+[2024-07-01 23:12:12] INFO Processed 90158 txs with indexing Speed: 2311.7 txs/sec
+[2024-07-01 23:12:16] INFO Block @ 139000 : 2011-07-31 18:46:22 : cbe5537156c25337dcb316250abbef84d10c2978a2aee8642a03000000000000
+[2024-07-01 23:12:34] INFO Processed 143785 txs with indexing Speed: 2357.1 txs/sec
+[2024-07-01 23:12:35] INFO Block @ 140000 : 2011-08-07 17:49:38 : db97f2fe217299bd8205663dc526ecf0de6600a81747cf286e08000000000000
+[2024-07-01 23:12:56] INFO Processed 198786 txs with indexing Speed: 2395.0 txs/sec
+[2024-07-01 23:12:57] INFO Block @ 141000 : 2011-08-15 01:43:51 : becc2a8650895a2f11b5a2bc8738005c5f36866e5873084c9c07000000000000
+[2024-07-01 23:13:19] INFO Processed 255180 txs with indexing Speed: 2384.9 txs/sec
+[2024-07-01 23:13:22] INFO Block @ 142000 : 2011-08-22 00:49:00 : 851f310620b7f4f999f110ca879fc2b93937d20cf1f526983706000000000000
+[2024-07-01 23:13:40] INFO Processed 302038 txs with indexing Speed: 2378.3 txs/sec
+[2024-07-01 23:13:45] INFO Block @ 143000 : 2011-08-29 05:31:34 : f859bc0cbac12b84dd61ba6c9d5257662bc851b5469a44d26b02000000000000
+[2024-07-01 23:14:03] INFO Processed 355886 txs with indexing Speed: 2356.9 txs/sec
+[2024-07-01 23:14:05] INFO Block @ 144000 : 2011-09-05 04:32:12 : 07fd53df89eddddacd1b09e1248d0419e4ce5404b51b3fa78106000000000000
+[2024-07-01 23:14:26] INFO Processed 406117 txs with indexing Speed: 2334.0 txs/sec
+[2024-07-01 23:14:28] INFO Block @ 145000 : 2011-09-12 08:03:59 : cb96eb2087aa1f77fe9033f0126d1bbe5e06ffd8082aa59a7f08000000000000
+[2024-07-01 23:14:46] INFO Processed 448779 txs with indexing Speed: 2313.3 txs/sec
+[2024-07-01 23:14:47] INFO Block @ 146000 : 2011-09-19 09:56:27 : 8d580b6e7b57b1761e3aeb11dc95093740f05674a8bdeecb8801000000000000
+[2024-07-01 23:15:08] INFO Processed 496353 txs with indexing Speed: 2308.6 txs/sec
+[2024-07-01 23:15:10] INFO Block @ 147000 : 2011-09-26 17:08:33 : 84e24eb2fc67d73d4e9190915c540c0d9fbde690209a3fff6a09000000000000
+[2024-07-01 23:15:28] INFO Processed 541742 txs with indexing Speed: 2295.5 txs/sec
+[2024-07-01 23:15:31] INFO Block @ 148000 : 2011-10-04 06:00:56 : a65f3cd9f73db5aa2abf2ad7b9c5a1a6e6bd5247a919b294be08000000000000
+[2024-07-01 23:15:48] INFO Processed 586028 txs with indexing Speed: 2289.2 txs/sec
+[2024-07-01 23:15:51] INFO Block @ 149000 : 2011-10-12 06:23:19 : c2869747a4e7d928b62bbfe814c00aebb0cc7f861f6398573603000000000000
+[2024-07-01 23:16:08] INFO Processed 630695 txs with indexing Speed: 2285.1 txs/sec
+[2024-07-01 23:16:11] INFO Block @ 150000 : 2011-10-20 13:44:51 : 4b8842d21590e3c7be46d8d1a148e9e05c500d86750ef290320a000000000000
+[2024-07-01 23:16:29] INFO Processed 677022 txs with indexing Speed: 2287.2 txs/sec
+[2024-07-01 23:16:31] INFO Block @ 151000 : 2011-10-29 05:17:47 : 418560038e34fecd78c8617a8a23ad12eb055c2334eaba31630a000000000000
+[2024-07-01 23:16:50] INFO Processed 723040 txs with indexing Speed: 2273.7 txs/sec
+[2024-07-01 23:16:50] INFO Block @ 152000 : 2011-11-05 17:34:27 : 13dca6866cc28da51ff2cb605bd1af48dc8a49ab7d263a2bca0a000000000000

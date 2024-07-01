@@ -2,9 +2,12 @@ use config::{Config, ConfigError, Environment, File};
 use dotenv::dotenv;
 use serde::Deserialize;
 
+use crate::eutxo::eutxo_api::UtxoIndexName;
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub blockchain: BlockchainSettings,
+    pub indexer: IndexerSettings,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -16,13 +19,18 @@ pub struct BlockchainSettings {
     pub api_password: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct IndexerSettings {
+    pub utxo_indexes: Vec<UtxoIndexName>,
+}
+
 impl AppConfig {
     pub fn new() -> Result<Self, ConfigError> {
         match dotenv() {
             Ok(_) => {
                 let builder = Config::builder()
                     .add_source(File::with_name("config/settings").required(true))
-                    .add_source(File::with_name("config/local-settings").required(false))
+                    .add_source(File::with_name("local-settings").required(false))
                     .add_source(
                         Environment::with_prefix("BLOCKCHAIN")
                             .try_parsing(true)

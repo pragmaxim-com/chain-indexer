@@ -2,3 +2,6 @@
 name = "btc"
 db_path = "/tmp/chain-indexer"
 api_host = "http://127.0.0.1:8332"
+
+[indexer]
+utxo_indexes = ["address", "script_hash"]

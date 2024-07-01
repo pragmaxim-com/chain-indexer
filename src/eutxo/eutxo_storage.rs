@@ -6,7 +6,7 @@ use rocksdb::{MultiThreaded, TransactionDB};
 use crate::api::{BlockHeight, TxHash, TxIndex};
 
 use super::{
-    eutxo_api::{CiTxInput, InputIndex, UtxoIndex, UtxoValue},
+    eutxo_api::{CiTxInput, InputIndex, UtxoIndex, UtxoIndexValue, UtxoValue},
     eutxo_tx_codec, eutxo_utxo_codec,
 };
 
@@ -68,4 +68,17 @@ pub fn persist_utxo_pk_by_input_pk(
     let input_pk = eutxo_utxo_codec::pk_bytes(block_height, tx_index, input_index);
 
     batch.put_cf(utxo_pk_by_input_pk_cf, input_pk, utxo_pk)
+}
+
+pub fn persist_utxo_index(
+    db_index_value: &UtxoIndexValue,
+    block_height: &BlockHeight,
+    tx_index: &TxIndex,
+    utxo_index: &UtxoIndex,
+    batch: &mut rocksdb::WriteBatchWithTransaction<true>,
+    utxo_index_cf: &Arc<rocksdb::BoundColumnFamily>,
+) {
+    let utxo_pk = eutxo_utxo_codec::pk_bytes(block_height, tx_index, utxo_index);
+
+    batch.merge_cf(utxo_index_cf, db_index_value, utxo_pk)
 }
