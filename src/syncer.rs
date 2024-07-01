@@ -24,6 +24,7 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
         let start_time = std::time::Instant::now();
         let total_tx_count = Arc::new(Mutex::new(0));
         let last_height = self.indexers.get_last_height() + 1;
+        log!("Indexing from {} to {}", last_height, end_height);
         let heights = last_height..=end_height;
         tokio_stream::iter(heights)
             .map(|height| {

@@ -150,7 +150,10 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
                     &tx_pk_by_hash_cf,
                     &mut self.tx_pk_by_tx_hash_lru_cache,
                 )
-                .unwrap();
+                .expect(&format!(
+                    "Unable to process tx {}",
+                    hex::encode(ci_tx.tx_hash)
+                ));
                 process_outputs(&block.height, ci_tx, &mut batch, &utxo_value_by_pk_cf);
                 if !ci_tx.is_coinbase {
                     process_inputs(
@@ -166,16 +169,15 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
             }
         }
         // persist last height to db_tx if Some
-        blocks.last().map(|block| {
+        if let Some(block) = blocks.last() {
             db_tx
                 .put_cf(
                     &meta_cf,
                     LAST_ADDRESS_HEIGHT_KEY,
                     u32_to_bytes(block.height),
                 )
-                .unwrap();
-        });
-
-        db_tx.commit().unwrap();
+                .expect(&format!("Failed to persist last height {}", block.height));
+        }
+        db_tx.commit().expect("Unable to commit db tx");
     }
 }
