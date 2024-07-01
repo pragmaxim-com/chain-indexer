@@ -1,27 +1,62 @@
-getBlockHashByHeight:
+PK          = unique pointer to an object
+Hash        = Hash of an object
+Index       = Secondary Index
+
+HeightPk    = block_height
+TxPk        = block_height|tx_index
+InputPk     = block_height|tx_index|input_index
+UtxoPk      = block_height|tx_index|utxo_index
+AssetPk     = block_height|tx_index|utxo_index|asset_index
+
+UtxoIndexes = address, script_hash, ...   -> UtxoPks
+
+AssetIndex  = asset_id                    -> AssetPks
+
+Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one
+------------------------------------------------------------
+
+## Block
+
+BlockHash_by_HeightPk:
     block_height -> block_hash
 
-getBlockHeightByHash:
+HeightPk_by_BlockHash:
     block_hash -> block_height
 
-getTxHashByBlockHeightAndTxIndex:
+
+## Transactions
+
+TxHash_by_TxPk:
     block_height|tx_index -> tx_hash
 
-getBlockHeightAndTxIndexByTxHash:
+TxPk_by_txHash:
     tx_hash -> block_height|tx_index
 
-getUtxoByTxInputIndex:
+
+## Utxo
+
+UtxoValue_by_UtxoPk:
+    block_height|tx_index|utxo_index -> utxo_value
+
+UtxoPk_by_InputPk:
     block_height|tx_index|input_index -> block_height|tx_index|utxo_index
 
---- 
 
-getContractByTxUtxoIndex:
-    block_height|tx_index|utxo_index -> {contract}
+## Utxo indexes
 
-getContractByHash:
-    contract_hash -> block_height|tx_index|utxo_index
-
-getContractByAddress:     
-    contract_address -> block_height|tx_index|utxo_index
+UtxoPks_by_UtxoIndex:
+    index_1 -> [block_height|tx_index|utxo_index,block_height|tx_index|utxo_index]
+    index_2 -> [block_height|tx_index|utxo_index]
 
 
+## Assets
+
+AssetValue_by_AssetPk:
+    block_height|tx_index|utxo_index|asset_index -> value
+
+
+## Asset index
+
+AssetPks_by_AssetIndex:
+    asset_1 -> [block_height|tx_index|utxo_index|asset_index,block_height|tx_index|utxo_index|asset_index]
+    asset_2 -> [block_height|tx_index|utxo_index|asset_index]
