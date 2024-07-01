@@ -28,7 +28,7 @@ impl BlockProcessor for BtcProcessor {
                         "Block @ {} : {} : {}",
                         ci_block.height,
                         readable_date,
-                        String::from_utf8(ci_block.hash.clone()).unwrap()
+                        hex::encode(&ci_block.hash)
                     );
                 }
                 ci_block
