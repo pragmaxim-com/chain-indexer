@@ -1,3 +1,0 @@
-[blockchain]
-db_path = "/home/lisak/.chain-indexer"
-api_host = "http://127.0.0.1:8332"
