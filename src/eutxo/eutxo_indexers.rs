@@ -18,10 +18,10 @@ impl EutxoIndexers {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         // Increase parallelism: setting the number of background threads
-        opts.increase_parallelism(num_cores / 2); // Set this based on your CPU cores
+        opts.increase_parallelism(num_cores); // Set this based on your CPU cores
         opts.set_max_background_jobs(std::cmp::max(num_cores / 2, 6));
         // Set other options for performance
-        opts.set_max_file_opening_threads(std::cmp::max(num_cores / 2, 6));
+        opts.set_max_file_opening_threads(std::cmp::max(num_cores, 16));
         opts.set_write_buffer_size(128 * 1024 * 1024); // 64 MB
         opts.set_max_write_buffer_number(8);
         opts.set_target_file_size_base(128 * 1024 * 1024); // 64 MB
