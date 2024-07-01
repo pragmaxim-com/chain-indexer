@@ -8,17 +8,17 @@ struct TxPk {
     pub tx_index: u16,
 }
 
-pub fn tx_pk_bytes(block_height: u32, tx_index: u16) -> TxPkBytes {
+pub fn tx_pk_bytes(block_height: &u32, tx_index: &u16) -> TxPkBytes {
     let mut bytes: TxPkBytes = [0u8; 6];
-    BigEndian::write_u32(&mut bytes[0..4], block_height);
-    BigEndian::write_u16(&mut bytes[4..6], tx_index);
+    BigEndian::write_u32(&mut bytes[0..4], *block_height);
+    BigEndian::write_u16(&mut bytes[4..6], *tx_index);
     bytes
 }
 
 // Implementing From trait for Tx to TxBytes conversion
 impl From<TxPk> for TxPkBytes {
     fn from(tx: TxPk) -> TxPkBytes {
-        tx_pk_bytes(tx.block_height, tx.tx_index)
+        tx_pk_bytes(&tx.block_height, &tx.tx_index)
     }
 }
 

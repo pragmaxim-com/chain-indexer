@@ -11,8 +11,8 @@ use super::{
 };
 
 pub fn persist_tx_hash_by_pk(
-    block_height: BlockHeight,
-    tx_index: TxIndex,
+    block_height: &BlockHeight,
+    tx_index: &TxIndex,
     tx_hash: &TxHash,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
     tx_hash_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
@@ -22,8 +22,8 @@ pub fn persist_tx_hash_by_pk(
 }
 
 pub fn persist_tx_pk_by_hash(
-    block_height: BlockHeight,
-    tx_index: TxIndex,
+    block_height: &BlockHeight,
+    tx_index: &TxIndex,
     tx_hash: &TxHash,
     db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
     tx_pk_by_hash_cf: &Arc<rocksdb::BoundColumnFamily>,
@@ -35,10 +35,10 @@ pub fn persist_tx_pk_by_hash(
 }
 
 pub fn persist_utxo_value_by_pk(
-    block_height: BlockHeight,
-    tx_index: TxIndex,
-    utxo_index: UtxoIndex,
-    utxo_value: UtxoValue,
+    block_height: &BlockHeight,
+    tx_index: &TxIndex,
+    utxo_index: &UtxoIndex,
+    utxo_value: &UtxoValue,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
     utxo_value_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
 ) {
@@ -48,9 +48,9 @@ pub fn persist_utxo_value_by_pk(
 }
 
 pub fn persist_utxo_pk_by_input_pk(
-    block_height: BlockHeight,
-    tx_index: TxIndex,
-    input_index: InputIndex,
+    block_height: &BlockHeight,
+    tx_index: &TxIndex,
+    input_index: &InputIndex,
     tx_input: &CiTxInput,
     db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,

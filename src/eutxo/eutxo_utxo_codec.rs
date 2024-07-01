@@ -13,17 +13,17 @@ struct EutxoPk {
     pub utxo_index: UtxoIndex,
 }
 
-pub fn utxo_value_to_bytes(utxo_value: UtxoValue) -> [u8; std::mem::size_of::<UtxoValue>()] {
+pub fn utxo_value_to_bytes(utxo_value: &UtxoValue) -> [u8; std::mem::size_of::<UtxoValue>()] {
     let mut bytes = [0u8; 8];
-    BigEndian::write_u64(&mut bytes, utxo_value);
+    BigEndian::write_u64(&mut bytes, *utxo_value);
     bytes
 }
 
-pub fn pk_bytes(block_height: BlockHeight, tx_index: TxIndex, box_index: u16) -> EutxoPkBytes {
+pub fn pk_bytes(block_height: &BlockHeight, tx_index: &TxIndex, box_index: &u16) -> EutxoPkBytes {
     let mut bytes: EutxoPkBytes = [0u8; 8];
-    BigEndian::write_u32(&mut bytes[0..4], block_height);
-    BigEndian::write_u16(&mut bytes[4..6], tx_index);
-    BigEndian::write_u16(&mut bytes[6..8], box_index);
+    BigEndian::write_u32(&mut bytes[0..4], *block_height);
+    BigEndian::write_u16(&mut bytes[4..6], *tx_index);
+    BigEndian::write_u16(&mut bytes[6..8], *box_index);
     bytes
 }
 
@@ -35,9 +35,13 @@ pub fn utxo_pk_bytes_from(tx_pk_bytes: Vec<u8>, utxo_index: UtxoIndex) -> EutxoP
 }
 
 // Implementing From trait for CiUtxoId to UtxoIdBytes conversion
-impl From<EutxoPk> for EutxoPkBytes {
-    fn from(utxo_id: EutxoPk) -> EutxoPkBytes {
-        pk_bytes(utxo_id.block_height, utxo_id.tx_index, utxo_id.utxo_index)
+impl From<&EutxoPk> for EutxoPkBytes {
+    fn from(utxo_id: &EutxoPk) -> EutxoPkBytes {
+        pk_bytes(
+            &utxo_id.block_height,
+            &utxo_id.tx_index,
+            &utxo_id.utxo_index,
+        )
     }
 }
 
@@ -67,7 +71,7 @@ mod tests {
             utxo_index: 1234,
         };
         let expected_bytes: EutxoPkBytes = [0, 1, 226, 64, 30, 222, 4, 210];
-        let encoded: EutxoPkBytes = utxo_id.into();
+        let encoded: EutxoPkBytes = (&utxo_id).into();
         assert_eq!(encoded, expected_bytes);
     }
 
@@ -90,7 +94,7 @@ mod tests {
             tx_index: 7890,
             utxo_index: 1234,
         };
-        let encoded: EutxoPkBytes = utxo_id.clone().into();
+        let encoded: EutxoPkBytes = (&utxo_id).into();
         let decoded: EutxoPk = encoded.into();
         assert_eq!(utxo_id, decoded);
     }
@@ -98,7 +102,7 @@ mod tests {
     fn test_utxo_value_to_bytes() {
         let value: u64 = 12345678901234567890;
         let expected_bytes = [1, 115, 205, 21, 205, 91, 205, 210];
-        let bytes = utxo_value_to_bytes(value);
+        let bytes = utxo_value_to_bytes(&value);
         assert_eq!(bytes, expected_bytes);
     }
 }

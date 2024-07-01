@@ -29,7 +29,7 @@ fn bytes_to_u32(bytes: &[u8]) -> u32 {
 }
 
 fn process_tx(
-    block_height: BlockHeight,
+    block_height: &BlockHeight,
     tx: &CiTx,
     db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
@@ -39,7 +39,7 @@ fn process_tx(
 ) -> Result<(), rocksdb::Error> {
     eutxo_storage::persist_tx_hash_by_pk(
         block_height,
-        tx.tx_index,
+        &tx.tx_index,
         &tx.tx_hash,
         batch,
         tx_hash_by_pk_cf,
@@ -47,7 +47,7 @@ fn process_tx(
 
     eutxo_storage::persist_tx_pk_by_hash(
         block_height,
-        tx.tx_index,
+        &tx.tx_index,
         &tx.tx_hash,
         db_tx,
         tx_pk_by_hash_cf,
@@ -57,17 +57,17 @@ fn process_tx(
 
 // Method to process the outputs of a transaction
 fn process_outputs(
-    block_height: BlockHeight,
+    block_height: &BlockHeight,
     tx: &CiTx,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
     utxo_value_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
 ) {
     for utxo in tx.outs.iter() {
         eutxo_storage::persist_utxo_value_by_pk(
-            block_height,
-            tx.tx_index,
-            utxo.index,
-            utxo.value,
+            &block_height,
+            &tx.tx_index,
+            &utxo.index,
+            &utxo.value,
             batch,
             utxo_value_by_pk_cf,
         )
@@ -86,9 +86,9 @@ fn process_inputs(
 ) {
     for (input_index, tx_input) in tx.ins.iter().enumerate() {
         eutxo_storage::persist_utxo_pk_by_input_pk(
-            block_height,
-            tx.tx_index,
-            input_index as u16,
+            &block_height,
+            &tx.tx_index,
+            &(input_index as u16),
             tx_input,
             db_tx,
             batch,
@@ -142,7 +142,7 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
         for block in blocks.iter() {
             for ci_tx in block.txs.iter() {
                 process_tx(
-                    block.height,
+                    &block.height,
                     ci_tx,
                     &db_tx,
                     &mut batch,
@@ -151,7 +151,7 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
                     &mut self.tx_pk_by_tx_hash_lru_cache,
                 )
                 .unwrap();
-                process_outputs(block.height, ci_tx, &mut batch, &utxo_value_by_pk_cf);
+                process_outputs(&block.height, ci_tx, &mut batch, &utxo_value_by_pk_cf);
                 if !ci_tx.is_coinbase {
                     process_inputs(
                         block.height,
