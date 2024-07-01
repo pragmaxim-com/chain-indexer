@@ -29,7 +29,7 @@ async fn main() -> Result<(), std::io::Error> {
                     let processor = Arc::new(BtcProcessor {});
                     let storage = EutxoIndexers::new(&full_db_path).unwrap();
                     let syncer = ChainSyncer::new(client, processor, Arc::new(storage));
-                    syncer.sync(844566, 50).await;
+                    syncer.sync(844566, 500).await;
                     Ok(())
                 }
                 _ => {

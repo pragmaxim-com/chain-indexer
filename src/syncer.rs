@@ -64,7 +64,7 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
                 Ok(blocks) => blocks,
                 Err(e) => panic!("Error: {:?}", e),
             })
-            .broadcast(100, self.indexers.get_indexers())
+            .broadcast(min_batch_size, self.indexers.get_indexers())
             .await;
     }
 }
