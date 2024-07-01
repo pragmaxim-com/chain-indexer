@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::api::{BlockHeight, BlockProcessor, TxIndex};
 use crate::eutxo::eutxo_api::{CiBlock, CiTx, CiTxInput, CiUtxo, UtxoIndexValue};
-use crate::log;
+use crate::info;
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
 use bitcoin_hashes::Hash;
@@ -24,7 +24,7 @@ impl BlockProcessor for BtcProcessor {
                 if ci_block.height % 1000 == 0 {
                     let datetime = DateTime::from_timestamp(ci_block.time as i64, 0).unwrap();
                     let readable_date = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
-                    log!(
+                    info!(
                         "Block @ {} : {} : {}",
                         ci_block.height,
                         readable_date,

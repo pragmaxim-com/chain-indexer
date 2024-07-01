@@ -1,5 +1,5 @@
 use crate::api::{BlockProcessor, BlockchainClient, ChainSyncer, Indexers};
-use crate::log;
+use crate::info;
 use broadcast_sink::StreamBroadcastSinkExt;
 use futures::stream::StreamExt;
 use min_batch::MinBatchExt;
@@ -24,7 +24,7 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
         let start_time = std::time::Instant::now();
         let total_tx_count = Arc::new(Mutex::new(0));
         let last_height = self.indexers.get_last_height() + 1;
-        log!("Indexing from {} to {}", last_height, end_height);
+        info!("Indexing from {} to {}", last_height, end_height);
         let heights = last_height..=end_height;
         tokio_stream::iter(heights)
             .map(|height| {
@@ -40,10 +40,9 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
                     *total_tx_count += tx_count;
                     let txs_per_sec = format!("{:.1}", *total_tx_count as f64 / total_time as f64);
                     if height % 1000 == 0 {
-                        log!(
+                        info!(
                             "Processed {} txs with indexing Speed: {} txs/sec",
-                            *total_tx_count,
-                            txs_per_sec
+                            *total_tx_count, txs_per_sec
                         );
                     }
 

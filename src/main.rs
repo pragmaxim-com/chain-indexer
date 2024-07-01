@@ -33,13 +33,13 @@ async fn main() -> Result<(), std::io::Error> {
                     Ok(())
                 }
                 _ => {
-                    log!("Unsupported blockchain: {}", blockchain.name);
+                    error!("Unsupported blockchain: {}", blockchain.name);
                     return Err(std::io::Error::new(std::io::ErrorKind::Other, "Error"));
                 }
             }
         }
         Err(e) => {
-            log!("Error: {}", e);
+            error!("Error: {}", e);
             Err(std::io::Error::new(std::io::ErrorKind::Other, "Error"))
         }
     }

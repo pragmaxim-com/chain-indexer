@@ -1,5 +1,5 @@
 use crate::eutxo::eutxo_api::CiBlock;
-use crate::log;
+use crate::info;
 use crate::{api::Indexers, eutxo};
 use broadcast_sink::Consumer;
 use rocksdb::{MultiThreaded, Options, TransactionDB, TransactionDBOptions};
@@ -13,7 +13,7 @@ pub struct EutxoIndexers {
 impl EutxoIndexers {
     pub fn new(db_path: &str) -> Result<Self, String> {
         let num_cores = num_cpus::get() as i32;
-        log!("Number of CPU cores: {}", num_cores);
+        info!("Number of CPU cores: {}", num_cores);
 
         let mut opts = Options::default();
         opts.create_if_missing(true);
