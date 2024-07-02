@@ -31,13 +31,13 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
                 let rpc_client = Arc::clone(&self.client);
                 let total_tx_count = Arc::clone(&total_tx_count);
                 tokio::task::spawn_blocking(move || {
-                    let (block, tx_count) = rpc_client
+                    let block_with_tx_count = rpc_client
                         .get_block_with_tx_count_for_height(height)
                         .unwrap();
 
                     let total_time = start_time.elapsed().as_secs();
                     let mut total_tx_count = total_tx_count.lock().unwrap();
-                    *total_tx_count += tx_count;
+                    *total_tx_count += block_with_tx_count.2;
                     let txs_per_sec = format!("{:.1}", *total_tx_count as f64 / total_time as f64);
                     if height % 1000 == 0 {
                         info!(
@@ -46,7 +46,7 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
                         );
                     }
 
-                    (height, block, tx_count)
+                    block_with_tx_count
                 })
             })
             .buffered(256)

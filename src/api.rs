@@ -22,7 +22,7 @@ pub trait BlockchainClient {
     fn get_block_with_tx_count_for_height(
         &self,
         height: u32,
-    ) -> Result<(Self::Block, usize), String>;
+    ) -> Result<(BlockHeight, Self::Block, usize), String>;
 }
 
 pub trait BlockProcessor {
