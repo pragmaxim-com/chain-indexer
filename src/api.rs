@@ -28,8 +28,10 @@ pub trait BlockchainClient {
 pub trait BlockProcessor {
     type InBlock: Send;
     type OutBlock: Send;
-    fn process(&self, block_batch: Vec<(BlockHeight, Self::InBlock, usize)>)
-        -> Vec<Self::OutBlock>;
+    fn process(
+        &self,
+        block_batch: &Vec<(BlockHeight, Self::InBlock, usize)>,
+    ) -> Vec<Self::OutBlock>;
 }
 
 pub trait Indexers {

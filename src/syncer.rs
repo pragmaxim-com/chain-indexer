@@ -57,7 +57,7 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
             .min_batch(min_batch_size, |(_, _, tx_count)| *tx_count)
             .map(|blocks| {
                 let processor = Arc::clone(&self.processor);
-                tokio::task::spawn_blocking(move || processor.process(blocks))
+                tokio::task::spawn_blocking(move || processor.process(&blocks))
             })
             .buffered(512)
             .map(|res| match res {

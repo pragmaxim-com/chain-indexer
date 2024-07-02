@@ -16,7 +16,7 @@ pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {
     type InBlock = bitcoin::Block;
     type OutBlock = CiBlock;
-    fn process(&self, block_batch: Vec<(BlockHeight, Self::InBlock, usize)>) -> Vec<CiBlock> {
+    fn process(&self, block_batch: &Vec<(BlockHeight, Self::InBlock, usize)>) -> Vec<CiBlock> {
         block_batch
             .into_iter()
             .map(|height_block| {
@@ -37,8 +37,8 @@ impl BlockProcessor for BtcProcessor {
     }
 }
 
-impl From<(BlockHeight, bitcoin::Block, usize)> for CiBlock {
-    fn from(block: (BlockHeight, bitcoin::Block, usize)) -> Self {
+impl From<&(BlockHeight, bitcoin::Block, usize)> for CiBlock {
+    fn from(block: &(BlockHeight, bitcoin::Block, usize)) -> Self {
         CiBlock {
             hash: block.1.block_hash().as_byte_array().to_vec(),
             time: block.1.header.time as i64,
@@ -46,9 +46,9 @@ impl From<(BlockHeight, bitcoin::Block, usize)> for CiBlock {
             txs: block
                 .1
                 .txdata
-                .into_iter()
+                .iter()
                 .enumerate()
-                .map(|(tx_index, tx)| (tx_index as u16, tx).into())
+                .map(|(tx_index, tx)| (&(tx_index as u16), tx).into())
                 .collect(),
         }
     }
@@ -66,12 +66,12 @@ fn get_indexes(
     vec
 }
 
-impl From<(TxIndex, bitcoin::Transaction)> for CiTx {
-    fn from(tx: (TxIndex, bitcoin::Transaction)) -> Self {
+impl From<(&TxIndex, &bitcoin::Transaction)> for CiTx {
+    fn from(tx: (&TxIndex, &bitcoin::Transaction)) -> Self {
         CiTx {
             is_coinbase: tx.1.is_coinbase(),
             tx_hash: tx.1.compute_txid().to_byte_array(),
-            tx_index: tx.0,
+            tx_index: *tx.0,
             ins: tx
                 .1
                 .input
