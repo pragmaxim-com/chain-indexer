@@ -45,7 +45,6 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
                             *total_tx_count, txs_per_sec
                         );
                     }
-
                     block_with_tx_count
                 })
             })

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::api::{BlockHeight, BlockProcessor, DbIndexValue, TxIndex};
+use crate::api::{AssetId, AssetValue, BlockHeight, BlockProcessor, TxIndex};
 use crate::eutxo::eutxo_api::{CiBlock, CiTx, CiTxInput, CiUtxo};
 use crate::info;
 use bitcoin::{Address, Network};
@@ -11,6 +11,8 @@ use chrono::DateTime;
 // define constant for address and script_hash
 pub const ADDRESS_INDEX: &str = "address";
 pub const SCRIPT_HASH_INDEX: &str = "script_hash";
+
+pub const EMPTY_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
 
 pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {
@@ -40,7 +42,7 @@ impl BlockProcessor for BtcProcessor {
 impl From<&(BlockHeight, bitcoin::Block, usize)> for CiBlock {
     fn from(block: &(BlockHeight, bitcoin::Block, usize)) -> Self {
         CiBlock {
-            hash: block.1.block_hash().as_byte_array().to_vec(),
+            hash: block.1.block_hash().to_byte_array(),
             time: block.1.header.time as i64,
             height: block.0,
             txs: block
@@ -52,18 +54,6 @@ impl From<&(BlockHeight, bitcoin::Block, usize)> for CiBlock {
                 .collect(),
         }
     }
-}
-
-fn get_indexes(
-    address: Option<DbIndexValue>,
-    script_hash: DbIndexValue,
-) -> Vec<(Cow<'static, str>, DbIndexValue)> {
-    let mut vec = Vec::with_capacity(2); // Pre-allocate capacity for 2 elements
-    vec.push((Cow::Borrowed(SCRIPT_HASH_INDEX), script_hash));
-    if let Some(address) = address {
-        vec.push((Cow::Borrowed(ADDRESS_INDEX), address));
-    }
-    vec
 }
 
 impl From<(&TxIndex, &bitcoin::Transaction)> for CiTx {
@@ -105,12 +95,17 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for CiTx {
                     let script_hash = sha256::Hash::hash(out.script_pubkey.as_bytes())
                         .as_byte_array()
                         .to_vec();
-                    let db_indexes = get_indexes(address, script_hash.to_vec());
+
+                    let mut db_indexes = Vec::with_capacity(2); // Pre-allocate capacity for 2 elements
+                    db_indexes.push((Cow::Borrowed(SCRIPT_HASH_INDEX), script_hash));
+                    if let Some(address) = address {
+                        db_indexes.push((Cow::Borrowed(ADDRESS_INDEX), address));
+                    }
 
                     CiUtxo {
                         index: out_index as u16,
                         db_indexes,
-                        assets: vec![],
+                        assets: EMPTY_VEC,
                         value: out.value.to_sat(),
                     }
                 })

@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 
 pub type BlockTimestamp = i64;
 pub type BlockHeight = u32;
-pub type BlockHash = Vec<u8>;
+pub type BlockHash = [u8; 32];
 
 pub type TxIndex = u16;
 pub type TxHash = [u8; 32];
