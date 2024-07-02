@@ -1,14 +1,14 @@
 use broadcast_sink::{BroadcastSinkError, Consumer};
 use lru::LruCache;
 use rocksdb::{BoundColumnFamily, MultiThreaded, TransactionDB, WriteBatchWithTransaction};
-use std::{collections::HashSet, num::NonZeroUsize, sync::Arc};
+use std::{num::NonZeroUsize, sync::Arc};
 
 use crate::{
-    api::BlockHeight,
+    api::{BlockHeight, DbIndexName},
     eutxo::eutxo_api::{CiBlock, CiTx},
 };
 
-use super::{eutxo_api::UtxoIndexName, eutxo_storage};
+use super::eutxo_storage;
 
 pub const TX_HASH_BY_PK_CF: &str = "TX_HASH_BY_PK_CF";
 pub const TX_PK_BY_HASH_CF: &str = "TX_PK_BY_HASH_CF";
@@ -61,7 +61,7 @@ fn process_outputs(
     tx: &CiTx,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
     utxo_value_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
-    utxo_indexes: &Vec<(UtxoIndexName, Arc<rocksdb::BoundColumnFamily>)>,
+    utxo_indexes: &Vec<(DbIndexName, Arc<rocksdb::BoundColumnFamily>)>,
 ) {
     for utxo in tx.outs.iter() {
         eutxo_storage::persist_utxo_value_by_pk(
@@ -135,13 +135,10 @@ pub fn get_last_height(db: Arc<TransactionDB<MultiThreaded>>) -> u32 {
 pub struct EutxoInputIndexer {
     db: Arc<TransactionDB<MultiThreaded>>,
     tx_pk_by_tx_hash_lru_cache: LruCache<[u8; 32], [u8; 6]>,
-    utxo_indexes: HashSet<UtxoIndexName>,
+    utxo_indexes: Vec<DbIndexName>,
 }
 impl EutxoInputIndexer {
-    pub fn new(
-        db: Arc<TransactionDB<MultiThreaded>>,
-        utxo_indexes: HashSet<UtxoIndexName>,
-    ) -> Self {
+    pub fn new(db: Arc<TransactionDB<MultiThreaded>>, utxo_indexes: Vec<DbIndexName>) -> Self {
         Self {
             db,
             tx_pk_by_tx_hash_lru_cache: LruCache::new(NonZeroUsize::new(10_000_000).unwrap()),
@@ -157,7 +154,7 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
         let utxo_pk_by_input_pk_cf = self.db.cf_handle(UTXO_PK_BY_INPUT_PK_CF).unwrap();
         let meta_cf = self.db.cf_handle(META_CF).unwrap();
 
-        let index_cf_by_name: &Vec<(UtxoIndexName, Arc<BoundColumnFamily>)> = &self
+        let index_cf_by_name: &Vec<(DbIndexName, Arc<BoundColumnFamily>)> = &self
             .utxo_indexes
             .iter()
             .map(|index_name| (index_name.clone(), self.db.cf_handle(&index_name).unwrap()))
@@ -183,7 +180,7 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
                     ci_tx,
                     &mut batch,
                     &utxo_value_by_pk_cf,
-                    &index_cf_by_name,
+                    index_cf_by_name,
                 );
                 if !ci_tx.is_coinbase {
                     process_inputs(

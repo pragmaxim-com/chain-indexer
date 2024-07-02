@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use crate::api::{BlockHeight, BlockProcessor, TxIndex};
-use crate::eutxo::eutxo_api::{CiBlock, CiTx, CiTxInput, CiUtxo, UtxoIndexValue};
+use crate::api::{BlockHeight, BlockProcessor, DbIndexValue, TxIndex};
+use crate::eutxo::eutxo_api::{CiBlock, CiTx, CiTxInput, CiUtxo};
 use crate::info;
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
@@ -55,9 +55,9 @@ impl From<(BlockHeight, bitcoin::Block, usize)> for CiBlock {
 }
 
 fn get_indexes(
-    address: Option<UtxoIndexValue>,
-    script_hash: UtxoIndexValue,
-) -> Vec<(Cow<'static, str>, UtxoIndexValue)> {
+    address: Option<DbIndexValue>,
+    script_hash: DbIndexValue,
+) -> Vec<(Cow<'static, str>, DbIndexValue)> {
     let mut vec = Vec::with_capacity(2); // Pre-allocate capacity for 2 elements
     vec.push((Cow::Borrowed(SCRIPT_HASH_INDEX), script_hash));
     if let Some(address) = address {

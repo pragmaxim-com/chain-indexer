@@ -1,21 +1,19 @@
+use crate::api::DbIndexName;
 use crate::eutxo::eutxo_api::CiBlock;
 use crate::info;
 use crate::{api::Indexers, eutxo};
 use broadcast_sink::Consumer;
 use rocksdb::{MultiThreaded, Options, TransactionDB, TransactionDBOptions};
-use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use super::eutxo_api::UtxoIndexName;
-
 pub struct EutxoIndexers {
     db: Arc<TransactionDB<MultiThreaded>>,
-    utxo_indexes: HashSet<UtxoIndexName>,
+    utxo_indexes: Vec<DbIndexName>,
 }
 
 impl EutxoIndexers {
-    pub fn new(db_path: &str, utxo_indexes: Vec<UtxoIndexName>) -> Result<Self, String> {
+    pub fn new(db_path: &str, utxo_indexes: Vec<DbIndexName>) -> Self {
         let num_cores = num_cpus::get() as i32;
         info!("Number of CPU cores: {}", num_cores);
 
@@ -57,10 +55,10 @@ impl EutxoIndexers {
             }
         }
 
-        Ok(EutxoIndexers {
+        EutxoIndexers {
             db: Arc::new(instance),
-            utxo_indexes: HashSet::from_iter(utxo_indexes),
-        })
+            utxo_indexes,
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use broadcast_sink::Consumer;
 use tokio::sync::Mutex;
@@ -12,6 +12,9 @@ pub type TxHash = [u8; 32];
 
 pub type AssetId = Vec<u8>;
 pub type AssetValue = u64;
+
+pub type DbIndexName = Cow<'static, str>;
+pub type DbIndexValue = Vec<u8>;
 
 pub trait BlockchainClient {
     type Block: Send;

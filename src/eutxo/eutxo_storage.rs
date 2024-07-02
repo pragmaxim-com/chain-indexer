@@ -3,10 +3,10 @@ use std::sync::Arc;
 use lru::LruCache;
 use rocksdb::{MultiThreaded, TransactionDB};
 
-use crate::api::{BlockHeight, TxHash, TxIndex};
+use crate::api::{BlockHeight, DbIndexValue, TxHash, TxIndex};
 
 use super::{
-    eutxo_api::{CiTxInput, InputIndex, UtxoIndex, UtxoIndexValue, UtxoValue},
+    eutxo_api::{CiTxInput, InputIndex, UtxoIndex, UtxoValue},
     eutxo_tx_codec, eutxo_utxo_codec,
 };
 
@@ -71,7 +71,7 @@ pub fn persist_utxo_pk_by_input_pk(
 }
 
 pub fn persist_utxo_index(
-    db_index_value: &UtxoIndexValue,
+    db_index_value: &DbIndexValue,
     block_height: &BlockHeight,
     tx_index: &TxIndex,
     utxo_index: &UtxoIndex,

@@ -1,19 +1,17 @@
-use std::borrow::Cow;
-
-use crate::api::{AssetId, AssetValue, BlockHash, BlockHeight, BlockTimestamp, TxHash, TxIndex};
+use crate::api::{
+    AssetId, AssetValue, BlockHash, BlockHeight, BlockTimestamp, DbIndexName, DbIndexValue, TxHash,
+    TxIndex,
+};
 
 pub type InputIndex = u16;
 
 pub type UtxoIndex = u16;
 pub type UtxoValue = u64;
 
-pub type UtxoIndexName = Cow<'static, str>;
-pub type UtxoIndexValue = Vec<u8>;
-
 #[derive(Debug, Clone)]
 pub struct CiUtxo {
     pub index: UtxoIndex,
-    pub db_indexes: Vec<(UtxoIndexName, UtxoIndexValue)>,
+    pub db_indexes: Vec<(DbIndexName, DbIndexValue)>,
     pub assets: Vec<(AssetId, AssetValue)>,
     pub value: UtxoValue,
 }

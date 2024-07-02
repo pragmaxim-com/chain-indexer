@@ -21,16 +21,19 @@ async fn main() -> Result<(), std::io::Error> {
             let api_host = blockchain.api_host;
             let api_username = blockchain.api_username;
             let api_password = blockchain.api_password;
-            let full_db_path = format!("{}/{}", blockchain.db_path, blockchain.name);
+            let db_path = format!("{}/{}", blockchain.db_path, blockchain.name);
+            let db_indexes = config.indexer.db_indexes;
+            let tx_batch_size = config.indexer.tx_batch_size;
 
             match blockchain.name.as_str() {
                 "btc" => {
-                    let client = Arc::new(BtcClient::new(&api_host, &api_username, &api_password));
-                    let processor = Arc::new(BtcProcessor {});
-                    let storage =
-                        EutxoIndexers::new(&full_db_path, config.indexer.utxo_indexes).unwrap();
-                    let syncer = ChainSyncer::new(client, processor, Arc::new(storage));
-                    syncer.sync(844566, 1000).await;
+                    ChainSyncer::new(
+                        Arc::new(BtcClient::new(&api_host, &api_username, &api_password)),
+                        Arc::new(BtcProcessor {}),
+                        Arc::new(EutxoIndexers::new(&db_path, db_indexes)),
+                    )
+                    .sync(844566, tx_batch_size)
+                    .await;
                     Ok(())
                 }
                 _ => {

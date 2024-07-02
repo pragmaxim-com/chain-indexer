@@ -2,7 +2,7 @@ use config::{Config, ConfigError, Environment, File};
 use dotenv::dotenv;
 use serde::Deserialize;
 
-use crate::eutxo::eutxo_api::UtxoIndexName;
+use crate::api::DbIndexName;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
@@ -21,7 +21,8 @@ pub struct BlockchainSettings {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexerSettings {
-    pub utxo_indexes: Vec<UtxoIndexName>,
+    pub db_indexes: Vec<DbIndexName>,
+    pub tx_batch_size: usize,
 }
 
 impl AppConfig {
