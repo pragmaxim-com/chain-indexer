@@ -48,7 +48,7 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
                     block_with_tx_count
                 })
             })
-            .buffered(256)
+            .buffered(512)
             .map(|res| match res {
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),

@@ -1,14 +1,8 @@
-mod api;
-mod config;
-mod eutxo;
-mod logger;
-mod syncer;
-
-use api::ChainSyncer;
 use btc::{btc_client::BtcClient, btc_processor::BtcProcessor};
-use config::AppConfig;
-use eutxo::btc;
-use eutxo::eutxo_indexers::EutxoIndexers;
+use ci::api::ChainSyncer;
+use ci::eutxo::btc;
+use ci::eutxo::eutxo_indexers::EutxoIndexers;
+use ci::settings::AppConfig;
 use std::sync::Arc;
 
 #[tokio::main]
@@ -37,13 +31,13 @@ async fn main() -> Result<(), std::io::Error> {
                     Ok(())
                 }
                 _ => {
-                    error!("Unsupported blockchain: {}", blockchain.name);
+                    ci::error!("Unsupported blockchain: {}", blockchain.name);
                     return Err(std::io::Error::new(std::io::ErrorKind::Other, "Error"));
                 }
             }
         }
         Err(e) => {
-            error!("Error: {}", e);
+            ci::error!("Error: {}", e);
             Err(std::io::Error::new(std::io::ErrorKind::Other, "Error"))
         }
     }

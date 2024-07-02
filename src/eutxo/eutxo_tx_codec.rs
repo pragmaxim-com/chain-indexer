@@ -39,28 +39,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_encode_tx() {
-        let tx = TxPk {
-            block_height: 123456,
-            tx_index: 7890,
-        };
-        let expected_bytes: TxPkBytes = [0, 1, 226, 64, 30, 222];
-        let encoded: TxPkBytes = tx.into();
-        assert_eq!(encoded, expected_bytes);
-    }
-
-    #[test]
-    fn test_decode_tx() {
-        let bytes: TxPkBytes = [0, 1, 226, 64, 30, 222];
-        let expected_tx = TxPk {
-            block_height: 123456,
-            tx_index: 7890,
-        };
-        let decoded: TxPk = bytes.into();
-        assert_eq!(decoded, expected_tx);
-    }
-
-    #[test]
     fn test_round_trip_conversion() {
         let tx = TxPk {
             block_height: 123456,

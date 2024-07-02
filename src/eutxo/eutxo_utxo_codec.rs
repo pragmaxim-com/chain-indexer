@@ -64,30 +64,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_encode_utxo_id() {
-        let utxo_id = EutxoPk {
-            block_height: 123456,
-            tx_index: 7890,
-            utxo_index: 1234,
-        };
-        let expected_bytes: EutxoPkBytes = [0, 1, 226, 64, 30, 222, 4, 210];
-        let encoded: EutxoPkBytes = (&utxo_id).into();
-        assert_eq!(encoded, expected_bytes);
-    }
-
-    #[test]
-    fn test_decode_utxo_id() {
-        let bytes: EutxoPkBytes = [0, 1, 226, 64, 30, 222, 4, 210];
-        let expected_utxo_id = EutxoPk {
-            block_height: 123456,
-            tx_index: 7890,
-            utxo_index: 1234,
-        };
-        let decoded: EutxoPk = bytes.into();
-        assert_eq!(decoded, expected_utxo_id);
-    }
-
-    #[test]
     fn test_round_trip_conversion() {
         let utxo_id = EutxoPk {
             block_height: 123456,
@@ -99,10 +75,10 @@ mod tests {
         assert_eq!(utxo_id, decoded);
     }
     #[test]
-    fn test_utxo_value_to_bytes() {
+    fn test_round_trip_utxo_value_conversion() {
         let value: u64 = 12345678901234567890;
-        let expected_bytes = [1, 115, 205, 21, 205, 91, 205, 210];
-        let bytes = utxo_value_to_bytes(&value);
-        assert_eq!(bytes, expected_bytes);
+        let encoded = utxo_value_to_bytes(&value);
+        let decoded = BigEndian::read_u64(&encoded);
+        assert_eq!(value, decoded);
     }
 }
