@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use ci::{
     api::{BlockHeight, BlockProcessor, BlockchainClient},
     eutxo::btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
@@ -15,8 +17,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     let btc_client = BtcClient::new(&api_host, &api_username, &api_password);
     let processor = BtcProcessor {};
     info!("Initiating download");
-    let batch_size = 10;
-    let start_height = 500_000 as u32;
+    let batch_size = 50000;
+    let start_height = 1 as u32;
     let end_height = start_height + batch_size;
     let mut blocks: Vec<(BlockHeight, bitcoin::Block, usize)> =
         Vec::with_capacity(batch_size as usize);
@@ -30,13 +32,14 @@ fn criterion_benchmark(c: &mut Criterion) {
     info!("Initiating processing");
     let mut group = c.benchmark_group("processor");
     group.throughput(Throughput::Elements(batch_size as u64));
-    group.bench_with_input(
-        BenchmarkId::from_parameter("processor"),
-        &blocks,
-        |bencher, blocks| {
-            bencher.iter(|| processor.process(&blocks));
-        },
-    );
+    group.warm_up_time(Duration::from_millis(1000));
+    group.measurement_time(Duration::from_millis(1000));
+    group.bench_function(BenchmarkId::from_parameter("processor"), |bencher| {
+        bencher.iter(|| {
+            let xs = blocks.drain(0..10).collect();
+            processor.process(&xs)
+        });
+    });
     group.finish();
 }
 
