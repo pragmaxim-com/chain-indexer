@@ -1,5 +1,5 @@
 use crate::api::DbIndexName;
-use crate::eutxo::eutxo_api::CiBlock;
+use crate::eutxo::eutxo_api::EuBlock;
 use crate::info;
 use crate::{api::Indexers, eutxo};
 use broadcast_sink::Consumer;
@@ -64,13 +64,13 @@ impl EutxoIndexers {
 
 // implement BlockBatchIndexer trait
 impl Indexers for EutxoIndexers {
-    type OutBlock = CiBlock;
+    type OutBlock = EuBlock;
     fn get_last_height(&self) -> u32 {
         let db_clone = Arc::clone(&self.db);
         eutxo::eutxo_input_indexer::get_last_height(db_clone)
     }
 
-    fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<CiBlock>>>>> {
+    fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<EuBlock>>>>> {
         vec![Arc::new(Mutex::new(
             eutxo::eutxo_input_indexer::EutxoInputIndexer::new(
                 Arc::clone(&self.db),

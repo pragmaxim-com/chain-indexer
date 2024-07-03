@@ -34,7 +34,6 @@ pub fn utxo_pk_bytes_from(tx_pk_bytes: Vec<u8>, utxo_index: UtxoIndex) -> EutxoP
     bytes
 }
 
-// Implementing From trait for CiUtxoId to UtxoIdBytes conversion
 impl From<&EutxoPk> for EutxoPkBytes {
     fn from(utxo_id: &EutxoPk) -> EutxoPkBytes {
         pk_bytes(
@@ -45,7 +44,6 @@ impl From<&EutxoPk> for EutxoPkBytes {
     }
 }
 
-// Implementing From trait for UtxoIdBytes to CiUtxoId conversion
 impl From<EutxoPkBytes> for EutxoPk {
     fn from(bytes: EutxoPkBytes) -> EutxoPk {
         let block_height = BigEndian::read_u32(&bytes[0..4]);

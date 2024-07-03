@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
-use crate::api::{AssetId, AssetValue, BlockHeight, BlockProcessor, TxIndex};
-use crate::eutxo::eutxo_api::{CiBlock, CiTx, CiTxInput, CiUtxo};
-use crate::info;
+use crate::api::{AssetId, AssetValue, Block, BlockProcessor, TxCount, TxIndex};
+use crate::eutxo::eutxo_api::{EuBlock, EuTx, EuTxInput, EuUtxo};
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
 use bitcoin_hashes::Hash;
-use chrono::DateTime;
+
+use super::btc_client::BtcBlock;
 
 // define constant for address and script_hash
 pub const ADDRESS_INDEX: &str = "address";
@@ -16,37 +16,34 @@ pub const EMPTY_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
 
 pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {
-    type InBlock = bitcoin::Block;
-    type OutBlock = CiBlock;
-    fn process(&self, block_batch: &Vec<(BlockHeight, Self::InBlock, usize)>) -> Vec<CiBlock> {
-        block_batch
-            .into_iter()
-            .map(|height_block| {
-                let ci_block: CiBlock = height_block.into();
-                if ci_block.height % 1000 == 0 {
-                    let datetime = DateTime::from_timestamp(ci_block.time as i64, 0).unwrap();
-                    let readable_date = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
-                    info!(
-                        "Block @ {} : {} : {}",
-                        ci_block.height,
-                        readable_date,
-                        hex::encode(&ci_block.hash)
-                    );
-                }
-                ci_block
-            })
-            .collect()
+    type InBlock = BtcBlock;
+    type OutBlock = EuBlock;
+    fn process(
+        &self,
+        block_batch: &Vec<Self::InBlock>,
+        tx_count: TxCount,
+    ) -> (Vec<EuBlock>, TxCount) {
+        (
+            block_batch
+                .into_iter()
+                .map(|height_block| {
+                    let eu_block: EuBlock = height_block.into();
+                    eu_block
+                })
+                .collect(),
+            tx_count,
+        )
     }
 }
 
-impl From<&(BlockHeight, bitcoin::Block, usize)> for CiBlock {
-    fn from(block: &(BlockHeight, bitcoin::Block, usize)) -> Self {
-        CiBlock {
-            hash: block.1.block_hash().to_byte_array(),
-            time: block.1.header.time as i64,
-            height: block.0,
+impl From<&BtcBlock> for EuBlock {
+    fn from(block: &BtcBlock) -> Self {
+        EuBlock {
+            hash: block.delegate.block_hash().to_byte_array(),
+            time: block.timestamp(),
+            height: block.height,
             txs: block
-                .1
+                .delegate
                 .txdata
                 .iter()
                 .enumerate()
@@ -56,9 +53,9 @@ impl From<&(BlockHeight, bitcoin::Block, usize)> for CiBlock {
     }
 }
 
-impl From<(&TxIndex, &bitcoin::Transaction)> for CiTx {
+impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
     fn from(tx: (&TxIndex, &bitcoin::Transaction)) -> Self {
-        CiTx {
+        EuTx {
             is_coinbase: tx.1.is_coinbase(),
             tx_hash: tx.1.compute_txid().to_byte_array(),
             tx_index: *tx.0,
@@ -66,7 +63,7 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for CiTx {
                 .1
                 .input
                 .iter()
-                .map(|input| CiTxInput {
+                .map(|input| EuTxInput {
                     tx_hash: input.previous_output.txid.to_byte_array(),
                     utxo_index: input.previous_output.vout as u16,
                 })
@@ -102,7 +99,7 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for CiTx {
                         db_indexes.push((Cow::Borrowed(ADDRESS_INDEX), address));
                     }
 
-                    CiUtxo {
+                    EuUtxo {
                         index: out_index as u16,
                         db_indexes,
                         assets: EMPTY_VEC,

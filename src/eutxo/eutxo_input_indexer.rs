@@ -4,12 +4,14 @@ use rocksdb::{BoundColumnFamily, MultiThreaded, TransactionDB, WriteBatchWithTra
 use std::{num::NonZeroUsize, sync::Arc};
 
 use crate::{
-    api::{BlockHeight, DbIndexName},
-    eutxo::eutxo_api::{CiBlock, CiTx},
+    api::{BlockHash, BlockHeight, DbIndexName},
+    eutxo::eutxo_api::{EuBlock, EuTx},
 };
 
 use super::eutxo_storage;
 
+pub const BLOCK_HASH_BY_PK_CF: &str = "BLOCK_HASH_BY_PK_CF";
+pub const BLOCK_PK_BY_HASH_CF: &str = "BLOCK_PK_BY_HASH_CF";
 pub const TX_HASH_BY_PK_CF: &str = "TX_HASH_BY_PK_CF";
 pub const TX_PK_BY_HASH_CF: &str = "TX_PK_BY_HASH_CF";
 pub const UTXO_VALUE_BY_PK_CF: &str = "UTXO_VALUE_BY_PK_CF";
@@ -28,9 +30,20 @@ fn bytes_to_u32(bytes: &[u8]) -> u32 {
     u32::from_ne_bytes(array)
 }
 
+fn process_block(
+    block_height: &BlockHeight,
+    block_hash: &BlockHash,
+    batch: &mut rocksdb::WriteBatchWithTransaction<true>,
+    block_hash_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
+    block_pk_by_hash_cf: &Arc<rocksdb::BoundColumnFamily>,
+) {
+    eutxo_storage::persist_block_hash_by_pk(block_height, block_hash, batch, block_hash_by_pk_cf);
+    eutxo_storage::persist_block_pk_by_hash(block_hash, block_height, batch, block_pk_by_hash_cf);
+}
+
 fn process_tx(
     block_height: &BlockHeight,
-    tx: &CiTx,
+    tx: &EuTx,
     db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
     tx_hash_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
@@ -58,7 +71,7 @@ fn process_tx(
 // Method to process the outputs of a transaction
 fn process_outputs(
     block_height: &BlockHeight,
-    tx: &CiTx,
+    tx: &EuTx,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
     utxo_value_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
     utxo_indexes: &Vec<(DbIndexName, Arc<rocksdb::BoundColumnFamily>)>,
@@ -93,7 +106,7 @@ fn process_outputs(
 // Method to process the inputs of a transaction
 fn process_inputs(
     block_height: BlockHeight,
-    tx: &CiTx,
+    tx: &EuTx,
     db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
     utxo_pk_by_input_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
@@ -118,6 +131,8 @@ fn process_inputs(
 pub fn get_column_families() -> Vec<&'static str> {
     vec![
         META_CF,
+        BLOCK_HASH_BY_PK_CF,
+        BLOCK_PK_BY_HASH_CF,
         TX_HASH_BY_PK_CF,
         TX_PK_BY_HASH_CF,
         UTXO_VALUE_BY_PK_CF,
@@ -146,8 +161,10 @@ impl EutxoInputIndexer {
         }
     }
 }
-impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
-    fn consume(&mut self, blocks: &Vec<CiBlock>) -> Result<(), BroadcastSinkError> {
+impl Consumer<Vec<EuBlock>> for EutxoInputIndexer {
+    fn consume(&mut self, blocks: &Vec<EuBlock>) -> Result<(), BroadcastSinkError> {
+        let block_hash_by_pk_cf = self.db.cf_handle(BLOCK_HASH_BY_PK_CF).unwrap();
+        let block_pk_by_hash_cf = self.db.cf_handle(BLOCK_PK_BY_HASH_CF).unwrap();
         let tx_hash_by_pk_cf = self.db.cf_handle(TX_HASH_BY_PK_CF).unwrap();
         let tx_pk_by_hash_cf = self.db.cf_handle(TX_PK_BY_HASH_CF).unwrap();
         let utxo_value_by_pk_cf = self.db.cf_handle(UTXO_VALUE_BY_PK_CF).unwrap();
@@ -164,10 +181,17 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
         let mut batch: WriteBatchWithTransaction<true> = db_tx.get_writebatch();
 
         for block in blocks.iter() {
-            for ci_tx in block.txs.iter() {
+            process_block(
+                &block.height,
+                &block.hash,
+                &mut batch,
+                &block_hash_by_pk_cf,
+                &block_pk_by_hash_cf,
+            );
+            for eu_tx in block.txs.iter() {
                 process_tx(
                     &block.height,
-                    ci_tx,
+                    eu_tx,
                     &db_tx,
                     &mut batch,
                     &tx_hash_by_pk_cf,
@@ -177,15 +201,15 @@ impl Consumer<Vec<CiBlock>> for EutxoInputIndexer {
                 .map_err(|e| BroadcastSinkError::new(e.as_ref()))?;
                 process_outputs(
                     &block.height,
-                    ci_tx,
+                    eu_tx,
                     &mut batch,
                     &utxo_value_by_pk_cf,
                     index_cf_by_name,
                 );
-                if !ci_tx.is_coinbase {
+                if !eu_tx.is_coinbase {
                     process_inputs(
                         block.height,
-                        ci_tx,
+                        eu_tx,
                         &db_tx,
                         &mut batch,
                         &utxo_pk_by_input_pk_cf,

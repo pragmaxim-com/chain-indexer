@@ -35,5 +35,9 @@ hex = "0.4.3"
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
 
 [[bench]]
-name = "processor_benchmark"
+name = "btc_processor_benchmark"
+harness = false
+
+[[bench]]
+name = "eutxo_indexer_benchmark"
 harness = false
