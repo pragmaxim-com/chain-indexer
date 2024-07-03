@@ -1,31 +1,30 @@
-use crate::api::{BlockProcessor, BlockchainClient, Indexers};
+use crate::api::{Block, BlockMonitor, BlockProcessor, BlockchainClient, Indexers};
 use crate::info;
-use crate::monitor::BlockMonitor;
 use broadcast_sink::StreamBroadcastSinkExt;
 use futures::stream::StreamExt;
-use min_batch::MinBatchExt;
+use min_batch::ext::MinBatchExt;
 use std::sync::Arc;
 
-pub struct ChainSyncer<InBlock: Send, OutBlock: Send> {
+pub struct ChainSyncer<InBlock: Block + Send, OutBlock: Block + Send> {
     pub client: Arc<dyn BlockchainClient<Block = InBlock> + Send + Sync>,
-    pub monitor: Arc<dyn BlockMonitor<InBlock>>,
     pub processor: Arc<dyn BlockProcessor<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
+    pub monitor: Arc<dyn BlockMonitor<OutBlock>>,
     pub indexers: Arc<dyn Indexers<OutBlock = OutBlock>>,
 }
 
-impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
+impl<InBlock: Block + Send + 'static, OutBlock: Block + Send + Sync + Clone + 'static>
     ChainSyncer<InBlock, OutBlock>
 {
     pub fn new(
         client: Arc<dyn BlockchainClient<Block = InBlock> + Send + Sync>,
-        monitor: Arc<dyn BlockMonitor<InBlock>>,
         processor: Arc<dyn BlockProcessor<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
+        monitor: Arc<dyn BlockMonitor<OutBlock>>,
         indexers: Arc<dyn Indexers<OutBlock = OutBlock> + Send + Sync>,
     ) -> Self {
         ChainSyncer {
             client,
-            monitor,
             processor,
+            monitor,
             indexers,
         }
     }
@@ -44,18 +43,17 @@ impl<InBlock: Send + 'static, OutBlock: Send + Sync + Clone + 'static>
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),
             })
-            .min_batch(min_batch_size, |(_, _, tx_count, _)| *tx_count)
-            .map(|blocks| {
-                let _ = &self.monitor.monitor(&blocks);
-                blocks
-            })
-            .map(|blocks| {
+            .min_batch_with_weight(min_batch_size, |block| block.tx_count())
+            .map(|(blocks, tx_count)| {
                 let processor = Arc::clone(&self.processor);
-                tokio::task::spawn_blocking(move || processor.process(&blocks))
+                tokio::task::spawn_blocking(move || processor.process(&blocks, tx_count))
             })
             .buffered(512)
             .map(|res| match res {
-                Ok(blocks) => blocks,
+                Ok((block_batch, tx_count)) => {
+                    let _ = &self.monitor.monitor(&block_batch, tx_count);
+                    block_batch
+                }
                 Err(e) => panic!("Error: {:?}", e),
             })
             .broadcast(min_batch_size, self.indexers.get_indexers())

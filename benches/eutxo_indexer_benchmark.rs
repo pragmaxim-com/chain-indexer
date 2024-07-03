@@ -4,10 +4,13 @@ use std::{
 };
 
 use ci::{
-    api::{BlockHeight, BlockProcessor, BlockTimestamp, BlockchainClient, Indexers, TxCount},
+    api::{BlockProcessor, BlockchainClient, Indexers},
     error,
     eutxo::{
-        btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
+        btc::{
+            btc_client::{BtcBlock, BtcClient},
+            btc_processor::BtcProcessor,
+        },
         eutxo_indexers::EutxoIndexers,
     },
     info, settings,
@@ -34,17 +37,12 @@ fn criterion_benchmark(c: &mut Criterion) {
     let batch_size = 100_000;
     let start_height = 1 as u32;
     let end_height = start_height + batch_size;
-    let mut blocks: Vec<(BlockHeight, bitcoin::Block, TxCount, BlockTimestamp)> =
-        Vec::with_capacity(batch_size as usize);
+    let mut blocks: Vec<BtcBlock> = Vec::with_capacity(batch_size as usize);
     for height in start_height..end_height {
-        blocks.push(
-            btc_client
-                .get_block(height)
-                .unwrap(),
-        );
+        blocks.push(btc_client.get_block(height).unwrap());
     }
     info!("Initiating processing");
-    let blocks = Arc::new(Mutex::new(processor.process(&blocks)));
+    let blocks = Arc::new(Mutex::new(processor.process(&blocks, 0)));
 
     info!("Initiating indexing");
     let mut group = c.benchmark_group("processor");
@@ -55,8 +53,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         bencher.to_async(&rt).iter(|| async {
             let arc = Arc::clone(&blocks);
             let mut blocks_chunk = arc.lock().unwrap();
-            let xs = blocks_chunk[0..10].to_vec();
-            blocks_chunk.drain(0..10);
+            let xs = blocks_chunk.0[0..10].to_vec();
+            blocks_chunk.0.drain(0..10);
             if let Err(e) = indexer.lock().await.consume(&xs) {
                 error!("BroadcastSink consumer error occurred: {:?}", e);
             }

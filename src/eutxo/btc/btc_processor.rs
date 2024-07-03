@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
-use crate::api::{
-    AssetId, AssetValue, BlockHeight, BlockProcessor, BlockTimestamp, TxCount, TxIndex,
-};
+use crate::api::{AssetId, AssetValue, Block, BlockProcessor, TxCount, TxIndex};
 use crate::eutxo::eutxo_api::{EuBlock, EuTx, EuTxInput, EuUtxo};
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
 use bitcoin_hashes::Hash;
+
+use super::btc_client::BtcBlock;
 
 // define constant for address and script_hash
 pub const ADDRESS_INDEX: &str = "address";
@@ -16,30 +16,34 @@ pub const EMPTY_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
 
 pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {
-    type InBlock = bitcoin::Block;
+    type InBlock = BtcBlock;
     type OutBlock = EuBlock;
     fn process(
         &self,
-        block_batch: &Vec<(BlockHeight, Self::InBlock, TxCount, BlockTimestamp)>,
-    ) -> Vec<EuBlock> {
-        block_batch
-            .into_iter()
-            .map(|height_block| {
-                let eu_block: EuBlock = height_block.into();
-                eu_block
-            })
-            .collect()
+        block_batch: &Vec<Self::InBlock>,
+        tx_count: TxCount,
+    ) -> (Vec<EuBlock>, TxCount) {
+        (
+            block_batch
+                .into_iter()
+                .map(|height_block| {
+                    let eu_block: EuBlock = height_block.into();
+                    eu_block
+                })
+                .collect(),
+            tx_count,
+        )
     }
 }
 
-impl From<&(BlockHeight, bitcoin::Block, TxCount, BlockTimestamp)> for EuBlock {
-    fn from(block: &(BlockHeight, bitcoin::Block, TxCount, BlockTimestamp)) -> Self {
+impl From<&BtcBlock> for EuBlock {
+    fn from(block: &BtcBlock) -> Self {
         EuBlock {
-            hash: block.1.block_hash().to_byte_array(),
-            time: block.1.header.time as i64,
-            height: block.0,
+            hash: block.delegate.block_hash().to_byte_array(),
+            time: block.timestamp(),
+            height: block.height,
             txs: block
-                .1
+                .delegate
                 .txdata
                 .iter()
                 .enumerate()

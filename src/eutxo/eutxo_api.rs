@@ -1,6 +1,6 @@
 use crate::api::{
-    AssetId, AssetValue, BlockHash, BlockHeight, BlockTimestamp, DbIndexName, DbIndexValue, TxHash,
-    TxIndex,
+    AssetId, AssetValue, Block, BlockHash, BlockHeight, BlockTimestamp, DbIndexName, DbIndexValue,
+    TxCount, TxHash, TxIndex,
 };
 
 pub type InputIndex = u16;
@@ -37,4 +37,18 @@ pub struct EuBlock {
     pub height: BlockHeight,
     pub time: BlockTimestamp,
     pub txs: Vec<EuTx>,
+}
+
+impl Block for EuBlock {
+    fn height(&self) -> BlockHeight {
+        self.height
+    }
+
+    fn timestamp(&self) -> BlockTimestamp {
+        self.time
+    }
+
+    fn tx_count(&self) -> TxCount {
+        self.txs.len()
+    }
 }

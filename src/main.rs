@@ -1,7 +1,7 @@
 use btc::{btc_client::BtcClient, btc_processor::BtcProcessor};
 use ci::eutxo::btc;
+use ci::eutxo::eutxo_block_monitor::EuBlockMonitor;
 use ci::eutxo::eutxo_indexers::EutxoIndexers;
-use ci::monitor::SimpleBlockMonitor;
 use ci::settings::AppConfig;
 use ci::syncer::ChainSyncer;
 use std::sync::Arc;
@@ -24,8 +24,8 @@ async fn main() -> Result<(), std::io::Error> {
                 "btc" => {
                     ChainSyncer::new(
                         Arc::new(BtcClient::new(&api_host, &api_username, &api_password)),
-                        Arc::new(SimpleBlockMonitor::new(1000)),
                         Arc::new(BtcProcessor {}),
+                        Arc::new(EuBlockMonitor::new(1000)),
                         Arc::new(EutxoIndexers::new(&db_path, db_indexes)),
                     )
                     .sync(844566, tx_batch_size)
