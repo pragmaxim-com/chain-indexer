@@ -9,7 +9,7 @@ pub type UtxoIndex = u16;
 pub type UtxoValue = u64;
 
 #[derive(Debug, Clone)]
-pub struct CiUtxo {
+pub struct EuUtxo {
     pub index: UtxoIndex,
     pub db_indexes: Vec<(DbIndexName, DbIndexValue)>,
     pub assets: Vec<(AssetId, AssetValue)>,
@@ -17,24 +17,24 @@ pub struct CiUtxo {
 }
 
 #[derive(Debug, Clone)]
-pub struct CiTxInput {
+pub struct EuTxInput {
     pub tx_hash: TxHash,
     pub utxo_index: UtxoIndex,
 }
 
 #[derive(Debug, Clone)]
-pub struct CiTx {
+pub struct EuTx {
     pub is_coinbase: bool,
     pub tx_hash: TxHash,
     pub tx_index: TxIndex,
-    pub ins: Vec<CiTxInput>,
-    pub outs: Vec<CiUtxo>,
+    pub ins: Vec<EuTxInput>,
+    pub outs: Vec<EuUtxo>,
 }
 
 #[derive(Debug, Clone)]
-pub struct CiBlock {
+pub struct EuBlock {
     pub hash: BlockHash,
     pub height: BlockHeight,
     pub time: BlockTimestamp,
-    pub txs: Vec<CiTx>,
+    pub txs: Vec<EuTx>,
 }

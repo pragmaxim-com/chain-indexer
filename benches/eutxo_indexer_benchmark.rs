@@ -4,7 +4,7 @@ use std::{
 };
 
 use ci::{
-    api::{BlockHeight, BlockProcessor, BlockchainClient, Indexers},
+    api::{BlockHeight, BlockProcessor, BlockTimestamp, BlockchainClient, Indexers, TxCount},
     error,
     eutxo::{
         btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
@@ -31,15 +31,15 @@ fn criterion_benchmark(c: &mut Criterion) {
     let indexers = storage.get_indexers();
     let indexer = indexers.get(0).unwrap();
     info!("Initiating download");
-    let batch_size = 50000;
+    let batch_size = 100_000;
     let start_height = 1 as u32;
     let end_height = start_height + batch_size;
-    let mut blocks: Vec<(BlockHeight, bitcoin::Block, usize)> =
+    let mut blocks: Vec<(BlockHeight, bitcoin::Block, TxCount, BlockTimestamp)> =
         Vec::with_capacity(batch_size as usize);
     for height in start_height..end_height {
         blocks.push(
             btc_client
-                .get_block_with_tx_count_for_height(height)
+                .get_block(height)
                 .unwrap(),
         );
     }
@@ -49,8 +49,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     info!("Initiating indexing");
     let mut group = c.benchmark_group("processor");
     group.throughput(Throughput::Elements(batch_size as u64));
-    group.warm_up_time(Duration::from_millis(50));
-    group.measurement_time(Duration::from_millis(500));
+    group.warm_up_time(Duration::from_millis(100));
+    group.measurement_time(Duration::from_millis(1000));
     group.bench_function(BenchmarkId::from_parameter("processor"), |bencher| {
         bencher.to_async(&rt).iter(|| async {
             let arc = Arc::clone(&blocks);

@@ -1,4 +1,4 @@
-use crate::api::{BlockHeight, BlockchainClient};
+use crate::api::{BlockHeight, BlockTimestamp, BlockchainClient, TxCount};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use std::sync::Arc;
 
@@ -17,10 +17,10 @@ impl BtcClient {
 impl BlockchainClient for BtcClient {
     type Block = bitcoin::Block;
 
-    fn get_block_with_tx_count_for_height(
+    fn get_block(
         &self,
         height: u32,
-    ) -> Result<(BlockHeight, bitcoin::Block, usize), String> {
+    ) -> Result<(BlockHeight, bitcoin::Block, TxCount, BlockTimestamp), String> {
         self.rpc_client
             .get_block_hash(height as u64)
             .map_err(|e| e.to_string())
@@ -30,7 +30,8 @@ impl BlockchainClient for BtcClient {
                     .get_block(&hash)
                     .map_err(|e| e.to_string())?;
                 let tx_count = block.txdata.len();
-                Ok((height, block, tx_count))
+                let timestamp = block.header.time;
+                Ok((height, block, tx_count, timestamp as i64))
             })
     }
 }

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use ci::{
-    api::{BlockHeight, BlockProcessor, BlockchainClient},
+    api::{BlockHeight, BlockProcessor, BlockTimestamp, BlockchainClient, TxCount},
     eutxo::btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
     info, settings,
 };
@@ -20,14 +20,10 @@ fn criterion_benchmark(c: &mut Criterion) {
     let batch_size = 50000;
     let start_height = 1 as u32;
     let end_height = start_height + batch_size;
-    let mut blocks: Vec<(BlockHeight, bitcoin::Block, usize)> =
+    let mut blocks: Vec<(BlockHeight, bitcoin::Block, TxCount, BlockTimestamp)> =
         Vec::with_capacity(batch_size as usize);
     for height in start_height..end_height {
-        blocks.push(
-            btc_client
-                .get_block_with_tx_count_for_height(height)
-                .unwrap(),
-        );
+        blocks.push(btc_client.get_block(height).unwrap());
     }
     info!("Initiating processing");
     let mut group = c.benchmark_group("processor");

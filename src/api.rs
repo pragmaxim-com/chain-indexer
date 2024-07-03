@@ -9,6 +9,7 @@ pub type BlockHash = [u8; 32];
 
 pub type TxIndex = u16;
 pub type TxHash = [u8; 32];
+pub type TxCount = usize;
 
 pub type AssetId = Vec<u8>;
 pub type AssetValue = u64;
@@ -19,10 +20,10 @@ pub type DbIndexValue = Vec<u8>;
 pub trait BlockchainClient {
     type Block: Send;
 
-    fn get_block_with_tx_count_for_height(
+    fn get_block(
         &self,
         height: u32,
-    ) -> Result<(BlockHeight, Self::Block, usize), String>;
+    ) -> Result<(BlockHeight, Self::Block, TxCount, BlockTimestamp), String>;
 }
 
 pub trait BlockProcessor {
@@ -30,7 +31,7 @@ pub trait BlockProcessor {
     type OutBlock: Send;
     fn process(
         &self,
-        block_batch: &Vec<(BlockHeight, Self::InBlock, usize)>,
+        block_batch: &Vec<(BlockHeight, Self::InBlock, TxCount, BlockTimestamp)>,
     ) -> Vec<Self::OutBlock>;
 }
 
@@ -42,10 +43,4 @@ pub trait Indexers {
 
 pub trait Syncable {
     fn sync(&self, start_height: BlockHeight, end_height: BlockHeight) -> Result<(), String>;
-}
-
-pub struct ChainSyncer<InBlock: Send, OutBlock: Send> {
-    pub client: Arc<dyn BlockchainClient<Block = InBlock> + Send + Sync>,
-    pub processor: Arc<dyn BlockProcessor<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
-    pub indexers: Arc<dyn Indexers<OutBlock = OutBlock>>,
 }
