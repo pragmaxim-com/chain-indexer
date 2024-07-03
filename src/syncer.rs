@@ -38,7 +38,7 @@ impl<InBlock: Block + Send + 'static, OutBlock: Block + Send + Sync + Clone + 's
                 let rpc_client = Arc::clone(&self.client);
                 tokio::task::spawn_blocking(move || rpc_client.get_block(height).unwrap())
             })
-            .buffered(10000)
+            .buffered(64)
             .map(|res| match res {
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),
@@ -48,7 +48,7 @@ impl<InBlock: Block + Send + 'static, OutBlock: Block + Send + Sync + Clone + 's
                 let processor = Arc::clone(&self.processor);
                 tokio::task::spawn_blocking(move || processor.process(&blocks, tx_count))
             })
-            .buffered(512)
+            .buffered(256)
             .map(|res| match res {
                 Ok((block_batch, tx_count)) => {
                     let _ = &self.monitor.monitor(&block_batch, tx_count);
