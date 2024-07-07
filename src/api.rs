@@ -20,6 +20,8 @@ pub type DbIndexValue = Vec<u8>;
 pub trait BlockchainClient {
     type Block: Send;
 
+    fn get_best_block(&self) -> Result<Self::Block, String>;
+
     fn get_block(&self, height: u32) -> Result<Self::Block, String>;
 }
 

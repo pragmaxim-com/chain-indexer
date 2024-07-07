@@ -2,3 +2,4 @@
 Cargo.lock
 .vscode
 local-settings.toml
+nohup.out

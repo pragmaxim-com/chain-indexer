@@ -28,7 +28,7 @@ async fn main() -> Result<(), std::io::Error> {
                         Arc::new(EuBlockMonitor::new(1000)),
                         Arc::new(EutxoIndexers::new(&db_path, db_indexes)),
                     )
-                    .sync(844566, tx_batch_size)
+                    .sync(tx_batch_size)
                     .await;
                     Ok(())
                 }

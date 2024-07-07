@@ -29,10 +29,11 @@ impl<InBlock: Block + Send + 'static, OutBlock: Block + Send + Sync + Clone + 's
         }
     }
 
-    pub async fn sync(&self, end_height: u32, min_batch_size: usize) -> () {
+    pub async fn sync(&self, min_batch_size: usize) -> () {
+        let best_height = self.client.get_best_block().unwrap().height();
         let last_height = self.indexers.get_last_height() + 1;
-        info!("Indexing from {} to {}", last_height, end_height);
-        let heights = last_height..=end_height;
+        info!("Indexing from {} to {}", last_height, best_height);
+        let heights = last_height..=best_height;
         tokio_stream::iter(heights)
             .map(|height| {
                 let rpc_client = Arc::clone(&self.client);
