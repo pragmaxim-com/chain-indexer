@@ -1,4 +1,5 @@
-use crate::api::{Block, BlockHeight, BlockTimestamp, BlockchainClient, TxCount};
+use crate::api::{Block, BlockHash, BlockHeight, BlockTimestamp, BlockchainClient, TxCount};
+use bitcoin_hashes::Hash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use std::sync::Arc;
 
@@ -9,6 +10,10 @@ pub struct BtcBlock {
 }
 
 impl Block for BtcBlock {
+    fn prev_hash(&self) -> BlockHash {
+        self.delegate.header.prev_blockhash.to_byte_array()
+    }
+
     fn height(&self) -> BlockHeight {
         self.height
     }

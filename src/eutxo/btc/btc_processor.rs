@@ -45,7 +45,8 @@ impl From<&BtcBlock> for EuBlock {
     fn from(block: &BtcBlock) -> Self {
         EuBlock {
             hash: block.delegate.block_hash().to_byte_array(),
-            time: block.timestamp(),
+            parent_hash: block.delegate.header.prev_blockhash.to_byte_array(),
+            timestamp: block.timestamp(),
             height: block.height,
             txs: block
                 .delegate

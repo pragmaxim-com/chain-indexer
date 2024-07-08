@@ -49,6 +49,7 @@ pub trait BlockMonitor<B> {
 }
 
 pub trait Block {
+    fn prev_hash(&self) -> BlockHash;
     fn height(&self) -> BlockHeight;
     fn timestamp(&self) -> BlockTimestamp;
     fn tx_count(&self) -> TxCount;

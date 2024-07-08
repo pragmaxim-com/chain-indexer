@@ -34,18 +34,23 @@ pub struct EuTx {
 #[derive(Debug, Clone)]
 pub struct EuBlock {
     pub hash: BlockHash,
+    pub parent_hash: BlockHash,
     pub height: BlockHeight,
-    pub time: BlockTimestamp,
+    pub timestamp: BlockTimestamp,
     pub txs: Vec<EuTx>,
 }
 
 impl Block for EuBlock {
+    fn prev_hash(&self) -> BlockHash {
+        self.parent_hash
+    }
+
     fn height(&self) -> BlockHeight {
         self.height
     }
 
     fn timestamp(&self) -> BlockTimestamp {
-        self.time
+        self.timestamp
     }
 
     fn tx_count(&self) -> TxCount {

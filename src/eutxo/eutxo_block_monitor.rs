@@ -36,7 +36,7 @@ impl BlockMonitor<EuBlock> for EuBlockMonitor {
             let last_block = block_batch.last().unwrap();
             let total_time = self.start_time.elapsed().as_secs();
             let txs_per_sec = format!("{:.1}", new_total_tx_count as f64 / total_time as f64);
-            let datetime = DateTime::from_timestamp(last_block.time, 0).unwrap();
+            let datetime = DateTime::from_timestamp(last_block.timestamp, 0).unwrap();
             let readable_date = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
             info!(
                 "Block @ {} from {} at {} txs/sec, total {}",
