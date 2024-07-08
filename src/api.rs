@@ -1,7 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
-
-use broadcast_sink::Consumer;
-use tokio::sync::Mutex;
+use std::borrow::Cow;
 
 pub type BlockTimestamp = i64;
 pub type BlockHeight = u32;
@@ -38,10 +35,27 @@ pub trait BlockProcessor {
     ) -> (Vec<Self::OutBlock>, TxCount);
 }
 
-pub trait Indexers {
+pub trait ChainLinker {
+    type InBlock: Block + Send + Sync;
+    type OutBlock: Block + Send + Sync;
+
+    fn process_batch(
+        &self,
+        block_batch: &Vec<Self::InBlock>,
+        tx_count: TxCount,
+    ) -> (Vec<Self::OutBlock>, TxCount);
+
+    fn get_best_block(&self) -> Result<Self::InBlock, String>;
+
+    fn get_block(&self, height: u32) -> Result<Self::InBlock, String>;
+
+    fn chain_link(&self, block: Self::OutBlock) -> Vec<Self::OutBlock>;
+}
+
+pub trait Indexer {
     type OutBlock: Send;
     fn get_last_height(&self) -> u32;
-    fn get_indexers(&self) -> Vec<Arc<Mutex<dyn Consumer<Vec<Self::OutBlock>>>>>;
+    fn consume(&self, blocks: &Vec<Self::OutBlock>) -> Result<(), String>;
 }
 
 pub trait BlockMonitor<B> {

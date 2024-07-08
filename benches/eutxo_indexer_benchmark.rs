@@ -4,14 +4,14 @@ use std::{
 };
 
 use ci::{
-    api::{BlockProcessor, BlockchainClient, Indexers},
+    api::{BlockProcessor, BlockchainClient, Indexer},
     error,
     eutxo::{
         btc::{
             btc_client::{BtcBlock, BtcClient},
             btc_processor::BtcProcessor,
         },
-        eutxo_indexers::EutxoIndexers,
+        eutxo_indexer::EutxoIndexer,
     },
     info, settings,
 };
@@ -30,7 +30,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let btc_client = BtcClient::new(&api_host, &api_username, &api_password);
     let processor = BtcProcessor {};
-    let storage = EutxoIndexers::new(&db_path, db_indexes);
+    let storage = EutxoIndexer::new(&db_path, db_indexes);
     let indexers = storage.get_indexers();
     let indexer = indexers.get(0).unwrap();
     info!("Initiating download");

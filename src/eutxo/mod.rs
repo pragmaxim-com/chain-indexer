@@ -4,6 +4,6 @@ pub mod eutxo_block_monitor;
 pub mod eutxo_codec_block;
 pub mod eutxo_codec_tx;
 pub mod eutxo_codec_utxo;
-pub mod eutxo_indexers;
-pub mod eutxo_input_indexer;
+pub mod eutxo_indexer;
+pub mod eutxo_service;
 pub mod eutxo_storage;
