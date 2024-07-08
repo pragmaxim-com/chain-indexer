@@ -18,7 +18,12 @@ pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {
     type InBlock = BtcBlock;
     type OutBlock = EuBlock;
-    fn process(
+
+    fn process(&self, btc_block: &Self::InBlock) -> EuBlock {
+        btc_block.into()
+    }
+
+    fn process_batch(
         &self,
         block_batch: &Vec<Self::InBlock>,
         tx_count: TxCount,
@@ -26,8 +31,8 @@ impl BlockProcessor for BtcProcessor {
         (
             block_batch
                 .into_iter()
-                .map(|height_block| {
-                    let eu_block: EuBlock = height_block.into();
+                .map(|btc_block| {
+                    let eu_block: EuBlock = btc_block.into();
                     eu_block
                 })
                 .collect(),

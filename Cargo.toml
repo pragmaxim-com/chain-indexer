@@ -14,6 +14,7 @@ rand = "0.8.5"
 rocksdb = { git = "https://github.com/rust-rocksdb/rust-rocksdb", default-features = false, rev = "1cf906dc4087f06631820f13855e6b27bd21b972" }
 min-batch = { git = "https://github.com/pragmaxim-com/min-batch.rs" }
 broadcast-sink = { git = "https://github.com/pragmaxim-com/broadcast-sink.rs" }
+# buffer = { path = "/home/lisak/src/rust/buffer.rs" }
 tokio = { version = "1.38.0", features = ["full"] }
 tokio-stream = { version = "0.1.15", features = ["sync"] }
 pin-project-lite = "0.2"

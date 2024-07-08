@@ -28,7 +28,10 @@ pub trait BlockchainClient {
 pub trait BlockProcessor {
     type InBlock: Send;
     type OutBlock: Send;
-    fn process(
+
+    fn process(&self, block: &Self::InBlock) -> Self::OutBlock;
+
+    fn process_batch(
         &self,
         block_batch: &Vec<Self::InBlock>,
         tx_count: TxCount,

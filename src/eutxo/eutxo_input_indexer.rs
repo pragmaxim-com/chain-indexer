@@ -33,12 +33,13 @@ fn bytes_to_u32(bytes: &[u8]) -> u32 {
 fn process_block(
     block_height: &BlockHeight,
     block_hash: &BlockHash,
+    db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
     block_hash_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
     block_pk_by_hash_cf: &Arc<rocksdb::BoundColumnFamily>,
-) {
+) -> Result<(), rocksdb::Error> {
     eutxo_storage::persist_block_hash_by_pk(block_height, block_hash, batch, block_hash_by_pk_cf);
-    eutxo_storage::persist_block_pk_by_hash(block_hash, block_height, batch, block_pk_by_hash_cf);
+    eutxo_storage::persist_block_pk_by_hash(block_hash, block_height, db_tx, block_pk_by_hash_cf)
 }
 
 fn process_tx(
@@ -184,10 +185,12 @@ impl Consumer<Vec<EuBlock>> for EutxoInputIndexer {
             process_block(
                 &block.height,
                 &block.hash,
+                &db_tx,
                 &mut batch,
                 &block_hash_by_pk_cf,
                 &block_pk_by_hash_cf,
-            );
+            )
+            .map_err(|e| BroadcastSinkError::new(e.as_ref()))?;
             for eu_tx in block.txs.iter() {
                 process_tx(
                     &block.height,

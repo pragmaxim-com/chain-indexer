@@ -35,7 +35,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     group.bench_function(BenchmarkId::from_parameter("processor"), |bencher| {
         bencher.iter(|| {
             let xs = blocks.drain(0..10).collect();
-            processor.process(&xs, 0)
+            processor.process_batch(&xs, 0)
         });
     });
     group.finish();

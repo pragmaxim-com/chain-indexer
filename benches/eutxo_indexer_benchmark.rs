@@ -42,7 +42,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         blocks.push(btc_client.get_block(height).unwrap());
     }
     info!("Initiating processing");
-    let blocks = Arc::new(Mutex::new(processor.process(&blocks, 0)));
+    let blocks = Arc::new(Mutex::new(processor.process_batch(&blocks, 0)));
 
     info!("Initiating indexing");
     let mut group = c.benchmark_group("processor");

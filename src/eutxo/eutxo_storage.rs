@@ -23,11 +23,11 @@ pub fn persist_block_hash_by_pk(
 pub fn persist_block_pk_by_hash(
     block_hash: &BlockHash,
     block_height: &BlockHeight,
-    batch: &mut rocksdb::WriteBatchWithTransaction<true>,
+    db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
     block_pk_by_hash_cf: &Arc<rocksdb::BoundColumnFamily>,
-) {
+) -> Result<(), rocksdb::Error> {
     let height_bytes = eutxo_codec_block::block_height_to_bytes(block_height);
-    batch.put_cf(block_pk_by_hash_cf, block_hash, height_bytes)
+    db_tx.put_cf(block_pk_by_hash_cf, block_hash, height_bytes)
 }
 
 pub fn persist_tx_hash_by_pk(

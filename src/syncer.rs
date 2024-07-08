@@ -1,5 +1,4 @@
 use crate::api::{Block, BlockMonitor, BlockProcessor, BlockchainClient, Indexers};
-use crate::info;
 use broadcast_sink::StreamBroadcastSinkExt;
 use futures::stream::StreamExt;
 use min_batch::ext::MinBatchExt;
@@ -8,8 +7,8 @@ use std::sync::Arc;
 pub struct ChainSyncer<InBlock: Block + Send, OutBlock: Block + Send> {
     pub client: Arc<dyn BlockchainClient<Block = InBlock> + Send + Sync>,
     pub processor: Arc<dyn BlockProcessor<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
-    pub monitor: Arc<dyn BlockMonitor<OutBlock>>,
-    pub indexers: Arc<dyn Indexers<OutBlock = OutBlock>>,
+    pub monitor: Arc<dyn BlockMonitor<OutBlock> + Send + Sync>,
+    pub indexers: Arc<dyn Indexers<OutBlock = OutBlock> + Send + Sync>,
 }
 
 impl<InBlock: Block + Send + 'static, OutBlock: Block + Send + Sync + Clone + 'static>
@@ -18,7 +17,7 @@ impl<InBlock: Block + Send + 'static, OutBlock: Block + Send + Sync + Clone + 's
     pub fn new(
         client: Arc<dyn BlockchainClient<Block = InBlock> + Send + Sync>,
         processor: Arc<dyn BlockProcessor<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
-        monitor: Arc<dyn BlockMonitor<OutBlock>>,
+        monitor: Arc<dyn BlockMonitor<OutBlock> + Send + Sync>,
         indexers: Arc<dyn Indexers<OutBlock = OutBlock> + Send + Sync>,
     ) -> Self {
         ChainSyncer {
@@ -32,7 +31,7 @@ impl<InBlock: Block + Send + 'static, OutBlock: Block + Send + Sync + Clone + 's
     pub async fn sync(&self, min_batch_size: usize) -> () {
         let best_height = self.client.get_best_block().unwrap().height();
         let last_height = self.indexers.get_last_height() + 1;
-        info!("Indexing from {} to {}", last_height, best_height);
+        // let check_forks: bool = best_height - last_height < 1000;
         let heights = last_height..=best_height;
         tokio_stream::iter(heights)
             .map(|height| {
@@ -47,7 +46,7 @@ impl<InBlock: Block + Send + 'static, OutBlock: Block + Send + Sync + Clone + 's
             .min_batch_with_weight(min_batch_size, |block| block.tx_count())
             .map(|(blocks, tx_count)| {
                 let processor = Arc::clone(&self.processor);
-                tokio::task::spawn_blocking(move || processor.process(&blocks, tx_count))
+                tokio::task::spawn_blocking(move || processor.process_batch(&blocks, tx_count))
             })
             .buffered(256)
             .map(|res| match res {
