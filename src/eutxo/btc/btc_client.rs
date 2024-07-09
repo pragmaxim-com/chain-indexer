@@ -60,7 +60,20 @@ impl BlockchainClient for BtcClient {
             })
     }
 
-    fn get_block(&self, height: u32) -> Result<BtcBlock, String> {
+    fn get_block_by_hash(&self, hash: BlockHash) -> Result<BtcBlock, String> {
+        let bitcoin_hash = bitcoin::BlockHash::from_slice(&hash).unwrap();
+        let block = self
+            .rpc_client
+            .get_block(&bitcoin_hash)
+            .map_err(|e| e.to_string())?;
+        let height = block.bip34_block_height().map_err(|e| e.to_string())?;
+        Ok(BtcBlock {
+            height: height as u32,
+            delegate: block,
+        })
+    }
+
+    fn get_block_by_height(&self, height: BlockHeight) -> Result<BtcBlock, String> {
         self.rpc_client
             .get_block_hash(height as u64)
             .map_err(|e| e.to_string())

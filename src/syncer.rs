@@ -32,7 +32,9 @@ impl<InBlock: Block + Send + Sync + 'static, OutBlock: Block + Send + Sync + Clo
         tokio_stream::iter(heights)
             .map(|height| {
                 let chain_linker = Arc::clone(&self.chain_linker);
-                tokio::task::spawn_blocking(move || chain_linker.get_block(height).unwrap())
+                tokio::task::spawn_blocking(move || {
+                    chain_linker.get_block_by_height(height).unwrap()
+                })
             })
             .buffered(64)
             .map(|res| match res {

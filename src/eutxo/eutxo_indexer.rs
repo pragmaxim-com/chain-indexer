@@ -1,4 +1,5 @@
 use crate::api::Block;
+use crate::api::BlockHeight;
 use crate::api::ChainLinker;
 use crate::api::DbIndexName;
 use crate::api::Indexer;
@@ -112,7 +113,38 @@ fn u32_to_bytes(n: u32) -> [u8; std::mem::size_of::<u32>()] {
     n.to_ne_bytes()
 }
 
-// implement BlockBatchIndexer trait
+enum DbOp {
+    Insert,
+    Delete,
+}
+
+impl<InBlock: Send + Sync> EutxoIndexer<InBlock> {
+    fn chain_link(
+        &self,
+        block: &EuBlock,
+        db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
+        block_pk_by_hash_cf: &Arc<BoundColumnFamily>,
+        winning_fork: &mut Vec<EuBlock>,
+    ) -> Result<Vec<EuBlock>, String> {
+        let prev_height: Option<BlockHeight> =
+            eutxo_service::get_block_height_by_hash(&block.prev_hash(), db_tx, block_pk_by_hash_cf)
+                .unwrap();
+        if block.height == 1 {
+            winning_fork.insert(0, block.clone());
+            Ok(winning_fork.clone())
+        } else if prev_height.is_some() {
+            winning_fork.insert(0, block.clone());
+            Ok(winning_fork.clone())
+        } else {
+            let prev_block = self
+                .chain_linker
+                .get_processed_block_by_hash(block.prev_hash())?;
+            winning_fork.insert(0, block.clone());
+            self.chain_link(&prev_block, db_tx, block_pk_by_hash_cf, winning_fork)
+        }
+    }
+}
+
 impl<InBlock: Send + Sync> Indexer for EutxoIndexer<InBlock> {
     type OutBlock = EuBlock;
 
@@ -147,7 +179,7 @@ impl<InBlock: Send + Sync> Indexer for EutxoIndexer<InBlock> {
             .lock()
             .map_err(|e| e.to_string())?;
 
-        for block in blocks.iter() {
+        let mut persist_block = |block: &EuBlock| -> Result<(), String> {
             eutxo_service::process_block(
                 &block.height,
                 &block.hash,
@@ -187,7 +219,26 @@ impl<InBlock: Send + Sync> Indexer for EutxoIndexer<InBlock> {
                     );
                 }
             }
-        }
+            Ok(())
+        };
+
+        blocks
+            .iter()
+            .map(|block| {
+                self.chain_link(block, &db_tx, &block_pk_by_hash_cf, &mut vec![])
+                    .unwrap()
+            })
+            .for_each(|blocks| match blocks.len() {
+                0 => panic!("Blocks vector is empty"),
+                1 => {
+                    let block = &blocks[0];
+                    persist_block(block).unwrap();
+                }
+                _ => {
+                    panic!("Blocks vector is empty")
+                }
+            });
+
         // persist last height to db_tx if Some
         if let Some(block) = blocks.last() {
             db_tx

@@ -19,7 +19,8 @@ pub trait BlockchainClient {
 
     fn get_best_block(&self) -> Result<Self::Block, String>;
 
-    fn get_block(&self, height: u32) -> Result<Self::Block, String>;
+    fn get_block_by_height(&self, height: BlockHeight) -> Result<Self::Block, String>;
+    fn get_block_by_hash(&self, height: BlockHash) -> Result<Self::Block, String>;
 }
 
 pub trait BlockProcessor {
@@ -36,8 +37,8 @@ pub trait BlockProcessor {
 }
 
 pub trait ChainLinker {
-    type InBlock: Block + Send + Sync;
-    type OutBlock: Block + Send + Sync;
+    type InBlock: Send + Sync;
+    type OutBlock: Send + Sync;
 
     fn process_batch(
         &self,
@@ -47,9 +48,9 @@ pub trait ChainLinker {
 
     fn get_best_block(&self) -> Result<Self::InBlock, String>;
 
-    fn get_block(&self, height: u32) -> Result<Self::InBlock, String>;
+    fn get_block_by_height(&self, height: BlockHeight) -> Result<Self::InBlock, String>;
 
-    fn chain_link(&self, block: Self::OutBlock) -> Vec<Self::OutBlock>;
+    fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Self::OutBlock, String>;
 }
 
 pub trait Indexer {

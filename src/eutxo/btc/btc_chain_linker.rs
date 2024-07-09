@@ -1,5 +1,5 @@
 use crate::{
-    api::{BlockProcessor, BlockchainClient, ChainLinker, TxCount},
+    api::{BlockHash, BlockHeight, BlockProcessor, BlockchainClient, ChainLinker, TxCount},
     eutxo::eutxo_api::EuBlock,
 };
 
@@ -30,11 +30,13 @@ impl ChainLinker for BtcChainLinker {
         self.client.get_best_block()
     }
 
-    fn get_block(&self, height: u32) -> Result<BtcBlock, String> {
-        self.client.get_block(height)
+    fn get_block_by_height(&self, height: BlockHeight) -> Result<BtcBlock, String> {
+        self.client.get_block_by_height(height)
     }
 
-    fn chain_link(&self, block: Self::OutBlock) -> Vec<Self::OutBlock> {
-        todo!()
+    fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Self::OutBlock, String> {
+        let block = self.client.get_block_by_hash(hash)?;
+        let processed_block = self.processor.process(&block);
+        Ok(processed_block)
     }
 }

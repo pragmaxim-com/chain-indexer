@@ -1,6 +1,6 @@
 use byteorder::{BigEndian, ByteOrder};
 
-use crate::api::BlockHeight;
+use crate::api::{BlockHash, BlockHeight};
 
 pub fn block_height_to_bytes(
     block_height: &BlockHeight,
@@ -12,6 +12,16 @@ pub fn block_height_to_bytes(
 
 pub fn bytes_to_block_height(block_height_bytes: [u8; 4]) -> BlockHeight {
     BigEndian::read_u32(&block_height_bytes[0..4])
+}
+
+pub fn vector_to_block_height(block_height_bytes: &Vec<u8>) -> BlockHeight {
+    BigEndian::read_u32(&block_height_bytes[0..4])
+}
+
+pub fn vector_to_block_hash(block_hash_bytes: &Vec<u8>) -> BlockHash {
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&block_hash_bytes);
+    hash
 }
 
 #[cfg(test)]

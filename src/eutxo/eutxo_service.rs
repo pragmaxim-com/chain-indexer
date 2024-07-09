@@ -9,6 +9,14 @@ use crate::{
 
 use super::eutxo_storage;
 
+pub(crate) fn get_block_height_by_hash(
+    block_hash: &BlockHash,
+    db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
+    block_pk_by_hash_cf: &Arc<rocksdb::BoundColumnFamily>,
+) -> Result<Option<BlockHeight>, rocksdb::Error> {
+    eutxo_storage::get_block_pk_by_hash(block_hash, db_tx, block_pk_by_hash_cf)
+}
+
 pub(crate) fn process_block(
     block_height: &BlockHeight,
     block_hash: &BlockHash,

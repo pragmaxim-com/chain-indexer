@@ -25,7 +25,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let end_height = start_height + batch_size;
     let mut blocks: Vec<BtcBlock> = Vec::with_capacity(batch_size as usize);
     for height in start_height..end_height {
-        blocks.push(btc_client.get_block(height).unwrap());
+        blocks.push(btc_client.get_block_by_height(height).unwrap());
     }
     info!("Initiating processing");
     let mut group = c.benchmark_group("processor");

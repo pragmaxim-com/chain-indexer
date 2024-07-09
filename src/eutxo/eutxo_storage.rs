@@ -20,6 +20,15 @@ pub fn persist_block_hash_by_pk(
     batch.put_cf(block_hash_by_pk_cf, height_bytes, block_hash)
 }
 
+pub fn get_block_pk_by_hash(
+    block_hash: &BlockHash,
+    db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
+    block_pk_by_hash_cf: &Arc<rocksdb::BoundColumnFamily>,
+) -> Result<Option<BlockHeight>, rocksdb::Error> {
+    let height_bytes = db_tx.get_cf(block_pk_by_hash_cf, block_hash)?;
+    Ok(height_bytes.map(|bytes| eutxo_codec_block::vector_to_block_height(&bytes)))
+}
+
 pub fn persist_block_pk_by_hash(
     block_hash: &BlockHash,
     block_height: &BlockHeight,
