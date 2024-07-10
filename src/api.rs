@@ -1,4 +1,7 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Mutex};
+
+use lru::LruCache;
+use rocksdb::{OptimisticTransactionDB, SingleThreaded};
 
 pub type BlockTimestamp = i64;
 pub type BlockHeight = u32;
@@ -52,11 +55,32 @@ pub trait ChainLinker {
 
     fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Self::OutBlock, String>;
 }
-
-pub trait Indexer {
+pub trait Service {
     type OutBlock: Send;
-    fn get_last_height(&self) -> u32;
-    fn consume(&self, blocks: &Vec<Self::OutBlock>) -> Result<(), String>;
+
+    fn get_tx_pk_by_tx_hash_lru_cache(&self) -> &Mutex<LruCache<[u8; 32], [u8; 6]>>;
+
+    fn process_block(
+        &self,
+        block: &Self::OutBlock,
+        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
+        batch: &mut rocksdb::WriteBatchWithTransaction<true>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<[u8; 32], [u8; 6]>,
+    ) -> Result<(), String>;
+
+    fn persist_last_height(
+        &self,
+        height: BlockHeight,
+        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
+    ) -> Result<(), rocksdb::Error>;
+
+    fn get_last_height(&self) -> BlockHeight;
+
+    fn get_block_height_by_hash(
+        &self,
+        block_hash: &BlockHash,
+        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
+    ) -> Result<Option<BlockHeight>, rocksdb::Error>;
 }
 
 pub trait BlockMonitor<B> {

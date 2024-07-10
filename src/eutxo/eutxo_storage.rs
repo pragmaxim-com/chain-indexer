@@ -1,7 +1,5 @@
-use std::sync::Arc;
-
 use lru::LruCache;
-use rocksdb::{MultiThreaded, TransactionDB};
+use rocksdb::{ColumnFamily, OptimisticTransactionDB, SingleThreaded};
 
 use crate::api::{BlockHash, BlockHeight, DbIndexValue, TxHash, TxIndex};
 
@@ -14,7 +12,7 @@ pub fn persist_block_hash_by_pk(
     block_height: &BlockHeight,
     block_hash: &BlockHash,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
-    block_hash_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
+    block_hash_by_pk_cf: &ColumnFamily,
 ) {
     let height_bytes = eutxo_codec_block::block_height_to_bytes(block_height);
     batch.put_cf(block_hash_by_pk_cf, height_bytes, block_hash)
@@ -22,8 +20,8 @@ pub fn persist_block_hash_by_pk(
 
 pub fn get_block_pk_by_hash(
     block_hash: &BlockHash,
-    db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
-    block_pk_by_hash_cf: &Arc<rocksdb::BoundColumnFamily>,
+    db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
+    block_pk_by_hash_cf: &ColumnFamily,
 ) -> Result<Option<BlockHeight>, rocksdb::Error> {
     let height_bytes = db_tx.get_cf(block_pk_by_hash_cf, block_hash)?;
     Ok(height_bytes.map(|bytes| eutxo_codec_block::vector_to_block_height(&bytes)))
@@ -32,8 +30,8 @@ pub fn get_block_pk_by_hash(
 pub fn persist_block_pk_by_hash(
     block_hash: &BlockHash,
     block_height: &BlockHeight,
-    db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
-    block_pk_by_hash_cf: &Arc<rocksdb::BoundColumnFamily>,
+    db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
+    block_pk_by_hash_cf: &ColumnFamily,
 ) -> Result<(), rocksdb::Error> {
     let height_bytes = eutxo_codec_block::block_height_to_bytes(block_height);
     db_tx.put_cf(block_pk_by_hash_cf, block_hash, height_bytes)
@@ -44,7 +42,7 @@ pub fn persist_tx_hash_by_pk(
     tx_index: &TxIndex,
     tx_hash: &TxHash,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
-    tx_hash_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
+    tx_hash_by_pk_cf: &ColumnFamily,
 ) {
     let tx_pk_bytes = eutxo_codec_tx::tx_pk_bytes(block_height, tx_index);
     batch.put_cf(tx_hash_by_pk_cf, tx_pk_bytes, tx_hash)
@@ -54,8 +52,8 @@ pub fn persist_tx_pk_by_hash(
     block_height: &BlockHeight,
     tx_index: &TxIndex,
     tx_hash: &TxHash,
-    db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
-    tx_pk_by_hash_cf: &Arc<rocksdb::BoundColumnFamily>,
+    db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
+    tx_pk_by_hash_cf: &ColumnFamily,
     tx_pk_by_tx_hash_lru_cache: &mut LruCache<[u8; 32], [u8; 6]>,
 ) -> Result<(), rocksdb::Error> {
     let tx_pk_bytes: [u8; 6] = eutxo_codec_tx::tx_pk_bytes(block_height, tx_index);
@@ -69,7 +67,7 @@ pub fn persist_utxo_value_by_pk(
     utxo_index: &UtxoIndex,
     utxo_value: &UtxoValue,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
-    utxo_value_by_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
+    utxo_value_by_pk_cf: &ColumnFamily,
 ) {
     let utxo_pk_bytes = eutxo_codec_utxo::pk_bytes(block_height, tx_index, utxo_index);
     let utxo_value_bytes = eutxo_codec_utxo::utxo_value_to_bytes(utxo_value);
@@ -81,10 +79,10 @@ pub fn persist_utxo_pk_by_input_pk(
     tx_index: &TxIndex,
     input_index: &InputIndex,
     tx_input: &EuTxInput,
-    db_tx: &rocksdb::Transaction<TransactionDB<MultiThreaded>>,
+    db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
-    utxo_pk_by_input_pk_cf: &Arc<rocksdb::BoundColumnFamily>,
-    tx_pk_by_hash_cf: &Arc<rocksdb::BoundColumnFamily>,
+    utxo_pk_by_input_pk_cf: &ColumnFamily,
+    tx_pk_by_hash_cf: &ColumnFamily,
     tx_pk_by_tx_hash_lru_cache: &mut LruCache<[u8; 32], [u8; 6]>,
 ) {
     let tx_pk_bytes = tx_pk_by_tx_hash_lru_cache
@@ -105,7 +103,7 @@ pub fn persist_utxo_index(
     tx_index: &TxIndex,
     utxo_index: &UtxoIndex,
     batch: &mut rocksdb::WriteBatchWithTransaction<true>,
-    utxo_index_cf: &Arc<rocksdb::BoundColumnFamily>,
+    utxo_index_cf: &ColumnFamily,
 ) {
     let utxo_pk = eutxo_codec_utxo::pk_bytes(block_height, tx_index, utxo_index);
 
