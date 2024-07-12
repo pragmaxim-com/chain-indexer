@@ -101,7 +101,7 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
         let mut tx_pk_by_tx_hash_lru_cache = self
             .service
             .get_tx_pk_by_tx_hash_lru_cache()
-            .lock()
+            .write()
             .map_err(|e| e.to_string())?;
 
         let mut binding = db_tx.get_writebatch();

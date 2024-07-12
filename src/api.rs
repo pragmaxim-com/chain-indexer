@@ -1,8 +1,4 @@
-use std::{
-    borrow::Cow,
-    cell::{RefCell, RefMut},
-    sync::Mutex,
-};
+use std::{borrow::Cow, cell::RefCell, sync::RwLock};
 
 use lru::LruCache;
 
@@ -63,7 +59,7 @@ pub trait ChainLinker {
 pub trait Service {
     type OutBlock: Send;
 
-    fn get_tx_pk_by_tx_hash_lru_cache(&self) -> &Mutex<LruCache<[u8; 32], [u8; 6]>>;
+    fn get_tx_pk_by_tx_hash_lru_cache(&self) -> &RwLock<LruCache<[u8; 32], [u8; 6]>>;
 
     fn persist_block(
         &self,

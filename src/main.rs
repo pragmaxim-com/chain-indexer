@@ -6,7 +6,6 @@ use ci::eutxo::eutxo_api::{self, EuBlock};
 use ci::eutxo::eutxo_block_monitor::EuBlockMonitor;
 use ci::eutxo::eutxo_service::EuService;
 use ci::indexer::Indexer;
-use ci::info;
 use ci::settings::AppConfig;
 use ci::storage::Storage;
 use ci::syncer::ChainSyncer;

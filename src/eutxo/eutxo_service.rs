@@ -7,19 +7,19 @@ use lru::LruCache;
 use std::{
     cell::{RefCell, RefMut},
     num::NonZeroUsize,
-    sync::Mutex,
+    sync::RwLock,
 };
 
 use super::{eutxo_api::EuBlock, eutxo_codec_block, eutxo_codec_tx, eutxo_codec_utxo};
 
 pub struct EuService {
-    pub(crate) tx_pk_by_tx_hash_lru_cache: Mutex<LruCache<[u8; 32], [u8; 6]>>,
+    pub(crate) tx_pk_by_tx_hash_lru_cache: RwLock<LruCache<[u8; 32], [u8; 6]>>,
 }
 
 impl<'d> Service for EuService {
     type OutBlock = EuBlock;
 
-    fn get_tx_pk_by_tx_hash_lru_cache(&self) -> &Mutex<LruCache<[u8; 32], [u8; 6]>> {
+    fn get_tx_pk_by_tx_hash_lru_cache(&self) -> &RwLock<LruCache<[u8; 32], [u8; 6]>> {
         &self.tx_pk_by_tx_hash_lru_cache
     }
 
@@ -57,7 +57,7 @@ impl<'d> Service for EuService {
 impl EuService {
     pub fn new() -> Self {
         EuService {
-            tx_pk_by_tx_hash_lru_cache: Mutex::new(LruCache::new(
+            tx_pk_by_tx_hash_lru_cache: RwLock::new(LruCache::new(
                 NonZeroUsize::new(10_000_000).unwrap(),
             )),
         }
