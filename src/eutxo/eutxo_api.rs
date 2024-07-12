@@ -41,6 +41,10 @@ pub struct EuBlock {
 }
 
 impl Block for EuBlock {
+    fn hash(&self) -> BlockHash {
+        self.hash
+    }
+
     fn prev_hash(&self) -> BlockHash {
         self.parent_hash
     }
@@ -56,4 +60,24 @@ impl Block for EuBlock {
     fn tx_count(&self) -> TxCount {
         self.txs.len()
     }
+}
+
+pub const BLOCK_HASH_BY_PK_CF: &str = "BLOCK_HASH_BY_PK_CF";
+pub const BLOCK_PK_BY_HASH_CF: &str = "BLOCK_PK_BY_HASH_CF";
+pub const TX_HASH_BY_PK_CF: &str = "TX_HASH_BY_PK_CF";
+pub const TX_PK_BY_HASH_CF: &str = "TX_PK_BY_HASH_CF";
+pub const UTXO_VALUE_BY_PK_CF: &str = "UTXO_VALUE_BY_PK_CF";
+pub const UTXO_PK_BY_INPUT_PK_CF: &str = "UTXO_PK_BY_INPUT_PK_CF";
+pub const META_CF: &str = "META_CF";
+
+pub fn get_eutxo_column_families() -> Vec<&'static str> {
+    vec![
+        META_CF,
+        BLOCK_HASH_BY_PK_CF,
+        BLOCK_PK_BY_HASH_CF,
+        TX_HASH_BY_PK_CF,
+        TX_PK_BY_HASH_CF,
+        UTXO_VALUE_BY_PK_CF,
+        UTXO_PK_BY_INPUT_PK_CF,
+    ]
 }

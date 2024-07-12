@@ -10,6 +10,9 @@ pub struct BtcBlock {
 }
 
 impl Block for BtcBlock {
+    fn hash(&self) -> BlockHash {
+        self.delegate.block_hash().to_byte_array()
+    }
     fn prev_hash(&self) -> BlockHash {
         self.delegate.header.prev_blockhash.to_byte_array()
     }

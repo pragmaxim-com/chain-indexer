@@ -2,12 +2,13 @@ use ci::api::ChainLinker;
 use ci::eutxo::btc::btc_chain_linker::BtcChainLinker;
 use ci::eutxo::btc::btc_client::BtcBlock;
 use ci::eutxo::btc::{btc_client::BtcClient, btc_processor::BtcProcessor};
-use ci::eutxo::eutxo_api::EuBlock;
+use ci::eutxo::eutxo_api::{self, EuBlock};
 use ci::eutxo::eutxo_block_monitor::EuBlockMonitor;
 use ci::eutxo::eutxo_service::EuService;
-use ci::indexer::{self, Indexer};
-use ci::rocksdb_wrapper::RocksDbWrapper;
+use ci::indexer::Indexer;
+use ci::info;
 use ci::settings::AppConfig;
+use ci::storage::Storage;
 use ci::syncer::ChainSyncer;
 use std::sync::Arc;
 
@@ -27,8 +28,13 @@ async fn main() -> Result<(), std::io::Error> {
 
             match blockchain.name.as_str() {
                 "btc" => {
-                    let db = Arc::new(RocksDbWrapper::initiate(&db_path, db_indexes));
-                    let service: Arc<EuService> = Arc::new(EuService::new(Arc::clone(&db)));
+                    let db_holder = Arc::new(Storage::new(
+                        &db_path,
+                        db_indexes,
+                        eutxo_api::get_eutxo_column_families(),
+                    ));
+                    // let db_holder = Arc::new(DbHolder { db: Arc::new(db) });
+                    let service: Arc<EuService> = Arc::new(EuService::new());
                     let chain_linker: Arc<
                         dyn ChainLinker<InBlock = BtcBlock, OutBlock = EuBlock> + Send + Sync,
                     > = Arc::new(BtcChainLinker {
@@ -38,13 +44,8 @@ async fn main() -> Result<(), std::io::Error> {
                     let syncer = ChainSyncer::new(
                         Arc::clone(&chain_linker),
                         Arc::new(EuBlockMonitor::new(1000)),
-                        Arc::new(Indexer::new(
-                            Arc::clone(&db),
-                            service,
-                            Arc::clone(&chain_linker),
-                        )),
+                        Arc::new(Indexer::new(db_holder, service, Arc::clone(&chain_linker))),
                     );
-                    // syncer.setup_signal_handler();
                     syncer.sync(tx_batch_size).await;
                     Ok(())
                 }

@@ -1,208 +1,160 @@
 use crate::{
     api::{BlockHash, BlockHeight, Service},
     eutxo::eutxo_api::EuTx,
-    rocksdb_wrapper::RocksDbWrapper,
+    indexer::RocksDbBatch,
 };
 use lru::LruCache;
-use rocksdb::{OptimisticTransactionDB, SingleThreaded};
 use std::{
+    cell::{RefCell, RefMut},
     num::NonZeroUsize,
-    sync::{Arc, Mutex},
+    sync::Mutex,
 };
 
-use super::{eutxo_api::EuBlock, eutxo_codec_block, eutxo_storage};
-
-pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
+use super::{eutxo_api::EuBlock, eutxo_codec_block, eutxo_codec_tx, eutxo_codec_utxo};
 
 pub struct EuService {
-    pub(crate) db: Arc<RocksDbWrapper>,
     pub(crate) tx_pk_by_tx_hash_lru_cache: Mutex<LruCache<[u8; 32], [u8; 6]>>,
 }
 
-impl Service for EuService {
+impl<'d> Service for EuService {
     type OutBlock = EuBlock;
 
     fn get_tx_pk_by_tx_hash_lru_cache(&self) -> &Mutex<LruCache<[u8; 32], [u8; 6]>> {
         &self.tx_pk_by_tx_hash_lru_cache
     }
 
-    fn process_block(
+    fn persist_block(
         &self,
         block: &EuBlock,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
-        batch: &mut rocksdb::WriteBatchWithTransaction<true>,
+        batch: &RefCell<RocksDbBatch>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<[u8; 32], [u8; 6]>,
     ) -> Result<(), String> {
-        self.process_header(&block.height, &block.hash, &db_tx, batch)
+        let mut batch = batch.borrow_mut();
+        self.persist_header(&block.height, &block.hash, &mut batch)
             .map_err(|e| e.into_string())?;
         for eu_tx in block.txs.iter() {
-            self.process_tx(
-                &block.height,
-                eu_tx,
-                &db_tx,
-                batch,
-                tx_pk_by_tx_hash_lru_cache,
-            )
-            .map_err(|e| e.into_string())?;
-            self.process_outputs(&block.height, eu_tx, batch);
+            self.persist_tx(&block.height, eu_tx, &mut batch, tx_pk_by_tx_hash_lru_cache)
+                .map_err(|e| e.into_string())?;
+            self.persist_outputs(&block.height, eu_tx, &mut batch);
             if !eu_tx.is_coinbase {
-                self.process_inputs(
-                    block.height,
-                    eu_tx,
-                    &db_tx,
-                    batch,
-                    tx_pk_by_tx_hash_lru_cache,
-                );
+                self.persist_inputs(&block.height, eu_tx, &mut batch, tx_pk_by_tx_hash_lru_cache);
             }
         }
         Ok(())
     }
 
-    fn persist_last_height(
-        &self,
-        height: BlockHeight,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
-    ) -> Result<(), rocksdb::Error> {
-        db_tx.put_cf(
-            self.db.borrow_meta_cf(),
-            LAST_ADDRESS_HEIGHT_KEY,
-            eutxo_codec_block::block_height_to_bytes(&height),
-        )
-    }
-
-    fn get_last_height(&self) -> BlockHeight {
-        self.db
-            .borrow_db()
-            .get_cf(self.db.borrow_meta_cf(), LAST_ADDRESS_HEIGHT_KEY)
-            .unwrap()
-            .map_or(0, |height| {
-                eutxo_codec_block::vector_to_block_height(&height)
-            })
-    }
-
     fn get_block_height_by_hash(
         &self,
         block_hash: &BlockHash,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
+        batch: &RefCell<RocksDbBatch>,
     ) -> Result<Option<BlockHeight>, rocksdb::Error> {
-        eutxo_storage::get_block_pk_by_hash(block_hash, db_tx, self.db.borrow_block_pk_by_hash_cf())
+        let batch = batch.borrow_mut();
+        let height_bytes = batch.db_tx.get_cf(batch.block_pk_by_hash_cf, block_hash)?;
+        Ok(height_bytes.map(|bytes| eutxo_codec_block::vector_to_block_height(&bytes)))
     }
 }
 
 impl EuService {
-    pub fn new(db: Arc<RocksDbWrapper>) -> Self {
+    pub fn new() -> Self {
         EuService {
-            db,
             tx_pk_by_tx_hash_lru_cache: Mutex::new(LruCache::new(
                 NonZeroUsize::new(10_000_000).unwrap(),
             )),
         }
     }
 
-    pub(crate) fn process_header(
+    pub(crate) fn persist_header(
         &self,
         block_height: &BlockHeight,
         block_hash: &BlockHash,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
-        batch: &mut rocksdb::WriteBatchWithTransaction<true>,
+        batch: &mut RefMut<RocksDbBatch>,
     ) -> Result<(), rocksdb::Error> {
-        eutxo_storage::persist_block_hash_by_pk(
-            block_height,
-            block_hash,
-            batch,
-            self.db.borrow_block_hash_by_pk_cf(),
-        );
-        eutxo_storage::persist_block_pk_by_hash(
-            block_hash,
-            block_height,
-            db_tx,
-            self.db.borrow_block_pk_by_hash_cf(),
-        )
+        let height_bytes = eutxo_codec_block::block_height_to_bytes(block_height);
+        let block_hash_by_pk_cf = batch.block_hash_by_pk_cf;
+        batch
+            .batch
+            .put_cf(&block_hash_by_pk_cf, height_bytes, block_hash);
+
+        let height_bytes = eutxo_codec_block::block_height_to_bytes(block_height);
+        batch
+            .db_tx
+            .put_cf(batch.block_pk_by_hash_cf, block_hash, height_bytes)
     }
 
-    pub(crate) fn process_tx(
+    pub(crate) fn persist_tx(
         &self,
         block_height: &BlockHeight,
         tx: &EuTx,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
-        batch: &mut rocksdb::WriteBatchWithTransaction<true>,
+        batch: &mut RefMut<RocksDbBatch>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<[u8; 32], [u8; 6]>,
     ) -> Result<(), rocksdb::Error> {
-        eutxo_storage::persist_tx_hash_by_pk(
-            block_height,
-            &tx.tx_index,
-            &tx.tx_hash,
-            batch,
-            self.db.borrow_tx_hash_by_pk_cf(),
-        );
+        let tx_pk_bytes = eutxo_codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
+        let tx_hash_by_pk_cf = batch.tx_hash_by_pk_cf;
+        let tx_pk_by_hash_cf = batch.tx_pk_by_hash_cf;
+        batch
+            .batch
+            .put_cf(tx_hash_by_pk_cf, tx_pk_bytes, &tx.tx_hash);
 
-        eutxo_storage::persist_tx_pk_by_hash(
-            block_height,
-            &tx.tx_index,
-            &tx.tx_hash,
-            db_tx,
-            self.db.borrow_tx_pk_by_hash_cf(),
-            tx_pk_by_tx_hash_lru_cache,
-        )
+        let tx_pk_bytes: [u8; 6] = eutxo_codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
+        tx_pk_by_tx_hash_lru_cache.put(tx.tx_hash, tx_pk_bytes);
+        batch
+            .db_tx
+            .put_cf(tx_pk_by_hash_cf, &tx.tx_hash, tx_pk_bytes)
     }
 
     // Method to process the outputs of a transaction
-    pub(crate) fn process_outputs(
+    pub(crate) fn persist_outputs(
         &self,
         block_height: &BlockHeight,
         tx: &EuTx,
-        batch: &mut rocksdb::WriteBatchWithTransaction<true>,
+        batch: &mut RefMut<RocksDbBatch>,
     ) {
         for utxo in tx.outs.iter() {
-            eutxo_storage::persist_utxo_value_by_pk(
-                &block_height,
-                &tx.tx_index,
-                &utxo.index,
-                &utxo.value,
-                batch,
-                self.db.borrow_utxo_value_by_pk_cf(),
-            );
+            let utxo_pk_bytes = eutxo_codec_utxo::pk_bytes(block_height, &tx.tx_index, &utxo.index);
+            let utxo_value_bytes = eutxo_codec_utxo::utxo_value_to_bytes(&utxo.value);
+            let utxo_value_by_pk_cf = batch.utxo_value_by_pk_cf;
+            batch
+                .batch
+                .put_cf(utxo_value_by_pk_cf, utxo_pk_bytes, utxo_value_bytes);
 
             for (db_index_name, db_index_value) in utxo.db_indexes.iter() {
-                eutxo_storage::persist_utxo_index(
-                    &db_index_value,
-                    &block_height,
-                    &tx.tx_index,
-                    &utxo.index,
-                    batch,
-                    &self
-                        .db
-                        .borrow_index_cf_by_name()
-                        .iter()
-                        .find(|&i| db_index_name == &i.0)
-                        .unwrap()
-                        .1,
-                )
+                let utxo_pk = eutxo_codec_utxo::pk_bytes(block_height, &tx.tx_index, &utxo.index);
+                let utxo_index_cf = batch
+                    .index_cf_by_name
+                    .iter()
+                    .find(|&i| db_index_name == &i.0)
+                    .unwrap()
+                    .1;
+                batch.batch.merge_cf(utxo_index_cf, db_index_value, utxo_pk)
             }
         }
     }
 
     // Method to process the inputs of a transaction
-    pub(crate) fn process_inputs(
+    pub(crate) fn persist_inputs(
         &self,
-        block_height: BlockHeight,
+        block_height: &BlockHeight,
         tx: &EuTx,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<SingleThreaded>>,
-        batch: &mut rocksdb::WriteBatchWithTransaction<true>,
+        batch: &mut RefMut<RocksDbBatch>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<[u8; 32], [u8; 6]>,
     ) {
         for (input_index, tx_input) in tx.ins.iter().enumerate() {
-            eutxo_storage::persist_utxo_pk_by_input_pk(
-                &block_height,
-                &tx.tx_index,
-                &(input_index as u16),
-                tx_input,
-                db_tx,
-                batch,
-                self.db.borrow_utxo_pk_by_input_pk_cf(),
-                self.db.borrow_tx_pk_by_hash_cf(),
-                tx_pk_by_tx_hash_lru_cache,
-            );
+            let tx_pk_bytes = tx_pk_by_tx_hash_lru_cache
+                .get(&tx_input.tx_hash)
+                .map(|f| f.to_vec())
+                .or(batch
+                    .db_tx
+                    .get_cf(batch.tx_pk_by_hash_cf, tx_input.tx_hash)
+                    .unwrap())
+                .unwrap();
+
+            let utxo_pk = eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, tx_input.utxo_index);
+            let input_pk =
+                eutxo_codec_utxo::pk_bytes(block_height, &tx.tx_index, &(input_index as u16));
+            let utxo_pk_by_input_pk_cf = batch.utxo_pk_by_input_pk_cf;
+            batch
+                .batch
+                .put_cf(utxo_pk_by_input_pk_cf, input_pk, utxo_pk)
         }
     }
 }
