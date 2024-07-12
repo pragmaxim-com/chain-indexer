@@ -1,6 +1,4 @@
-use std::{borrow::Cow, cell::RefCell, sync::RwLock};
-
-use lru::LruCache;
+use std::{borrow::Cow, cell::RefCell};
 
 use crate::indexer::RocksDbBatch;
 
@@ -59,13 +57,10 @@ pub trait ChainLinker {
 pub trait Service {
     type OutBlock: Send;
 
-    fn get_tx_pk_by_tx_hash_lru_cache(&self) -> &RwLock<LruCache<[u8; 32], [u8; 6]>>;
-
     fn persist_block(
         &self,
         block: &Self::OutBlock,
         batch: &RefCell<RocksDbBatch>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<[u8; 32], [u8; 6]>,
     ) -> Result<(), String>;
 
     fn get_block_height_by_hash(

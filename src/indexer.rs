@@ -18,13 +18,8 @@ pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 
 pub struct Indexer<InBlock: Block + Send + Sync, OutBlock: Block + Send + Sync> {
     pub db_holder: Arc<Storage>,
-    service: Arc<dyn Service<OutBlock = OutBlock> + Send + Sync>,
+    service: Arc<dyn Service<OutBlock = OutBlock>>,
     chain_linker: Arc<dyn ChainLinker<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
-}
-
-enum DbOp {
-    Insert,
-    Delete,
 }
 
 impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
@@ -32,7 +27,7 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
 {
     pub fn new(
         db: Arc<Storage>,
-        service: Arc<dyn Service<OutBlock = OutBlock> + Send + Sync>,
+        service: Arc<dyn Service<OutBlock = OutBlock>>,
         chain_linker: Arc<dyn ChainLinker<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
     ) -> Self {
         Indexer {
@@ -77,7 +72,7 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
         if block.height() == 1 {
             winning_fork.insert(0, block.clone());
             Ok(winning_fork.clone())
-        } else if prev_height.is_some() {
+        } else if prev_height.is_some_and(|ph| ph == block.height() - 1) {
             winning_fork.insert(0, block.clone());
             Ok(winning_fork.clone())
         } else {
@@ -98,11 +93,6 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
     pub(crate) fn persist_blocks(&self, blocks: &Vec<OutBlock>) -> Result<(), String> {
         let db = self.db_holder.db.write().unwrap();
         let db_tx = db.transaction();
-        let mut tx_pk_by_tx_hash_lru_cache = self
-            .service
-            .get_tx_pk_by_tx_hash_lru_cache()
-            .write()
-            .map_err(|e| e.to_string())?;
 
         let mut binding = db_tx.get_writebatch();
         let batch = RefCell::new(RocksDbBatch {
@@ -130,9 +120,7 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
                 0 => panic!("Blocks vector is empty"),
                 1 => {
                     let block = &linked_blocks[0];
-                    self.service
-                        .persist_block(block, &batch, &mut tx_pk_by_tx_hash_lru_cache)
-                        .unwrap();
+                    self.service.persist_block(block, &batch).unwrap();
                 }
                 _ => {
                     panic!("Blocks vector is empty")

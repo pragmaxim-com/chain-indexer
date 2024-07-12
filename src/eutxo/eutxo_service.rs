@@ -1,5 +1,5 @@
 use crate::{
-    api::{BlockHash, BlockHeight, Service},
+    api::{BlockHash, BlockHeight, Service, TxHash},
     eutxo::eutxo_api::EuTx,
     indexer::RocksDbBatch,
 };
@@ -7,37 +7,39 @@ use lru::LruCache;
 use std::{
     cell::{RefCell, RefMut},
     num::NonZeroUsize,
-    sync::RwLock,
 };
 
 use super::{eutxo_api::EuBlock, eutxo_codec_block, eutxo_codec_tx, eutxo_codec_utxo};
 
 pub struct EuService {
-    pub(crate) tx_pk_by_tx_hash_lru_cache: RwLock<LruCache<[u8; 32], [u8; 6]>>,
+    pub(crate) tx_pk_by_tx_hash_lru_cache: RefCell<LruCache<TxHash, [u8; 6]>>,
+    pub(crate) block_height_by_hash_lru_cache: RefCell<LruCache<BlockHash, [u8; 4]>>,
 }
 
 impl<'d> Service for EuService {
     type OutBlock = EuBlock;
 
-    fn get_tx_pk_by_tx_hash_lru_cache(&self) -> &RwLock<LruCache<[u8; 32], [u8; 6]>> {
-        &self.tx_pk_by_tx_hash_lru_cache
-    }
-
-    fn persist_block(
-        &self,
-        block: &EuBlock,
-        batch: &RefCell<RocksDbBatch>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<[u8; 32], [u8; 6]>,
-    ) -> Result<(), String> {
+    fn persist_block(&self, block: &EuBlock, batch: &RefCell<RocksDbBatch>) -> Result<(), String> {
         let mut batch = batch.borrow_mut();
-        self.persist_header(&block.height, &block.hash, &mut batch)
-            .map_err(|e| e.into_string())?;
+        self.persist_header(&block.height, &block.hash, &mut batch)?;
+        let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
+
         for eu_tx in block.txs.iter() {
-            self.persist_tx(&block.height, eu_tx, &mut batch, tx_pk_by_tx_hash_lru_cache)
-                .map_err(|e| e.into_string())?;
+            self.persist_tx(
+                &block.height,
+                eu_tx,
+                &mut batch,
+                &mut tx_pk_by_tx_hash_lru_cache,
+            )
+            .map_err(|e| e.into_string())?;
             self.persist_outputs(&block.height, eu_tx, &mut batch);
             if !eu_tx.is_coinbase {
-                self.persist_inputs(&block.height, eu_tx, &mut batch, tx_pk_by_tx_hash_lru_cache);
+                self.persist_inputs(
+                    &block.height,
+                    eu_tx,
+                    &mut batch,
+                    &mut tx_pk_by_tx_hash_lru_cache,
+                );
             }
         }
         Ok(())
@@ -48,6 +50,15 @@ impl<'d> Service for EuService {
         block_hash: &BlockHash,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<Option<BlockHeight>, rocksdb::Error> {
+        if let Some(value) = self
+            .block_height_by_hash_lru_cache
+            .borrow_mut()
+            .get(block_hash)
+            .map(|bytes| eutxo_codec_block::bytes_to_block_height(*bytes))
+        {
+            return Ok(Some(value));
+        }
+
         let batch = batch.borrow_mut();
         let height_bytes = batch.db_tx.get_cf(batch.block_pk_by_hash_cf, block_hash)?;
         Ok(height_bytes.map(|bytes| eutxo_codec_block::vector_to_block_height(&bytes)))
@@ -57,8 +68,11 @@ impl<'d> Service for EuService {
 impl EuService {
     pub fn new() -> Self {
         EuService {
-            tx_pk_by_tx_hash_lru_cache: RwLock::new(LruCache::new(
+            tx_pk_by_tx_hash_lru_cache: RefCell::new(LruCache::new(
                 NonZeroUsize::new(10_000_000).unwrap(),
+            )),
+            block_height_by_hash_lru_cache: RefCell::new(LruCache::new(
+                NonZeroUsize::new(1_000).unwrap(),
             )),
         }
     }
@@ -68,17 +82,22 @@ impl EuService {
         block_height: &BlockHeight,
         block_hash: &BlockHash,
         batch: &mut RefMut<RocksDbBatch>,
-    ) -> Result<(), rocksdb::Error> {
+    ) -> Result<(), String> {
         let height_bytes = eutxo_codec_block::block_height_to_bytes(block_height);
         let block_hash_by_pk_cf = batch.block_hash_by_pk_cf;
         batch
             .batch
             .put_cf(&block_hash_by_pk_cf, height_bytes, block_hash);
 
+        let mut block_height_by_hash_lru_cache = self.block_height_by_hash_lru_cache.borrow_mut();
+
         let height_bytes = eutxo_codec_block::block_height_to_bytes(block_height);
+        block_height_by_hash_lru_cache.put(*block_hash, height_bytes);
         batch
             .db_tx
             .put_cf(batch.block_pk_by_hash_cf, block_hash, height_bytes)
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     pub(crate) fn persist_tx(
