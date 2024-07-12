@@ -3,7 +3,9 @@ use crate::{
     indexer::Indexer,
     info,
 };
+use buffer::StreamBufferExt;
 use futures::stream::StreamExt;
+
 use min_batch::ext::MinBatchExt;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -16,7 +18,7 @@ pub struct ChainSyncer<
 > {
     pub is_shutdown: Arc<AtomicBool>,
     pub chain_linker: Arc<dyn ChainLinker<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
-    pub monitor: Arc<dyn BlockMonitor<OutBlock> + Send + Sync>,
+    pub monitor: Arc<dyn BlockMonitor<OutBlock>>,
     pub indexer: Arc<Indexer<InBlock, OutBlock>>,
 }
 
@@ -25,14 +27,14 @@ impl<InBlock: Block + Send + Sync + 'static, OutBlock: Block + Send + Sync + Clo
 {
     pub fn new(
         chain_linker: Arc<dyn ChainLinker<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
-        monitor: Arc<dyn BlockMonitor<OutBlock> + Send + Sync>,
-        indexers: Arc<Indexer<InBlock, OutBlock>>,
+        monitor: Arc<dyn BlockMonitor<OutBlock>>,
+        indexer: Arc<Indexer<InBlock, OutBlock>>,
     ) -> Self {
         ChainSyncer {
             is_shutdown: Arc::new(AtomicBool::new(false)),
             chain_linker,
             monitor,
-            indexer: indexers,
+            indexer,
         }
     }
 
@@ -43,37 +45,39 @@ impl<InBlock: Block + Send + Sync + 'static, OutBlock: Block + Send + Sync + Clo
         info!("Initiating index from {} to {}", last_height, best_height);
         let heights = last_height..=best_height;
 
-        let chain_linker_clone = Arc::clone(&self.chain_linker);
-        let indexer_clone = Arc::clone(&self.indexer);
-        let monitor_clone = Arc::clone(&self.monitor);
         tokio_stream::iter(heights)
             .map(|height| {
-                let chain_linker = Arc::clone(&chain_linker_clone);
+                let chain_linker = Arc::clone(&self.chain_linker);
                 tokio::task::spawn_blocking(move || {
                     chain_linker.get_block_by_height(height).unwrap()
                 })
             })
-            .buffered(64)
+            .buffered(num_cpus::get())
             .map(|res| match res {
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),
             })
             .min_batch_with_weight(min_batch_size, |block| block.tx_count())
             .map(|(blocks, tx_count)| {
-                let chain_linker = Arc::clone(&chain_linker_clone);
+                let chain_linker = Arc::clone(&self.chain_linker);
                 tokio::task::spawn_blocking(move || chain_linker.process_batch(&blocks, tx_count))
             })
-            .buffered(64)
-            .map(|res| match res {
+            .buffered(num_cpus::get())
+            .buffer(256)
+            .inspect(|res| match res {
                 Ok((block_batch, tx_count)) => {
-                    let _ = monitor_clone.monitor(&block_batch, tx_count);
-                    block_batch
+                    self.monitor.monitor(block_batch, tx_count);
+                    self.indexer
+                        .persist_blocks(block_batch)
+                        .unwrap_or_else(|e| {
+                            panic!(
+                                "Unable to persist blocks at height {} due to {}",
+                                block_batch.get(0).unwrap().height(),
+                                e
+                            )
+                        })
                 }
-                Err(e) => panic!("Error: {:?}", e),
-            })
-            .map(|blocks| {
-                let indexer = Arc::clone(&indexer_clone);
-                indexer.persist_blocks(&blocks)
+                Err(e) => panic!("Unable to process blocks: {:?}", e),
             })
             .count()
             .await;

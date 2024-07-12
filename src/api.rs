@@ -71,7 +71,7 @@ pub trait Service {
 }
 
 pub trait BlockMonitor<B> {
-    fn monitor(&self, block_batch: &Vec<B>, tx_count: TxCount);
+    fn monitor(&self, block_batch: &Vec<B>, tx_count: &TxCount);
 }
 
 pub trait Block {

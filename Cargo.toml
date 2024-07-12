@@ -14,7 +14,7 @@ base16 = "0.2.1"
 rand = "0.8.5"
 min-batch = { git = "https://github.com/pragmaxim-com/min-batch.rs" }
 broadcast-sink = { git = "https://github.com/pragmaxim-com/broadcast-sink.rs" }
-# buffer = { path = "/home/lisak/src/rust/buffer.rs" }
+buffer = { git = "https://github.com/pragmaxim-com/buffer.rs" }
 tokio = { version = "1.38.0", features = ["full"] }
 tokio-stream = { version = "0.1.15", features = ["sync"] }
 pin-project-lite = "0.2"
