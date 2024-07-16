@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
-use crate::api::{AssetId, AssetValue, Block, BlockProcessor, TxCount, TxIndex};
-use crate::eutxo::eutxo_api::{EuBlock, EuTx, EuTxInput, EuUtxo};
+use crate::api::BlockProcessor;
+use crate::eutxo::eutxo_model::{EuBlock, EuTx, EuTxInput, EuUtxo};
+use crate::model::{AssetId, AssetValue, Block, TxCount, TxIndex};
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
 use bitcoin_hashes::Hash;
@@ -44,16 +45,13 @@ impl BlockProcessor for BtcProcessor {
 impl From<&BtcBlock> for EuBlock {
     fn from(block: &BtcBlock) -> Self {
         EuBlock {
-            hash: block.delegate.block_hash().to_byte_array(),
-            parent_hash: block.delegate.header.prev_blockhash.to_byte_array(),
-            timestamp: block.timestamp(),
-            height: block.height,
+            header: block.header(),
             txs: block
                 .delegate
                 .txdata
                 .iter()
                 .enumerate()
-                .map(|(tx_index, tx)| (&(tx_index as u16), tx).into())
+                .map(|(tx_index, tx)| (&(tx_index as u16).into(), tx).into())
                 .collect(),
         }
     }
@@ -63,15 +61,15 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
     fn from(tx: (&TxIndex, &bitcoin::Transaction)) -> Self {
         EuTx {
             is_coinbase: tx.1.is_coinbase(),
-            tx_hash: tx.1.compute_txid().to_byte_array(),
-            tx_index: *tx.0,
+            tx_hash: tx.1.compute_txid().to_byte_array().into(),
+            tx_index: tx.0.clone(),
             ins: tx
                 .1
                 .input
                 .iter()
                 .map(|input| EuTxInput {
-                    tx_hash: input.previous_output.txid.to_byte_array(),
-                    utxo_index: input.previous_output.vout as u16,
+                    tx_hash: input.previous_output.txid.to_byte_array().into(),
+                    utxo_index: (input.previous_output.vout as u16).into(),
                 })
                 .collect(),
             outs: tx
@@ -106,10 +104,10 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
                     }
 
                     EuUtxo {
-                        index: out_index as u16,
+                        index: (out_index as u16).into(),
                         db_indexes,
                         assets: EMPTY_VEC,
-                        value: out.value.to_sat(),
+                        value: out.value.to_sat().into(),
                     }
                 })
                 .collect(),

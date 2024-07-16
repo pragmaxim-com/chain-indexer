@@ -33,6 +33,7 @@ dotenv = "0.15.0"
 hex = "0.4.3"
 signal-hook = "0.3.17"
 ouroboros = "0.18.4"
+derive_more = "0.99.18"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }

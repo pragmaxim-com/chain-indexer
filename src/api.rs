@@ -1,20 +1,10 @@
-use std::{borrow::Cow, cell::RefCell};
+use std::cell::RefCell;
 
-use crate::indexer::RocksDbBatch;
-
-pub type BlockTimestamp = i64;
-pub type BlockHeight = u32;
-pub type BlockHash = [u8; 32];
-
-pub type TxIndex = u16;
-pub type TxHash = [u8; 32];
-pub type TxCount = usize;
-
-pub type AssetId = Vec<u8>;
-pub type AssetValue = u64;
-
-pub type DbIndexName = Cow<'static, str>;
-pub type DbIndexValue = Vec<u8>;
+use crate::{
+    eutxo::eutxo_model::{EuTx, UtxoIndex, UtxoValue},
+    indexer::RocksDbBatch,
+    model::{BlockHash, BlockHeight, TxCount, TxIndex},
+};
 
 pub trait BlockchainClient {
     type Block: Send;
@@ -63,21 +53,44 @@ pub trait Service {
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<(), String>;
 
+    fn update_blocks(
+        &self,
+        block: &Vec<Self::OutBlock>,
+        batch: &RefCell<RocksDbBatch>,
+    ) -> Result<(), String>;
+
     fn get_block_height_by_hash(
         &self,
         block_hash: &BlockHash,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<Option<BlockHeight>, rocksdb::Error>;
+
+    fn get_block_by_hash(
+        &self,
+        block_hash: &BlockHash,
+        batch: &RefCell<RocksDbBatch>,
+    ) -> Result<Option<Self::OutBlock>, rocksdb::Error>;
+
+    fn get_txs_by_height(
+        &self,
+        block_height: &BlockHeight,
+        batch: &RefCell<RocksDbBatch>,
+    ) -> Result<Vec<EuTx>, String>;
+
+    fn get_utxo_value_by_index(
+        &self,
+        block_height: &BlockHeight,
+        tx_index: &TxIndex,
+        batch: &RefCell<RocksDbBatch>,
+    ) -> Result<Vec<(UtxoIndex, UtxoValue)>, String>;
+
+    fn get_block_by_height(
+        &self,
+        block_height: BlockHeight,
+        batch: &RefCell<RocksDbBatch>,
+    ) -> Result<Option<Self::OutBlock>, rocksdb::Error>;
 }
 
 pub trait BlockMonitor<B> {
     fn monitor(&self, block_batch: &Vec<B>, tx_count: &TxCount);
-}
-
-pub trait Block {
-    fn hash(&self) -> BlockHash;
-    fn prev_hash(&self) -> BlockHash;
-    fn height(&self) -> BlockHeight;
-    fn timestamp(&self) -> BlockTimestamp;
-    fn tx_count(&self) -> TxCount;
 }

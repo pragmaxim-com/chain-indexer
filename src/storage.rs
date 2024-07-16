@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use crate::{api::DbIndexName, info};
+use crate::{info, model::DbIndexName};
 use rocksdb::{OptimisticTransactionDB, Options, SingleThreaded, Transaction};
 
 /// Type alias for a database

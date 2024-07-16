@@ -1,7 +1,8 @@
 use crate::{
-    api::{Block, BlockMonitor, ChainLinker},
+    api::{BlockMonitor, ChainLinker},
     indexer::Indexer,
     info,
+    model::Block,
 };
 use buffer::StreamBufferExt;
 use futures::stream::StreamExt;
@@ -39,17 +40,17 @@ impl<InBlock: Block + Send + Sync + 'static, OutBlock: Block + Send + Sync + Clo
     }
 
     pub async fn sync(&self, min_batch_size: usize) {
-        let best_height = self.chain_linker.get_best_block().unwrap().height();
-        let last_height = self.indexer.get_last_height() + 1;
+        let best_height = self.chain_linker.get_best_block().unwrap().header().height;
+        let last_height = self.indexer.get_last_height().0 + 1;
         // let check_forks: bool = best_height - last_height < 1000;
         info!("Initiating index from {} to {}", last_height, best_height);
-        let heights = last_height..=best_height;
+        let heights = last_height..=best_height.0;
 
         tokio_stream::iter(heights)
             .map(|height| {
                 let chain_linker = Arc::clone(&self.chain_linker);
                 tokio::task::spawn_blocking(move || {
-                    chain_linker.get_block_by_height(height).unwrap()
+                    chain_linker.get_block_by_height(height.into()).unwrap()
                 })
             })
             .buffered(num_cpus::get())
@@ -72,7 +73,7 @@ impl<InBlock: Block + Send + Sync + 'static, OutBlock: Block + Send + Sync + Clo
                         .unwrap_or_else(|e| {
                             panic!(
                                 "Unable to persist blocks at height {} due to {}",
-                                block_batch.get(0).unwrap().height(),
+                                block_batch.get(0).unwrap().header().height,
                                 e
                             )
                         })

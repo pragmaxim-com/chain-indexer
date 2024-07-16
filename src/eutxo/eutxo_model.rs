@@ -1,12 +1,16 @@
-use crate::api::{
-    AssetId, AssetValue, Block, BlockHash, BlockHeight, BlockTimestamp, DbIndexName, DbIndexValue,
-    TxCount, TxHash, TxIndex,
+use crate::model::{
+    AssetId, AssetValue, Block, BlockHeader, DbIndexName, DbIndexValue, TxCount, TxHash, TxIndex,
 };
+use derive_more::{AsRef, Display, From, Into};
 
-pub type InputIndex = u16;
+#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Display)]
+pub struct InputIndex(u16);
 
-pub type UtxoIndex = u16;
-pub type UtxoValue = u64;
+#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Display)]
+pub struct UtxoValue(pub u64);
+
+#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Display)]
+pub struct UtxoIndex(pub u16);
 
 #[derive(Debug, Clone)]
 pub struct EuUtxo {
@@ -33,28 +37,13 @@ pub struct EuTx {
 
 #[derive(Debug, Clone)]
 pub struct EuBlock {
-    pub hash: BlockHash,
-    pub parent_hash: BlockHash,
-    pub height: BlockHeight,
-    pub timestamp: BlockTimestamp,
+    pub header: BlockHeader,
     pub txs: Vec<EuTx>,
 }
 
 impl Block for EuBlock {
-    fn hash(&self) -> BlockHash {
-        self.hash
-    }
-
-    fn prev_hash(&self) -> BlockHash {
-        self.parent_hash
-    }
-
-    fn height(&self) -> BlockHeight {
-        self.height
-    }
-
-    fn timestamp(&self) -> BlockTimestamp {
-        self.timestamp
+    fn header(&self) -> BlockHeader {
+        self.header
     }
 
     fn tx_count(&self) -> TxCount {

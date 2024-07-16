@@ -1,14 +1,12 @@
 use rocksdb::ColumnFamily;
 use rocksdb::WriteBatchWithTransaction;
 
-use crate::api::Block;
-use crate::api::BlockHeight;
 use crate::api::ChainLinker;
-use crate::api::DbIndexName;
 use crate::api::Service;
-use crate::eutxo::eutxo_api::*;
 use crate::eutxo::eutxo_codec_block;
+use crate::eutxo::eutxo_model::*;
 use crate::info;
+use crate::model::{Block, BlockHeight, DbIndexName};
 use crate::storage::Storage;
 use crate::storage::Tx;
 use std::cell::RefCell;
@@ -54,7 +52,7 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
         let db = self.db_holder.db.read().unwrap();
         db.get_cf(db.cf_handle(META_CF).unwrap(), LAST_ADDRESS_HEIGHT_KEY)
             .unwrap()
-            .map_or(0, |height| {
+            .map_or(0.into(), |height| {
                 eutxo_codec_block::vector_to_block_height(&height)
             })
     }
@@ -65,28 +63,30 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
         batch: &RefCell<RocksDbBatch>,
         winning_fork: &mut Vec<OutBlock>,
     ) -> Result<Vec<OutBlock>, String> {
+        let header = block.header();
         let prev_height: Option<BlockHeight> = self
             .service
-            .get_block_height_by_hash(&block.prev_hash(), batch)
+            .get_block_height_by_hash(&header.parent_hash, batch)
             .unwrap();
-        if block.height() == 1 {
+        if header.height.0 == 1 {
             winning_fork.insert(0, block.clone());
             Ok(winning_fork.clone())
-        } else if prev_height.is_some_and(|ph| ph == block.height() - 1) {
+        } else if prev_height.is_some_and(|ph| ph.0 == header.height.0 - 1) {
             winning_fork.insert(0, block.clone());
             Ok(winning_fork.clone())
-        } else {
+        } else if prev_height.is_none() {
             info!(
                 "Fork detected at {}@{}, downloading parent {}",
-                block.height(),
-                hex::encode(block.hash()),
-                hex::encode(block.prev_hash()),
+                header.height, header.hash, header.parent_hash,
             );
-            let prev_block = self
+            let downloaded_prev_block = self
                 .chain_linker
-                .get_processed_block_by_hash(block.prev_hash())?;
+                .get_processed_block_by_hash(header.parent_hash)?;
+
             winning_fork.insert(0, block.clone());
-            self.chain_link(&prev_block, batch, winning_fork)
+            self.chain_link(&downloaded_prev_block, batch, winning_fork)
+        } else {
+            panic!("Unexpected condition") // todo pretty print blocks
         }
     }
 
@@ -123,13 +123,13 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
                     self.service.persist_block(block, &batch).unwrap();
                 }
                 _ => {
-                    panic!("Blocks vector is empty")
+                    self.service.update_blocks(&linked_blocks, &batch).unwrap();
                 }
             });
 
         // persist last height to db_tx if Some
         if let Some(block) = blocks.last() {
-            self.persist_last_height(block.height(), &batch)?;
+            self.persist_last_height(block.header().height, &batch)?;
         }
         db_tx.commit().map_err(|e| e.into_string())?;
         Ok(())

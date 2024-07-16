@@ -1,37 +1,20 @@
 use byteorder::{BigEndian, ByteOrder};
 
-type TxPkBytes = [u8; 6];
+use crate::model::{BlockHeight, TxIndex};
 
-#[derive(Debug, PartialEq, Clone)]
-struct TxPk {
-    pub block_height: u32,
-    pub tx_index: u16,
-}
+pub type TxPkBytes = [u8; 6];
 
-pub fn tx_pk_bytes(block_height: &u32, tx_index: &u16) -> TxPkBytes {
+pub fn tx_pk_bytes(block_height: &BlockHeight, tx_index: &TxIndex) -> TxPkBytes {
     let mut bytes: TxPkBytes = [0u8; 6];
-    BigEndian::write_u32(&mut bytes[0..4], *block_height);
-    BigEndian::write_u16(&mut bytes[4..6], *tx_index);
+    BigEndian::write_u32(&mut bytes[0..4], block_height.0);
+    BigEndian::write_u16(&mut bytes[4..6], tx_index.0);
     bytes
 }
 
-// Implementing From trait for Tx to TxBytes conversion
-impl From<TxPk> for TxPkBytes {
-    fn from(tx: TxPk) -> TxPkBytes {
-        tx_pk_bytes(&tx.block_height, &tx.tx_index)
-    }
-}
-
-// Implementing From trait for TxBytes to Tx conversion
-impl From<TxPkBytes> for TxPk {
-    fn from(bytes: TxPkBytes) -> TxPk {
-        let block_height = BigEndian::read_u32(&bytes[0..4]);
-        let tx_index = BigEndian::read_u16(&bytes[4..6]);
-        TxPk {
-            block_height,
-            tx_index,
-        }
-    }
+pub fn pk_bytes_to_tx(bytes: TxPkBytes) -> (BlockHeight, TxIndex) {
+    let block_height: BlockHeight = BigEndian::read_u32(&bytes[0..4]).into();
+    let tx_index: TxIndex = BigEndian::read_u16(&bytes[4..6]).into();
+    (block_height, tx_index)
 }
 
 #[cfg(test)]
@@ -40,12 +23,11 @@ mod tests {
 
     #[test]
     fn test_round_trip_conversion() {
-        let tx = TxPk {
-            block_height: 123456,
-            tx_index: 7890,
-        };
-        let encoded: TxPkBytes = tx.clone().into();
-        let decoded: TxPk = encoded.into();
-        assert_eq!(tx, decoded);
+        let block_height: BlockHeight = 123456.into();
+        let tx_index: TxIndex = 7890.into();
+        let encoded: TxPkBytes = tx_pk_bytes(&block_height, &tx_index);
+        let (h, ti) = pk_bytes_to_tx(encoded);
+        assert_eq!(block_height, h);
+        assert_eq!(tx_index, ti);
     }
 }

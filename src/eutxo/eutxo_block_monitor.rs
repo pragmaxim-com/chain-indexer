@@ -2,11 +2,7 @@ use std::{cell::RefCell, sync::Arc, time::Instant};
 
 use chrono::DateTime;
 
-use crate::{
-    api::{BlockMonitor, TxCount},
-    eutxo::eutxo_api::EuBlock,
-    info,
-};
+use crate::{api::BlockMonitor, eutxo::eutxo_model::EuBlock, info, model::TxCount};
 
 pub struct EuBlockMonitor {
     min_tx_count_report: usize,
@@ -30,14 +26,12 @@ impl BlockMonitor<EuBlock> for EuBlockMonitor {
         let new_total_tx_count = total_tx_count.0 + tx_count;
         if new_total_tx_count > total_tx_count.1 + self.min_tx_count_report {
             *total_tx_count = (new_total_tx_count, new_total_tx_count);
-            let last_block = block_batch.last().unwrap();
+            let last_block = block_batch.last().unwrap().header;
             let total_time = self.start_time.elapsed().as_secs();
             let txs_per_sec = format!("{:.1}", new_total_tx_count as f64 / total_time as f64);
-            let datetime = DateTime::from_timestamp(last_block.timestamp, 0).unwrap();
-            let readable_date = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
             info!(
                 "Block @ {} from {} at {} txs/sec, total {}",
-                last_block.height, readable_date, txs_per_sec, new_total_tx_count
+                last_block.height, last_block.timestamp, txs_per_sec, new_total_tx_count
             );
         } else {
             *total_tx_count = (new_total_tx_count, total_tx_count.1);

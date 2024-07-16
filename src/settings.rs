@@ -2,7 +2,7 @@ use config::{Config, ConfigError, Environment, File};
 use dotenv::dotenv;
 use serde::Deserialize;
 
-use crate::api::DbIndexName;
+use crate::model::DbIndexName;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {

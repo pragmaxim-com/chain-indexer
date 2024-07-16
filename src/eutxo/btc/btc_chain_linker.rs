@@ -1,6 +1,7 @@
 use crate::{
-    api::{BlockHash, BlockHeight, BlockProcessor, BlockchainClient, ChainLinker, TxCount},
-    eutxo::eutxo_api::EuBlock,
+    api::{BlockProcessor, BlockchainClient, ChainLinker},
+    eutxo::eutxo_model::EuBlock,
+    model::{BlockHash, BlockHeight, TxCount},
 };
 
 use super::{
