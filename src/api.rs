@@ -1,9 +1,10 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
+
+use lru::LruCache;
 
 use crate::{
-    eutxo::eutxo_model::{EuTx, UtxoIndex, UtxoValue},
     indexer::RocksDbBatch,
-    model::{Block, BlockHash, BlockHeight, TxCount, TxIndex},
+    model::{Block, BlockHash, BlockHeight, Transaction, TxCount, TxHash},
 };
 
 pub trait BlockchainClient {
@@ -44,51 +45,37 @@ pub trait ChainLinker {
 
     fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::OutTx>, String>;
 }
-pub trait Service {
-    type OutTx: Clone;
-
-    fn persist_block(
-        &self,
-        block: Block<Self::OutTx>,
-        batch: &RefCell<RocksDbBatch>,
-    ) -> Result<(), String>;
-
-    fn update_blocks(
-        &self,
-        block: &Vec<Block<Self::OutTx>>,
-        batch: &RefCell<RocksDbBatch>,
-    ) -> Result<(), String>;
-
-    fn get_block_height_by_hash(
-        &self,
-        block_hash: &BlockHash,
-        batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Option<BlockHeight>, rocksdb::Error>;
-
-    fn get_block_by_hash(
-        &self,
-        block_hash: &BlockHash,
-        batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Option<Block<Self::OutTx>>, rocksdb::Error>;
+pub trait TxService {
+    type Tx: Transaction + Clone;
 
     fn get_txs_by_height(
         &self,
         block_height: &BlockHeight,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Vec<EuTx>, String>;
+    ) -> Result<Vec<Self::Tx>, String>;
 
-    fn get_utxo_value_by_index(
+    fn persist_tx(
         &self,
         block_height: &BlockHeight,
-        tx_index: &TxIndex,
-        batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Vec<(UtxoIndex, UtxoValue)>, String>;
+        tx: &Self::Tx,
+        batch: &mut RefMut<RocksDbBatch>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, [u8; 6]>,
+    ) -> Result<(), rocksdb::Error>;
 
-    fn get_block_by_height(
+    fn persist_outputs(
         &self,
-        block_height: BlockHeight,
-        batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Option<Block<Self::OutTx>>, rocksdb::Error>;
+        block_height: &BlockHeight,
+        tx: &Self::Tx,
+        batch: &mut RefMut<RocksDbBatch>,
+    );
+
+    fn persist_inputs(
+        &self,
+        block_height: &BlockHeight,
+        tx: &Self::Tx,
+        batch: &mut RefMut<RocksDbBatch>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, [u8; 6]>,
+    );
 }
 
 pub trait BlockMonitor<Tx: Clone> {

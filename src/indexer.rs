@@ -2,10 +2,11 @@ use rocksdb::ColumnFamily;
 use rocksdb::WriteBatchWithTransaction;
 
 use crate::api::ChainLinker;
-use crate::api::Service;
-use crate::eutxo::eutxo_codec_block;
+use crate::block_service::BlockService;
+use crate::codec_block;
 use crate::eutxo::eutxo_model::*;
 use crate::info;
+use crate::model::Transaction;
 use crate::model::{Block, BlockHeight, DbIndexName};
 use crate::storage::Storage;
 use crate::storage::Tx;
@@ -14,16 +15,16 @@ use std::sync::Arc;
 
 pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 
-pub struct Indexer<InTx: Send + Clone, OutTx: Send + Clone> {
+pub struct Indexer<InTx: Send + Clone, OutTx: Transaction + Send + Clone> {
     pub db_holder: Arc<Storage>,
-    service: Arc<dyn Service<OutTx = OutTx>>,
+    service: Arc<BlockService<OutTx>>,
     chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
 }
 
-impl<InTx: Send + Clone, OutTx: Send + Clone> Indexer<InTx, OutTx> {
+impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx> {
     pub fn new(
         db: Arc<Storage>,
-        service: Arc<dyn Service<OutTx = OutTx>>,
+        service: Arc<BlockService<OutTx>>,
         chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
     ) -> Self {
         Indexer {
@@ -42,7 +43,7 @@ impl<InTx: Send + Clone, OutTx: Send + Clone> Indexer<InTx, OutTx> {
         batch.db_tx.put_cf(
             batch.meta_cf,
             LAST_ADDRESS_HEIGHT_KEY,
-            eutxo_codec_block::block_height_to_bytes(&height),
+            codec_block::block_height_to_bytes(&height),
         )
     }
 
@@ -51,7 +52,7 @@ impl<InTx: Send + Clone, OutTx: Send + Clone> Indexer<InTx, OutTx> {
         db.get_cf(db.cf_handle(META_CF).unwrap(), LAST_ADDRESS_HEIGHT_KEY)
             .unwrap()
             .map_or(0.into(), |height| {
-                eutxo_codec_block::vector_to_block_height(&height)
+                codec_block::vector_to_block_height(&height)
             })
     }
 

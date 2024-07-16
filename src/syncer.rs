@@ -2,6 +2,7 @@ use crate::{
     api::{BlockMonitor, ChainLinker},
     indexer::Indexer,
     info,
+    model::Transaction,
 };
 use buffer::StreamBufferExt;
 use futures::stream::StreamExt;
@@ -12,14 +13,16 @@ use std::sync::{
     Arc,
 };
 
-pub struct ChainSyncer<InTx: Send + Clone + 'static, OutTx: Send + Clone + 'static> {
+pub struct ChainSyncer<InTx: Send + Clone + 'static, OutTx: Transaction + Send + Clone + 'static> {
     pub is_shutdown: Arc<AtomicBool>,
     pub chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
     pub monitor: Arc<dyn BlockMonitor<OutTx>>,
     pub indexer: Arc<Indexer<InTx, OutTx>>,
 }
 
-impl<InTx: Send + Clone + 'static, OutTx: Send + Clone + 'static> ChainSyncer<InTx, OutTx> {
+impl<InTx: Send + Clone + 'static, OutTx: Transaction + Send + Clone + 'static>
+    ChainSyncer<InTx, OutTx>
+{
     pub fn new(
         chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
         monitor: Arc<dyn BlockMonitor<OutTx>>,
@@ -94,7 +97,7 @@ impl<InTx: Send + Clone + 'static, OutTx: Send + Clone + 'static> ChainSyncer<In
     }
 }
 
-impl<InTx: Send + Clone + 'static, OutTx: Send + Clone + 'static> Drop
+impl<InTx: Send + Clone + 'static, OutTx: Transaction + Send + Clone + 'static> Drop
     for ChainSyncer<InTx, OutTx>
 {
     fn drop(&mut self) {

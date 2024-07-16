@@ -11,6 +11,15 @@ pub struct BtcChainLinker {
     pub processor: BtcProcessor,
 }
 
+impl BtcChainLinker {
+    pub fn new(api_host: &str, api_username: &str, api_password: &str) -> Self {
+        BtcChainLinker {
+            client: BtcClient::new(api_host, api_username, api_password),
+            processor: BtcProcessor {},
+        }
+    }
+}
+
 impl ChainLinker for BtcChainLinker {
     type InTx = bitcoin::Transaction;
     type OutTx = EuTx;

@@ -81,3 +81,9 @@ impl<T: Clone> Block<T> {
         Self { header, txs }
     }
 }
+
+pub trait Transaction {
+    fn is_coinbase(&self) -> bool;
+    fn hash(&self) -> &TxHash;
+    fn index(&self) -> &TxIndex;
+}

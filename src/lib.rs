@@ -1,4 +1,7 @@
 pub mod api;
+pub mod block_service;
+pub mod codec_block;
+pub mod codec_tx;
 pub mod eutxo;
 pub mod indexer;
 pub mod logger;

@@ -1,6 +1,4 @@
-use crate::model::{
-    AssetId, AssetValue, Block, BlockHeader, DbIndexName, DbIndexValue, TxCount, TxHash, TxIndex,
-};
+use crate::model::{AssetId, AssetValue, DbIndexName, DbIndexValue, Transaction, TxHash, TxIndex};
 use derive_more::{AsRef, Display, From, Into};
 
 #[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Display)]
@@ -33,6 +31,20 @@ pub struct EuTx {
     pub tx_index: TxIndex,
     pub ins: Vec<EuTxInput>,
     pub outs: Vec<EuUtxo>,
+}
+
+impl Transaction for EuTx {
+    fn is_coinbase(&self) -> bool {
+        self.is_coinbase
+    }
+
+    fn hash(&self) -> &TxHash {
+        &self.tx_hash
+    }
+
+    fn index(&self) -> &TxIndex {
+        &self.tx_index
+    }
 }
 
 pub const BLOCK_HASH_BY_PK_CF: &str = "BLOCK_HASH_BY_PK_CF";
