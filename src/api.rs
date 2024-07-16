@@ -3,59 +3,59 @@ use std::cell::RefCell;
 use crate::{
     eutxo::eutxo_model::{EuTx, UtxoIndex, UtxoValue},
     indexer::RocksDbBatch,
-    model::{BlockHash, BlockHeight, TxCount, TxIndex},
+    model::{Block, BlockHash, BlockHeight, TxCount, TxIndex},
 };
 
 pub trait BlockchainClient {
-    type Block: Send;
+    type Tx: Send + Clone;
 
-    fn get_best_block(&self) -> Result<Self::Block, String>;
+    fn get_best_block(&self) -> Result<Block<Self::Tx>, String>;
 
-    fn get_block_by_height(&self, height: BlockHeight) -> Result<Self::Block, String>;
-    fn get_block_by_hash(&self, height: BlockHash) -> Result<Self::Block, String>;
+    fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::Tx>, String>;
+    fn get_block_by_hash(&self, height: BlockHash) -> Result<Block<Self::Tx>, String>;
 }
 
 pub trait BlockProcessor {
-    type InBlock: Send;
-    type OutBlock: Send;
+    type InTx: Send + Clone;
+    type OutTx: Send + Clone;
 
-    fn process(&self, block: &Self::InBlock) -> Self::OutBlock;
+    fn process(&self, block: &Block<Self::InTx>) -> Block<Self::OutTx>;
 
     fn process_batch(
         &self,
-        block_batch: &Vec<Self::InBlock>,
+        block_batch: &Vec<Block<Self::InTx>>,
         tx_count: TxCount,
-    ) -> (Vec<Self::OutBlock>, TxCount);
+    ) -> (Vec<Block<Self::OutTx>>, TxCount);
 }
 
 pub trait ChainLinker {
-    type InBlock: Send + Sync;
-    type OutBlock: Send + Sync;
+    type InTx: Send + Clone;
+    type OutTx: Send + Clone;
 
     fn process_batch(
         &self,
-        block_batch: &Vec<Self::InBlock>,
+        block_batch: &Vec<Block<Self::InTx>>,
         tx_count: TxCount,
-    ) -> (Vec<Self::OutBlock>, TxCount);
+    ) -> (Vec<Block<Self::OutTx>>, TxCount);
 
-    fn get_best_block(&self) -> Result<Self::InBlock, String>;
+    fn get_best_block(&self) -> Result<Block<Self::InTx>, String>;
 
-    fn get_block_by_height(&self, height: BlockHeight) -> Result<Self::InBlock, String>;
+    fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::InTx>, String>;
 
-    fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Self::OutBlock, String>;
+    fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::OutTx>, String>;
 }
 pub trait Service {
-    type OutBlock: Send;
+    type OutTx: Clone;
 
     fn persist_block(
         &self,
-        block: &Self::OutBlock,
+        block: Block<Self::OutTx>,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<(), String>;
 
     fn update_blocks(
         &self,
-        block: &Vec<Self::OutBlock>,
+        block: &Vec<Block<Self::OutTx>>,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<(), String>;
 
@@ -69,7 +69,7 @@ pub trait Service {
         &self,
         block_hash: &BlockHash,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Option<Self::OutBlock>, rocksdb::Error>;
+    ) -> Result<Option<Block<Self::OutTx>>, rocksdb::Error>;
 
     fn get_txs_by_height(
         &self,
@@ -88,9 +88,9 @@ pub trait Service {
         &self,
         block_height: BlockHeight,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Option<Self::OutBlock>, rocksdb::Error>;
+    ) -> Result<Option<Block<Self::OutTx>>, rocksdb::Error>;
 }
 
-pub trait BlockMonitor<B> {
-    fn monitor(&self, block_batch: &Vec<B>, tx_count: &TxCount);
+pub trait BlockMonitor<Tx: Clone> {
+    fn monitor(&self, block_batch: &Vec<Block<Tx>>, tx_count: &TxCount);
 }

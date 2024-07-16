@@ -35,22 +35,6 @@ pub struct EuTx {
     pub outs: Vec<EuUtxo>,
 }
 
-#[derive(Debug, Clone)]
-pub struct EuBlock {
-    pub header: BlockHeader,
-    pub txs: Vec<EuTx>,
-}
-
-impl Block for EuBlock {
-    fn header(&self) -> BlockHeader {
-        self.header
-    }
-
-    fn tx_count(&self) -> TxCount {
-        self.txs.len()
-    }
-}
-
 pub const BLOCK_HASH_BY_PK_CF: &str = "BLOCK_HASH_BY_PK_CF";
 pub const BLOCK_PK_BY_HASH_CF: &str = "BLOCK_PK_BY_HASH_CF";
 pub const TX_HASH_BY_PK_CF: &str = "TX_HASH_BY_PK_CF";

@@ -1,28 +1,13 @@
 use crate::api::BlockchainClient;
-use crate::model::{Block, BlockHash, BlockHeader, BlockHeight, TxCount};
+use crate::model::{Block, BlockHash, BlockHeader, BlockHeight};
 use bitcoin_hashes::Hash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
-pub struct BtcBlock {
+pub struct BtcTx {
     pub height: BlockHeight, // expensive to calculate
     pub delegate: bitcoin::Block,
-}
-
-impl Block for BtcBlock {
-    fn header(&self) -> BlockHeader {
-        BlockHeader {
-            height: self.height,
-            timestamp: (self.delegate.header.time as i64).into(),
-            hash: self.delegate.block_hash().to_byte_array().into(),
-            parent_hash: self.delegate.header.prev_blockhash.to_byte_array().into(),
-        }
-    }
-
-    fn tx_count(&self) -> TxCount {
-        self.delegate.txdata.len()
-    }
 }
 
 pub struct BtcClient {
@@ -38,10 +23,25 @@ impl BtcClient {
     }
 }
 
-impl BlockchainClient for BtcClient {
-    type Block = BtcBlock;
+impl TryFrom<bitcoin::Block> for Block<bitcoin::Transaction> {
+    type Error = String;
 
-    fn get_best_block(&self) -> Result<BtcBlock, String> {
+    fn try_from(block: bitcoin::Block) -> Result<Self, String> {
+        let height = block.bip34_block_height().map_err(|e| e.to_string())?;
+        let header = BlockHeader {
+            height: (height as u32).into(),
+            timestamp: (block.header.time as i64).into(),
+            hash: block.block_hash().to_byte_array().into(),
+            parent_hash: block.header.prev_blockhash.to_byte_array().into(),
+        };
+        Ok(Block::new(header, block.txdata))
+    }
+}
+
+impl BlockchainClient for BtcClient {
+    type Tx = bitcoin::Transaction;
+
+    fn get_best_block(&self) -> Result<Block<bitcoin::Transaction>, String> {
         self.rpc_client
             .get_best_block_hash()
             .map_err(|e| e.to_string())
@@ -50,28 +50,22 @@ impl BlockchainClient for BtcClient {
                     .rpc_client
                     .get_block(&hash)
                     .map_err(|e| e.to_string())?;
-                let height = block.bip34_block_height().map_err(|e| e.to_string())?;
-                Ok(BtcBlock {
-                    height: (height as u32).into(),
-                    delegate: block,
-                })
+
+                block.try_into()
             })
     }
 
-    fn get_block_by_hash(&self, hash: BlockHash) -> Result<BtcBlock, String> {
+    fn get_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::Tx>, String> {
         let bitcoin_hash = bitcoin::BlockHash::from_slice(&hash.0).unwrap();
         let block = self
             .rpc_client
             .get_block(&bitcoin_hash)
             .map_err(|e| e.to_string())?;
-        let height = block.bip34_block_height().map_err(|e| e.to_string())?;
-        Ok(BtcBlock {
-            height: (height as u32).into(),
-            delegate: block,
-        })
+
+        block.try_into()
     }
 
-    fn get_block_by_height(&self, height: BlockHeight) -> Result<BtcBlock, String> {
+    fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::Tx>, String> {
         self.rpc_client
             .get_block_hash(height.0 as u64)
             .map_err(|e| e.to_string())
@@ -80,10 +74,14 @@ impl BlockchainClient for BtcClient {
                     .rpc_client
                     .get_block(&hash)
                     .map_err(|e| e.to_string())?;
-                Ok(BtcBlock {
+                // for performance reasons, we don't call existing From implementation due to hight calculation
+                let header = BlockHeader {
                     height,
-                    delegate: block,
-                })
+                    timestamp: (block.header.time as i64).into(),
+                    hash: block.block_hash().to_byte_array().into(),
+                    parent_hash: block.header.prev_blockhash.to_byte_array().into(),
+                };
+                Ok(Block::new(header, block.txdata))
             })
     }
 }

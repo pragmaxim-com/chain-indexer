@@ -2,7 +2,7 @@ use crate::{
     api::Service,
     eutxo::eutxo_model::EuTx,
     indexer::RocksDbBatch,
-    model::{BlockHash, BlockHeader, BlockHeight, TxHash, TxIndex},
+    model::{Block, BlockHash, BlockHeader, BlockHeight, TxHash, TxIndex},
 };
 use lru::LruCache;
 use std::{
@@ -14,23 +14,26 @@ use super::{
     eutxo_codec_block,
     eutxo_codec_tx::{self, TxPkBytes},
     eutxo_codec_utxo,
-    eutxo_model::{EuBlock, UtxoIndex, UtxoValue},
+    eutxo_model::{UtxoIndex, UtxoValue},
 };
 
 pub struct EuService {
     pub(crate) tx_pk_by_tx_hash_lru_cache: RefCell<LruCache<TxHash, TxPkBytes>>,
-    pub(crate) block_by_hash_lru_cache: RefCell<LruCache<BlockHash, EuBlock>>,
+    pub(crate) block_by_hash_lru_cache: RefCell<LruCache<BlockHash, Block<EuTx>>>,
 }
 
 impl Service for EuService {
-    type OutBlock = EuBlock;
+    type OutTx = EuTx;
 
-    fn persist_block(&self, block: &EuBlock, batch: &RefCell<RocksDbBatch>) -> Result<(), String> {
+    fn persist_block(
+        &self,
+        block: Block<EuTx>,
+        batch: &RefCell<RocksDbBatch>,
+    ) -> Result<(), String> {
         let mut batch = batch.borrow_mut();
         self.persist_header(&block.header, &mut batch)?;
         let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
         let mut block_height_by_hash_lru_cache = self.block_by_hash_lru_cache.borrow_mut();
-        block_height_by_hash_lru_cache.put(block.header.hash, block.clone());
 
         for eu_tx in block.txs.iter() {
             self.persist_tx(
@@ -50,12 +53,13 @@ impl Service for EuService {
                 );
             }
         }
+        block_height_by_hash_lru_cache.put(block.header.hash, block);
         Ok(())
     }
 
     fn update_blocks(
         &self,
-        blocks: &Vec<Self::OutBlock>,
+        blocks: &Vec<Block<Self::OutTx>>,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<(), String> {
         todo!("s")
@@ -65,7 +69,7 @@ impl Service for EuService {
         &self,
         block_hash: &BlockHash,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Option<EuBlock>, rocksdb::Error> {
+    ) -> Result<Option<Block<Self::OutTx>>, rocksdb::Error> {
         if let Some(value) = self.block_by_hash_lru_cache.borrow_mut().get(block_hash) {
             Ok(Some(value.clone()))
         } else if let Ok(Some(block_height)) = self.get_block_height_by_hash(block_hash, batch) {
@@ -125,7 +129,7 @@ impl Service for EuService {
         &self,
         block_height: BlockHeight,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Option<EuBlock>, rocksdb::Error> {
+    ) -> Result<Option<Block<Self::OutTx>>, rocksdb::Error> {
         let mut_batch = batch.borrow_mut();
         let height_bytes = eutxo_codec_block::block_height_to_bytes(&block_height);
         let hash_bytes = mut_batch

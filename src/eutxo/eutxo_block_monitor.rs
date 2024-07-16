@@ -1,8 +1,12 @@
 use std::{cell::RefCell, sync::Arc, time::Instant};
 
-use chrono::DateTime;
+use crate::{
+    api::BlockMonitor,
+    info,
+    model::{Block, TxCount},
+};
 
-use crate::{api::BlockMonitor, eutxo::eutxo_model::EuBlock, info, model::TxCount};
+use super::eutxo_model::EuTx;
 
 pub struct EuBlockMonitor {
     min_tx_count_report: usize,
@@ -20,8 +24,8 @@ impl EuBlockMonitor {
     }
 }
 
-impl BlockMonitor<EuBlock> for EuBlockMonitor {
-    fn monitor(&self, block_batch: &Vec<EuBlock>, tx_count: &TxCount) {
+impl BlockMonitor<EuTx> for EuBlockMonitor {
+    fn monitor(&self, block_batch: &Vec<Block<EuTx>>, tx_count: &TxCount) {
         let mut total_tx_count = self.total_and_last_report_tx_count.borrow_mut();
         let new_total_tx_count = total_tx_count.0 + tx_count;
         if new_total_tx_count > total_tx_count.1 + self.min_tx_count_report {

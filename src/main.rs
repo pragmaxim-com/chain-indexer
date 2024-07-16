@@ -1,9 +1,8 @@
 use ci::api::ChainLinker;
 use ci::eutxo::btc::btc_chain_linker::BtcChainLinker;
-use ci::eutxo::btc::btc_client::BtcBlock;
 use ci::eutxo::btc::{btc_client::BtcClient, btc_processor::BtcProcessor};
-use ci::eutxo::eutxo_model::{self, EuBlock};
 use ci::eutxo::eutxo_block_monitor::EuBlockMonitor;
+use ci::eutxo::eutxo_model::{self, EuTx};
 use ci::eutxo::eutxo_service::EuService;
 use ci::indexer::Indexer;
 use ci::settings::AppConfig;
@@ -35,7 +34,7 @@ async fn main() -> Result<(), std::io::Error> {
                     // let db_holder = Arc::new(DbHolder { db: Arc::new(db) });
                     let service: Arc<EuService> = Arc::new(EuService::new());
                     let chain_linker: Arc<
-                        dyn ChainLinker<InBlock = BtcBlock, OutBlock = EuBlock> + Send + Sync,
+                        dyn ChainLinker<InTx = bitcoin::Transaction, OutTx = EuTx> + Send + Sync,
                     > = Arc::new(BtcChainLinker {
                         client: BtcClient::new(&api_host, &api_username, &api_password),
                         processor: BtcProcessor {},

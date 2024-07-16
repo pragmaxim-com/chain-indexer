@@ -70,7 +70,14 @@ pub type AssetValue = u64;
 pub type DbIndexName = Cow<'static, str>;
 pub type DbIndexValue = Vec<u8>;
 
-pub trait Block {
-    fn header(&self) -> BlockHeader;
-    fn tx_count(&self) -> TxCount;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Block<T: Clone> {
+    pub header: BlockHeader,
+    pub txs: Vec<T>,
+}
+
+impl<T: Clone> Block<T> {
+    pub fn new(header: BlockHeader, txs: Vec<T>) -> Self {
+        Self { header, txs }
+    }
 }

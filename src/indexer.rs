@@ -14,19 +14,17 @@ use std::sync::Arc;
 
 pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 
-pub struct Indexer<InBlock: Block + Send + Sync, OutBlock: Block + Send + Sync> {
+pub struct Indexer<InTx: Send + Clone, OutTx: Send + Clone> {
     pub db_holder: Arc<Storage>,
-    service: Arc<dyn Service<OutBlock = OutBlock>>,
-    chain_linker: Arc<dyn ChainLinker<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
+    service: Arc<dyn Service<OutTx = OutTx>>,
+    chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
 }
 
-impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
-    Indexer<InBlock, OutBlock>
-{
+impl<InTx: Send + Clone, OutTx: Send + Clone> Indexer<InTx, OutTx> {
     pub fn new(
         db: Arc<Storage>,
-        service: Arc<dyn Service<OutBlock = OutBlock>>,
-        chain_linker: Arc<dyn ChainLinker<InBlock = InBlock, OutBlock = OutBlock> + Send + Sync>,
+        service: Arc<dyn Service<OutTx = OutTx>>,
+        chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
     ) -> Self {
         Indexer {
             db_holder: db,
@@ -59,11 +57,11 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
 
     fn chain_link(
         &self,
-        block: &OutBlock,
+        block: &Block<OutTx>,
         batch: &RefCell<RocksDbBatch>,
-        winning_fork: &mut Vec<OutBlock>,
-    ) -> Result<Vec<OutBlock>, String> {
-        let header = block.header();
+        winning_fork: &mut Vec<Block<OutTx>>,
+    ) -> Result<Vec<Block<OutTx>>, String> {
+        let header = block.header;
         let prev_height: Option<BlockHeight> = self
             .service
             .get_block_height_by_hash(&header.parent_hash, batch)
@@ -90,7 +88,7 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
         }
     }
 
-    pub(crate) fn persist_blocks(&self, blocks: &Vec<OutBlock>) -> Result<(), String> {
+    pub(crate) fn persist_blocks(&self, blocks: &Vec<Block<OutTx>>) -> Result<(), String> {
         let db = self.db_holder.db.write().unwrap();
         let db_tx = db.transaction();
 
@@ -114,14 +112,13 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
         });
 
         blocks
-            .iter()
+            .into_iter()
             .map(|block| self.chain_link(block, &batch, &mut vec![]).unwrap())
             .for_each(|linked_blocks| match linked_blocks.len() {
                 0 => panic!("Blocks vector is empty"),
-                1 => {
-                    let block = &linked_blocks[0];
-                    self.service.persist_block(block, &batch).unwrap();
-                }
+                1 => linked_blocks
+                    .into_iter()
+                    .for_each(|block| self.service.persist_block(block, &batch).unwrap()),
                 _ => {
                     self.service.update_blocks(&linked_blocks, &batch).unwrap();
                 }
@@ -129,7 +126,7 @@ impl<InBlock: Block + Send + Sync, OutBlock: Block + Clone + Send + Sync>
 
         // persist last height to db_tx if Some
         if let Some(block) = blocks.last() {
-            self.persist_last_height(block.header().height, &batch)?;
+            self.persist_last_height(block.header.height, &batch)?;
         }
         db_tx.commit().map_err(|e| e.into_string())?;
         Ok(())

@@ -1,13 +1,11 @@
 use std::borrow::Cow;
 
 use crate::api::BlockProcessor;
-use crate::eutxo::eutxo_model::{EuBlock, EuTx, EuTxInput, EuUtxo};
+use crate::eutxo::eutxo_model::{EuTx, EuTxInput, EuUtxo};
 use crate::model::{AssetId, AssetValue, Block, TxCount, TxIndex};
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
 use bitcoin_hashes::Hash;
-
-use super::btc_client::BtcBlock;
 
 // define constant for address and script_hash
 pub const ADDRESS_INDEX: &str = "address";
@@ -17,23 +15,23 @@ pub const EMPTY_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
 
 pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {
-    type InBlock = BtcBlock;
-    type OutBlock = EuBlock;
+    type InTx = bitcoin::Transaction;
+    type OutTx = EuTx;
 
-    fn process(&self, btc_block: &Self::InBlock) -> EuBlock {
+    fn process(&self, btc_block: &Block<Self::InTx>) -> Block<Self::OutTx> {
         btc_block.into()
     }
 
     fn process_batch(
         &self,
-        block_batch: &Vec<Self::InBlock>,
+        block_batch: &Vec<Block<Self::InTx>>,
         tx_count: TxCount,
-    ) -> (Vec<EuBlock>, TxCount) {
+    ) -> (Vec<Block<Self::OutTx>>, TxCount) {
         (
             block_batch
                 .into_iter()
                 .map(|btc_block| {
-                    let eu_block: EuBlock = btc_block.into();
+                    let eu_block: Block<Self::OutTx> = btc_block.into();
                     eu_block
                 })
                 .collect(),
@@ -42,18 +40,17 @@ impl BlockProcessor for BtcProcessor {
     }
 }
 
-impl From<&BtcBlock> for EuBlock {
-    fn from(block: &BtcBlock) -> Self {
-        EuBlock {
-            header: block.header(),
-            txs: block
-                .delegate
-                .txdata
+impl From<&Block<bitcoin::Transaction>> for Block<EuTx> {
+    fn from(block: &Block<bitcoin::Transaction>) -> Self {
+        Block::new(
+            block.header,
+            block
+                .txs
                 .iter()
                 .enumerate()
                 .map(|(tx_index, tx)| (&(tx_index as u16).into(), tx).into())
                 .collect(),
-        }
+        )
     }
 }
 
