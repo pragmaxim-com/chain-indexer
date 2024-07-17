@@ -57,9 +57,9 @@ impl From<&Block<bitcoin::Transaction>> for Block<EuTx> {
 impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
     fn from(tx: (&TxIndex, &bitcoin::Transaction)) -> Self {
         EuTx {
-            hash: tx.1.compute_txid().to_byte_array().into(),
-            index: tx.0.clone(),
-            ins: tx
+            tx_hash: tx.1.compute_txid().to_byte_array().into(),
+            tx_index: tx.0.clone(),
+            tx_inputs: tx
                 .1
                 .input
                 .iter()
@@ -68,7 +68,7 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
                     utxo_index: (input.previous_output.vout as u16).into(),
                 })
                 .collect(),
-            outs: tx
+            tx_outputs: tx
                 .1
                 .output
                 .iter()
@@ -80,7 +80,7 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
                         Some(address.to_string().into_bytes())
                     } else if let Some(pk) = out.script_pubkey.p2pk_public_key() {
                         Some(
-                            bitcoin::Address::p2pkh(pk.pubkey_hash(), bitcoin::Network::Bitcoin)
+                            Address::p2pkh(pk.pubkey_hash(), Network::Bitcoin)
                                 .to_string()
                                 .into_bytes(),
                         )
@@ -100,10 +100,10 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
                     }
 
                     EuUtxo {
-                        index: (out_index as u16).into(),
+                        utxo_index: (out_index as u16).into(),
                         db_indexes,
                         assets: EMPTY_VEC,
-                        value: out.value.to_sat().into(),
+                        utxo_value: out.value.to_sat().into(),
                     }
                 })
                 .collect(),

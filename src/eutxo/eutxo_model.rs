@@ -12,10 +12,10 @@ pub struct UtxoIndex(pub u16);
 
 #[derive(Debug, Clone)]
 pub struct EuUtxo {
-    pub index: UtxoIndex,
+    pub utxo_index: UtxoIndex,
     pub db_indexes: Vec<(DbIndexName, DbIndexValue)>,
     pub assets: Vec<(AssetId, AssetValue)>,
-    pub value: UtxoValue,
+    pub utxo_value: UtxoValue,
 }
 
 #[derive(Debug, Clone)]
@@ -26,23 +26,23 @@ pub struct EuTxInput {
 
 #[derive(Debug, Clone)]
 pub struct EuTx {
-    pub hash: TxHash,
-    pub index: TxIndex,
-    pub ins: Vec<EuTxInput>,
-    pub outs: Vec<EuUtxo>,
+    pub tx_hash: TxHash,
+    pub tx_index: TxIndex,
+    pub tx_inputs: Vec<EuTxInput>,
+    pub tx_outputs: Vec<EuUtxo>,
 }
 
 impl Transaction for EuTx {
     fn is_coinbase(&self) -> bool {
-        self.index.0 == 0
+        self.tx_index.0 == 0
     }
 
     fn hash(&self) -> &TxHash {
-        &self.hash
+        &self.tx_hash
     }
 
     fn index(&self) -> &TxIndex {
-        &self.index
+        &self.tx_index
     }
 }
 

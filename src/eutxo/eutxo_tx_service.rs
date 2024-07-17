@@ -11,7 +11,7 @@ use std::cell::{RefCell, RefMut};
 
 use super::{
     eutxo_codec_utxo,
-    eutxo_model::{EuTxInput, UtxoIndex, UtxoValue},
+    eutxo_model::{EuTxInput, EuUtxo},
 };
 
 pub struct EuTxService {}
@@ -22,7 +22,7 @@ impl EuTxService {
         block_height: &BlockHeight,
         tx_index: &TxIndex,
         mut_batch: &mut RocksDbBatch,
-    ) -> Result<Vec<(UtxoIndex, UtxoValue)>, rocksdb::Error> {
+    ) -> Result<Vec<EuUtxo>, rocksdb::Error> {
         let pk_bytes = codec_tx::tx_pk_bytes(block_height, tx_index);
         mut_batch
             .db_tx
@@ -31,7 +31,12 @@ impl EuTxService {
                 result.map(|(utxo_pk, utxo_value_bytes)| {
                     let utxo_index = eutxo_codec_utxo::utxo_index_from_pk_bytes(&utxo_pk);
                     let utxo_value = eutxo_codec_utxo::bytes_to_utxo_value(&utxo_value_bytes);
-                    (utxo_index, utxo_value)
+                    EuUtxo {
+                        utxo_index,
+                        db_indexes: vec![],
+                        assets: vec![],
+                        utxo_value,
+                    }
                 })
             })
             .collect()
@@ -78,17 +83,17 @@ impl TxService for EuTxService {
             .db_tx
             .prefix_iterator_cf(mut_batch.tx_hash_by_pk_cf, height_bytes)
             .map(|result| {
-                result.map(|(tx_pk, tx_hash)| {
+                result.and_then(|(tx_pk, tx_hash)| {
                     let tx_index = codec_tx::pk_bytes_to_tx_index(&tx_pk);
                     let tx_hash: TxHash = codec_tx::hash_bytes_to_tx_hash(&tx_hash);
-                    let utxos =
+                    let tx_outputs =
                         self.get_utxo_value_by_index(block_height, &tx_index, &mut mut_batch)?;
                     let tx_inputs = self.get_tx_inputs(block_height, &tx_index, &mut mut_batch)?;
                     Ok(EuTx {
                         tx_hash,
                         tx_index,
                         tx_inputs,
-                        utxos,
+                        tx_outputs,
                     })
                 })
             })
@@ -102,13 +107,17 @@ impl TxService for EuTxService {
         batch: &mut RefMut<RocksDbBatch>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error> {
-        let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.index);
+        let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
         let tx_hash_by_pk_cf = batch.tx_hash_by_pk_cf;
         let tx_pk_by_hash_cf = batch.tx_pk_by_hash_cf;
-        batch.batch.put_cf(tx_hash_by_pk_cf, tx_pk_bytes, &tx.hash);
+        batch
+            .batch
+            .put_cf(tx_hash_by_pk_cf, tx_pk_bytes, &tx.tx_hash);
 
-        tx_pk_by_tx_hash_lru_cache.put(tx.hash, tx_pk_bytes);
-        batch.db_tx.put_cf(tx_pk_by_hash_cf, &tx.hash, tx_pk_bytes)
+        tx_pk_by_tx_hash_lru_cache.put(tx.tx_hash, tx_pk_bytes);
+        batch
+            .db_tx
+            .put_cf(tx_pk_by_hash_cf, &tx.tx_hash, tx_pk_bytes)
     }
 
     // Method to process the outputs of a transaction
@@ -118,9 +127,10 @@ impl TxService for EuTxService {
         tx: &EuTx,
         batch: &mut RefMut<RocksDbBatch>,
     ) {
-        for utxo in tx.outs.iter() {
-            let utxo_pk_bytes = eutxo_codec_utxo::pk_bytes(block_height, &tx.index, &utxo.index.0);
-            let utxo_value_bytes = eutxo_codec_utxo::utxo_value_to_bytes(&utxo.value);
+        for utxo in tx.tx_outputs.iter() {
+            let utxo_pk_bytes =
+                eutxo_codec_utxo::pk_bytes(block_height, &tx.tx_index, &utxo.utxo_index.0);
+            let utxo_value_bytes = eutxo_codec_utxo::utxo_value_to_bytes(&utxo.utxo_value);
             let utxo_value_by_pk_cf = batch.utxo_value_by_pk_cf;
             batch
                 .batch
@@ -148,7 +158,7 @@ impl TxService for EuTxService {
         batch: &mut RefMut<RocksDbBatch>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) {
-        for (input_index, tx_input) in tx.ins.iter().enumerate() {
+        for (input_index, tx_input) in tx.tx_inputs.iter().enumerate() {
             let tx_pk_bytes = tx_pk_by_tx_hash_lru_cache
                 .get(&tx_input.tx_hash)
                 .map(|f| f.to_vec())
@@ -160,7 +170,7 @@ impl TxService for EuTxService {
 
             let utxo_pk = eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index);
             let input_pk =
-                eutxo_codec_utxo::pk_bytes(block_height, &tx.index, &(input_index as u16));
+                eutxo_codec_utxo::pk_bytes(block_height, &tx.tx_index, &(input_index as u16));
             let utxo_pk_by_input_pk_cf = batch.utxo_pk_by_input_pk_cf;
             batch
                 .batch

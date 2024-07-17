@@ -45,8 +45,10 @@ UtxoPk_by_InputPk:
 ## Utxo indexes
 
 UtxoPks_by_UtxoIndex:
-    index_1 -> [block_height|tx_index|utxo_index,block_height|tx_index|utxo_index]
-    index_2 -> [block_height|tx_index|utxo_index]
+    index_1_cf: 
+       index_1 -> [block_height|tx_index|utxo_index,block_height|tx_index|utxo_index]
+    index_2_cf: 
+       index_2 -> [block_height|tx_index|utxo_index]
 
 
 ## Assets
@@ -58,5 +60,7 @@ AssetValue_by_AssetPk:
 ## Asset index
 
 AssetPks_by_AssetIndex:
-    asset_1 -> [block_height|tx_index|utxo_index|asset_index,block_height|tx_index|utxo_index|asset_index]
-    asset_2 -> [block_height|tx_index|utxo_index|asset_index]
+    asset_1_cf
+        asset_1 -> [block_height|tx_index|utxo_index|asset_index,block_height|tx_index|utxo_index|asset_index]
+    asset_2_cf 
+        asset_2 -> [block_height|tx_index|utxo_index|asset_index]
