@@ -52,7 +52,7 @@ pub trait TxService {
         &self,
         block_height: &BlockHeight,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Vec<Self::Tx>, String>;
+    ) -> Result<Vec<Self::Tx>, rocksdb::Error>;
 
     fn persist_tx(
         &self,

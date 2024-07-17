@@ -26,24 +26,23 @@ pub struct EuTxInput {
 
 #[derive(Debug, Clone)]
 pub struct EuTx {
-    pub is_coinbase: bool,
-    pub tx_hash: TxHash,
-    pub tx_index: TxIndex,
+    pub hash: TxHash,
+    pub index: TxIndex,
     pub ins: Vec<EuTxInput>,
     pub outs: Vec<EuUtxo>,
 }
 
 impl Transaction for EuTx {
     fn is_coinbase(&self) -> bool {
-        self.is_coinbase
+        self.index.0 == 0
     }
 
     fn hash(&self) -> &TxHash {
-        &self.tx_hash
+        &self.hash
     }
 
     fn index(&self) -> &TxIndex {
-        &self.tx_index
+        &self.index
     }
 }
 

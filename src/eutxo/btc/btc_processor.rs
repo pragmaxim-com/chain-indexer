@@ -57,9 +57,8 @@ impl From<&Block<bitcoin::Transaction>> for Block<EuTx> {
 impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
     fn from(tx: (&TxIndex, &bitcoin::Transaction)) -> Self {
         EuTx {
-            is_coinbase: tx.1.is_coinbase(),
-            tx_hash: tx.1.compute_txid().to_byte_array().into(),
-            tx_index: tx.0.clone(),
+            hash: tx.1.compute_txid().to_byte_array().into(),
+            index: tx.0.clone(),
             ins: tx
                 .1
                 .input

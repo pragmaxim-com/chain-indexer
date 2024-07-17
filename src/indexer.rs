@@ -6,6 +6,7 @@ use crate::block_service::BlockService;
 use crate::codec_block;
 use crate::eutxo::eutxo_model::*;
 use crate::info;
+use crate::model::BlockHeader;
 use crate::model::Transaction;
 use crate::model::{Block, BlockHeight, DbIndexName};
 use crate::storage::Storage;
@@ -52,7 +53,7 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
         db.get_cf(db.cf_handle(META_CF).unwrap(), LAST_ADDRESS_HEIGHT_KEY)
             .unwrap()
             .map_or(0.into(), |height| {
-                codec_block::vector_to_block_height(&height)
+                codec_block::bytes_to_block_height(&height)
             })
     }
 
@@ -63,24 +64,24 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
         winning_fork: &mut Vec<Block<OutTx>>,
     ) -> Result<Vec<Block<OutTx>>, String> {
         let header = block.header;
-        let prev_height: Option<BlockHeight> = self
+        let prev_header: Option<BlockHeader> = self
             .service
-            .get_block_height_by_hash(&header.parent_hash, batch)
+            .get_block_header_by_hash(&header.prev_hash, batch)
             .unwrap();
         if header.height.0 == 1 {
             winning_fork.insert(0, block.clone());
             Ok(winning_fork.clone())
-        } else if prev_height.is_some_and(|ph| ph.0 == header.height.0 - 1) {
+        } else if prev_header.is_some_and(|ph| ph.height.0 == header.height.0 - 1) {
             winning_fork.insert(0, block.clone());
             Ok(winning_fork.clone())
-        } else if prev_height.is_none() {
+        } else if prev_header.is_none() {
             info!(
                 "Fork detected at {}@{}, downloading parent {}",
-                header.height, header.hash, header.parent_hash,
+                header.height, header.hash, header.prev_hash,
             );
             let downloaded_prev_block = self
                 .chain_linker
-                .get_processed_block_by_hash(header.parent_hash)?;
+                .get_processed_block_by_hash(header.prev_hash)?;
 
             winning_fork.insert(0, block.clone());
             self.chain_link(&downloaded_prev_block, batch, winning_fork)

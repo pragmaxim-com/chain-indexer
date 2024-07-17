@@ -1,6 +1,7 @@
 use crate::{
     api::TxService,
-    codec_block, codec_tx,
+    codec_block,
+    codec_tx::{self, TxPkBytes},
     eutxo::eutxo_model::EuTx,
     indexer::RocksDbBatch,
     model::{BlockHeight, TxHash, TxIndex},
@@ -33,38 +34,23 @@ impl TxService for EuTxService {
         &self,
         block_height: &BlockHeight,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Vec<EuTx>, String> {
+    ) -> Result<Vec<EuTx>, rocksdb::Error> {
         let height_bytes = codec_block::block_height_to_bytes(&block_height);
         let mut_batch = batch.borrow_mut();
 
-        /*
-                       mut_batch
-                           .db_tx
-                           .prefix_iterator_cf(mut_batch.tx_hash_by_pk_cf, height_bytes)
-                           .enumerate() // are we sure by the order from lower to higher height|index ?
-                           .map(|(tx_index, result)| match result {
-                               Ok((tx_pk, tx_hash)) => {
-                                   let tx_pk: TxPk = tx_pk.into();
-                                   let tx_hash: TxHash = tx_hash;
-                                   if let Ok(utxo_value_by_index) =
-                                       self.get_utxo_value_by_index(block_height, &tx_pk.tx_index, batch)
+        mut_batch
+            .db_tx
+            .prefix_iterator_cf(mut_batch.tx_hash_by_pk_cf, height_bytes)
+            .map(|result| match result {
+                Ok((tx_pk, tx_hash)) => {
+                    let tx_index = codec_tx::pk_bytes_to_tx_index(&tx_pk);
+                    let tx_hash: TxHash = codec_tx::hash_bytes_to_tx_hash(&tx_hash);
+                    if let Ok(utxo_value_by_index) =
+                        self.get_utxo_value_by_index(block_height, &tx_index, batch)
 
-        pub(crate) fn persist_tx(&self, block_height: &BlockHeight, tx: &EuTx, batch: &mut RefMut<RocksDbBatch>, tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, [u8; 6]>) -> Result<(), rocksdb::Error>;       {
 
-            pub(crate) fn persist_tx(&self, block_height: &BlockHeight, tx: &EuTx, batch: &mut RefMut<RocksDbBatch>, tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, [u8; 6]>) -> Result<(), rocksdb::Error>;    EuTx {
-                                           is_coinbase: false, // TODO we don't know
-                                           tx_hash,
-                                           tx_index,
-                                       }
-                                       todo!("")
-                                   } else {
-                                       todo!("")
-                                   }
-                               }
-                               Err(e) => panic!("Error: {:?}", e),
-                           })
-                */
-        todo!("")
+                }
+            })
     }
 
     fn persist_tx(
@@ -72,20 +58,19 @@ impl TxService for EuTxService {
         block_height: &BlockHeight,
         tx: &EuTx,
         batch: &mut RefMut<RocksDbBatch>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, [u8; 6]>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error> {
-        let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
+        let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.index);
         let tx_hash_by_pk_cf = batch.tx_hash_by_pk_cf;
         let tx_pk_by_hash_cf = batch.tx_pk_by_hash_cf;
         batch
             .batch
-            .put_cf(tx_hash_by_pk_cf, tx_pk_bytes, &tx.tx_hash);
+            .put_cf(tx_hash_by_pk_cf, tx_pk_bytes, &tx.hash);
 
-        let tx_pk_bytes: [u8; 6] = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
-        tx_pk_by_tx_hash_lru_cache.put(tx.tx_hash, tx_pk_bytes);
+        tx_pk_by_tx_hash_lru_cache.put(tx.hash, tx_pk_bytes);
         batch
             .db_tx
-            .put_cf(tx_pk_by_hash_cf, &tx.tx_hash, tx_pk_bytes)
+            .put_cf(tx_pk_by_hash_cf, &tx.hash, tx_pk_bytes)
     }
 
     // Method to process the outputs of a transaction
@@ -97,7 +82,7 @@ impl TxService for EuTxService {
     ) {
         for utxo in tx.outs.iter() {
             let utxo_pk_bytes =
-                eutxo_codec_utxo::pk_bytes(block_height, &tx.tx_index, &utxo.index.0);
+                eutxo_codec_utxo::pk_bytes(block_height, &tx.index, &utxo.index.0);
             let utxo_value_bytes = eutxo_codec_utxo::utxo_value_to_bytes(&utxo.value);
             let utxo_value_by_pk_cf = batch.utxo_value_by_pk_cf;
             batch
@@ -105,14 +90,15 @@ impl TxService for EuTxService {
                 .put_cf(utxo_value_by_pk_cf, utxo_pk_bytes, utxo_value_bytes);
 
             for (db_index_name, db_index_value) in utxo.db_indexes.iter() {
-                let utxo_pk = eutxo_codec_utxo::pk_bytes(block_height, &tx.tx_index, &utxo.index.0);
                 let utxo_index_cf = batch
                     .index_cf_by_name
                     .iter()
                     .find(|&i| db_index_name == &i.0)
                     .unwrap()
                     .1;
-                batch.batch.merge_cf(utxo_index_cf, db_index_value, utxo_pk)
+                batch
+                    .batch
+                    .merge_cf(utxo_index_cf, db_index_value, utxo_pk_bytes)
             }
         }
     }
@@ -123,7 +109,7 @@ impl TxService for EuTxService {
         block_height: &BlockHeight,
         tx: &EuTx,
         batch: &mut RefMut<RocksDbBatch>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, [u8; 6]>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) {
         for (input_index, tx_input) in tx.ins.iter().enumerate() {
             let tx_pk_bytes = tx_pk_by_tx_hash_lru_cache
@@ -137,7 +123,7 @@ impl TxService for EuTxService {
 
             let utxo_pk = eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index);
             let input_pk =
-                eutxo_codec_utxo::pk_bytes(block_height, &tx.tx_index, &(input_index as u16));
+                eutxo_codec_utxo::pk_bytes(block_height, &tx.index, &(input_index as u16));
             let utxo_pk_by_input_pk_cf = batch.utxo_pk_by_input_pk_cf;
             batch
                 .batch

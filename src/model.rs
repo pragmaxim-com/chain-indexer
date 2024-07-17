@@ -8,23 +8,23 @@ pub struct BlockHeader {
     pub height: BlockHeight,
     pub timestamp: BlockTimestamp,
     pub hash: BlockHash,
-    pub parent_hash: BlockHash,
+    pub prev_hash: BlockHash,
 }
 impl fmt::Display for BlockHeader {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{} @ {} : {} <- {}",
-            self.height, self.timestamp, self.hash, self.parent_hash,
+            self.height, self.timestamp, self.hash, self.prev_hash,
         )
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From)]
-pub struct BlockTimestamp(pub i64);
+pub struct BlockTimestamp(pub u32);
 impl fmt::Display for BlockTimestamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let datetime = DateTime::from_timestamp(self.0, 0).unwrap();
+        let datetime = DateTime::from_timestamp(self.0 as i64, 0).unwrap();
         let readable_date = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
         write!(f, "{}", readable_date)
     }
@@ -52,7 +52,7 @@ pub type TxCount = usize;
 pub struct TxIndex(pub u16);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]
-pub struct TxHash([u8; 32]);
+pub struct TxHash(pub [u8; 32]);
 impl fmt::Display for TxHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(self.0))
@@ -61,6 +61,21 @@ impl fmt::Display for TxHash {
 impl AsRef<[u8]> for TxHash {
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+impl TryFrom<Box<[u8]>> for TxHash {
+    type Error = &'static str;
+
+    fn try_from(boxed_slice: Box<[u8]>) -> Result<Self, Self::Error> {
+        if boxed_slice.len() == 32 {
+            let boxed_array: Box<[u8; 32]> = match boxed_slice.try_into() {
+                Ok(arr) => arr,
+                Err(_) => return Err("Failed to convert Box<[u8]> into Box<[u8; 32]>"),
+            };
+            Ok(TxHash(*boxed_array))
+        } else {
+            Err("Box<[u8]> does not have exactly 32 bytes")
+        }
     }
 }
 

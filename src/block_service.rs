@@ -75,11 +75,18 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
     ) -> Result<Option<Block<Tx>>, rocksdb::Error> {
         if let Some(value) = self.block_by_hash_lru_cache.borrow_mut().get(block_hash) {
             Ok(Some(value.clone()))
-        } else if let Ok(Some(block_height)) = self.get_block_height_by_hash(block_hash, batch) {
-            let txs = self.tx_service.get_txs_by_height(&block_height, batch);
-            todo!("ss")
         } else {
-            panic!("")
+            let header_opt = self.get_block_header_by_hash(block_hash, batch)?;
+            match header_opt {
+                Some(block_header) => {
+                    let txs = self
+                        .tx_service
+                        .get_txs_by_height(&block_header.height, batch)?;
+
+                    Ok(Some(Block::new(block_header, txs)))
+                }
+                None => Ok(None),
+            }
         }
     }
 
@@ -94,24 +101,24 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
             .db_tx
             .get_cf(mut_batch.block_hash_by_pk_cf, height_bytes)?;
 
-        if let Some(hash) = hash_bytes.map(|bytes| codec_block::vector_to_block_hash(&bytes)) {
+        if let Some(hash) = hash_bytes.map(|bytes| codec_block::bytes_to_block_hash(&bytes)) {
             self.get_block_by_hash(&hash, batch)
         } else {
             Ok(None)
         }
     }
 
-    pub(crate) fn get_block_height_by_hash(
+    pub(crate) fn get_block_header_by_hash(
         &self,
         block_hash: &BlockHash,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Option<BlockHeight>, rocksdb::Error> {
+    ) -> Result<Option<BlockHeader>, rocksdb::Error> {
         if let Some(value) = self.block_by_hash_lru_cache.borrow_mut().get(block_hash) {
-            return Ok(Some(value.header.height));
+            return Ok(Some(value.header));
         } else {
             let batch = batch.borrow_mut();
-            let height_bytes = batch.db_tx.get_cf(batch.block_pk_by_hash_cf, block_hash)?;
-            Ok(height_bytes.map(|bytes| codec_block::vector_to_block_height(&bytes)))
+            let header_bytes = batch.db_tx.get_cf(batch.block_pk_by_hash_cf, block_hash)?;
+            Ok(header_bytes.map(|bytes| codec_block::bytes_to_block_header(&block_hash.0, &bytes)))
         }
     }
 
@@ -126,10 +133,10 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
             .batch
             .put_cf(&block_hash_by_pk_cf, height_bytes, block_header.hash.0);
 
-        let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
+        let header_bytes = codec_block::block_header_to_bytes(&block_header);
         batch
             .db_tx
-            .put_cf(batch.block_pk_by_hash_cf, block_header.hash.0, height_bytes)
+            .put_cf(batch.block_pk_by_hash_cf, block_header.hash.0, header_bytes)
             .map_err(|e| e.to_string())?;
         Ok(())
     }

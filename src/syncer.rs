@@ -4,7 +4,6 @@ use crate::{
     info,
     model::Transaction,
 };
-use buffer::StreamBufferExt;
 use futures::stream::StreamExt;
 
 use min_batch::ext::MinBatchExt;
@@ -61,7 +60,6 @@ impl<InTx: Send + Clone + 'static, OutTx: Transaction + Send + Clone + 'static>
                 tokio::task::spawn_blocking(move || chain_linker.process_batch(&blocks, tx_count))
             })
             .buffered(num_cpus::get())
-            .buffer(256)
             .inspect(|res| match res {
                 Ok((block_batch, tx_count)) => {
                     self.monitor.monitor(block_batch, tx_count);
