@@ -7,10 +7,11 @@ use crate::{
 
 use super::eutxo_model::{UtxoIndex, UtxoValue};
 
-type UtxoPkBytes = [u8; 8];
-pub type AgidBytes = [u8; 4];
+pub type UtxoPkBytes = [u8; 8];
+pub type UtxoValueWithIndexes = Vec<u8>;
+pub type AgidBytes = Vec<u8>;
 type AgidWithUtxoPkBytes = [u8; 12];
-type DbIndexAgidBytes = [u8; 4];
+pub type DbIndexAgidBytes = [u8; 4];
 
 #[derive(Debug, PartialEq, Clone)]
 struct EutxoPk {
@@ -27,12 +28,12 @@ pub fn utxo_value_to_bytes(utxo_value: &UtxoValue) -> [u8; std::mem::size_of::<U
 
 pub fn concat_agid_with_utxo_pk(
     agid_bytes: &[u8],
-    utxo_pk_bytes: UtxoPkBytes,
+    utxo_pk_bytes: &UtxoPkBytes,
 ) -> AgidWithUtxoPkBytes {
     let mut combined_bytes = [0u8; 12];
 
     combined_bytes[0..4].copy_from_slice(agid_bytes);
-    combined_bytes[4..12].copy_from_slice(&utxo_pk_bytes);
+    combined_bytes[4..12].copy_from_slice(utxo_pk_bytes);
 
     combined_bytes
 }

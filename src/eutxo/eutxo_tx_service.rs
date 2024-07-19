@@ -15,7 +15,7 @@ use std::{
 };
 
 use super::{
-    eutxo_codec_utxo,
+    eutxo_codec_utxo::{self, AgidBytes, DbIndexAgidBytes, UtxoPkBytes, UtxoValueWithIndexes},
     eutxo_model::{EuTxInput, EuUtxo},
 };
 
@@ -28,6 +28,30 @@ impl EuTxService {
         todo!("")
     }
 
+    fn get_utxo_indexes(
+        &self,
+        index_agid_by_cf_index: &Vec<(DbIndexCfIndex, DbIndexAgidBytes)>,
+        mut_batch: &mut RocksDbBatch,
+    ) -> Result<Vec<(DbIndexCfIndex, Vec<u8>)>, rocksdb::Error> {
+        index_agid_by_cf_index
+            .iter()
+            .map(|(cf_index, index_agid)| {
+                let agid_with_utxo_pk_cf = mut_batch.agid_with_utxo_pk_cf[*cf_index as usize];
+                let index_by_agid_cf = mut_batch.index_by_agid_cf[*cf_index as usize];
+                let agid_by_index_cf = mut_batch.agid_by_index_cf[*cf_index as usize];
+
+                // get index value for this particular Agid
+
+                let index_value = mut_batch
+                    .db_tx
+                    .get_cf(index_by_agid_cf, &index_agid)?
+                    .unwrap();
+
+                Ok((*cf_index, index_value))
+            })
+            .collect::<Result<Vec<(DbIndexCfIndex, Vec<u8>)>, rocksdb::Error>>()
+    }
+
     fn get_outputs(
         &self,
         block_height: &BlockHeight,
@@ -35,8 +59,8 @@ impl EuTxService {
         mut_batch: &mut RocksDbBatch,
     ) -> Result<Vec<EuUtxo>, rocksdb::Error> {
         let pk_bytes = codec_tx::tx_pk_bytes(block_height, tx_index);
-        let db_tx = mut_batch.db_tx;
-        db_tx
+        mut_batch
+            .db_tx
             .prefix_iterator_cf(mut_batch.utxo_value_by_pk_cf, pk_bytes)
             .map(|result| {
                 result.and_then(|(utxo_pk, utxo_value_bytes)| {
@@ -44,21 +68,8 @@ impl EuTxService {
                     let (utxo_value, index_agid_by_cf_index) =
                         eutxo_codec_utxo::bytes_to_utxo(&utxo_value_bytes);
 
-                    let db_indexes: Vec<(DbIndexCfIndex, Vec<u8>)> = index_agid_by_cf_index
-                        .into_iter()
-                        .map(|(cf_index, index_agid)| {
-                            let agid_with_utxo_pk_cf =
-                                mut_batch.agid_with_utxo_pk_cf[cf_index as usize];
-                            let index_by_agid_cf = mut_batch.index_by_agid_cf[cf_index as usize];
-                            let agid_by_index_cf = mut_batch.agid_by_index_cf[cf_index as usize];
-
-                            // get index value for this particular Agid
-
-                            let index_value = db_tx.get_cf(index_by_agid_cf, &index_agid)?.unwrap();
-
-                            Ok((cf_index, index_value))
-                        })
-                        .collect::<Result<Vec<(DbIndexCfIndex, Vec<u8>)>, rocksdb::Error>>()?;
+                    let db_indexes: Vec<(DbIndexCfIndex, Vec<u8>)> =
+                        self.get_utxo_indexes(&index_agid_by_cf_index, mut_batch)?;
 
                     Ok(EuUtxo {
                         utxo_index,
@@ -94,6 +105,58 @@ impl EuTxService {
                 })
             })
             .collect()
+    }
+
+    fn persist_utxo_value_with_indexes(
+        &self,
+        utxo_pk_bytes: &UtxoPkBytes,
+        utxo_value_with_indexes: &UtxoValueWithIndexes,
+        batch: &mut RocksDbBatch,
+    ) {
+        // persist utxo_value_with_indexes
+        let utxo_value_by_pk_cf = batch.utxo_value_by_pk_cf;
+        batch
+            .batch
+            .put_cf(utxo_value_by_pk_cf, utxo_pk_bytes, &utxo_value_with_indexes);
+    }
+
+    fn persist_agid_with_utxo(
+        &self,
+        cf_index: usize,
+        index_agid_bytes: &AgidBytes,
+        utxo_pk_bytes: &UtxoPkBytes,
+        batch: &mut RocksDbBatch,
+    ) {
+        // in either case, insert new agid_utxo_pk record
+        let agid_with_utxo_pk =
+            eutxo_codec_utxo::concat_agid_with_utxo_pk(index_agid_bytes, utxo_pk_bytes);
+        let agid_with_utxo_pk_cf = batch.agid_with_utxo_pk_cf[cf_index as usize];
+        batch
+            .batch
+            .put_cf(agid_with_utxo_pk_cf, agid_with_utxo_pk, vec![]);
+    }
+
+    fn get_or_persist_index_with_agid(
+        &self,
+        cf_index: usize,
+        db_index_value: &[u8],
+        batch: &mut RocksDbBatch,
+    ) -> Result<AgidBytes, rocksdb::Error> {
+        let agid_by_index_cf = batch.agid_by_index_cf[cf_index as usize];
+        if let Some(index_agid) = batch.db_tx.get_cf(agid_by_index_cf, db_index_value)? {
+            Ok(index_agid)
+        } else {
+            let index_by_agid_cf = batch.index_by_agid_cf[cf_index];
+            let mut new_agid_vec = vec![0; 4];
+            BigEndian::write_u32(&mut new_agid_vec, self.get_new_agid());
+            batch
+                .db_tx
+                .put_cf(agid_by_index_cf, &new_agid_vec, db_index_value)?;
+            batch
+                .db_tx
+                .put_cf(index_by_agid_cf, db_index_value, &new_agid_vec)?;
+            Ok(new_agid_vec)
+        }
     }
 }
 
@@ -165,35 +228,17 @@ impl TxService for EuTxService {
             let mut index = 8;
 
             for (cf_index, db_index_value) in utxo.db_indexes.iter() {
-                let agid_with_utxo_pk_cf = batch.agid_with_utxo_pk_cf[*cf_index as usize];
-                let index_by_agid_cf = batch.index_by_agid_cf[*cf_index as usize];
-                let agid_by_index_cf = batch.agid_by_index_cf[*cf_index as usize];
-
                 // first check if IndexValue has been already indexed or it is the first time
-                let index_agid_bytes: Vec<u8> = if let Some(index_agid) =
-                    batch.db_tx.get_cf(agid_by_index_cf, db_index_value)?
-                {
-                    index_agid
-                } else {
-                    let mut new_agid_vec = vec![0; 4];
-                    BigEndian::write_u32(&mut new_agid_vec, self.get_new_agid());
-                    batch
-                        .db_tx
-                        .put_cf(agid_by_index_cf, &new_agid_vec, db_index_value)?;
-                    batch
-                        .db_tx
-                        .put_cf(index_by_agid_cf, db_index_value, &new_agid_vec)?;
-                    new_agid_vec
-                };
+                let index_agid_bytes: AgidBytes =
+                    self.get_or_persist_index_with_agid(*cf_index as usize, db_index_value, batch)?;
 
                 // in either case, insert new agid_utxo_pk record
-                let agid_with_utxo_pk =
-                    eutxo_codec_utxo::concat_agid_with_utxo_pk(&index_agid_bytes, utxo_pk_bytes);
-
-                batch
-                    .batch
-                    .put_cf(agid_with_utxo_pk_cf, agid_with_utxo_pk, vec![]);
-
+                self.persist_agid_with_utxo(
+                    *cf_index as usize,
+                    &index_agid_bytes,
+                    &utxo_pk_bytes,
+                    batch,
+                );
                 // append indexes to utxo_value_with_indexes
                 utxo_value_with_indexes[index] = *cf_index;
                 index += 1;
@@ -201,11 +246,7 @@ impl TxService for EuTxService {
                 index += 4;
             }
 
-            // persist utxo_value_with_indexes
-            let utxo_value_by_pk_cf = batch.utxo_value_by_pk_cf;
-            batch
-                .batch
-                .put_cf(utxo_value_by_pk_cf, utxo_pk_bytes, &utxo_value_with_indexes);
+            self.persist_utxo_value_with_indexes(&utxo_pk_bytes, &utxo_value_with_indexes, batch);
         }
         Ok(())
     }
