@@ -12,7 +12,7 @@ UtxoIndexes = address, script_hash, ...   -> UtxoPks
 
 AssetIndex  = asset_id                    -> AssetPks
 
-Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one
+Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one, `utxo_index_cf` is encoded as u8
 ------------------------------------------------------------
 
 ## Block
@@ -21,7 +21,7 @@ BlockHash_by_HeightPk:
     block_height -> block_hash
 
 HeightPk_by_BlockHash:
-    block_hash -> block_height
+    block_hash -> block_height|block_timestamp
 
 
 ## Transactions
@@ -35,32 +35,47 @@ TxPk_by_txHash:
 
 ## Utxo
 
-UtxoValue_by_UtxoPk:
-    block_height|tx_index|utxo_index -> utxo_value
+UtxoValueAndAgids_by_UtxoPk:
+    block_height|tx_index|utxo_index -> utxo_value|[utxo_index_cf:utxo_index_agid,utxo_index_cf:utxo_index_agid]
 
 UtxoPk_by_InputPk:
     block_height|tx_index|input_index -> block_height|tx_index|utxo_index
 
+# Utxo indexes
 
-## Utxo indexes
+UtxoIndex_by_IndexAGID
+    index_by_agid_address_cf: 
+        addres_agid -> address
+    index_by_agid_script_hash_cf: 
+        script_hash_agid -> script_hash
 
-UtxoPks_by_UtxoIndex:
-    index_1_cf: 
-       index_1 -> [block_height|tx_index|utxo_index,block_height|tx_index|utxo_index]
-    index_2_cf: 
-       index_2 -> [block_height|tx_index|utxo_index]
+UtxoAgid_by_UtxoIndex
+    agid_by_index_address_cf: 
+        address -> addres_agid
+    agid_by_index_script_hash_cf: 
+        script_hash -> script_hash_agid
+
+AddressAgid_with_UtxoPk:
+    agid_by_index_address_cf: 
+       addres_agid|block_height|tx_index|utxo_index
+    agid_by_script_hash_cf: 
+       script_hash_agid|block_height|tx_index|utxo_index
 
 
 ## Assets
 
-AssetValue_by_AssetPk:
-    block_height|tx_index|utxo_index|asset_index -> value
+AssetValueAndAgid_by_AssetPk:
+    block_height|tx_index|utxo_index|asset_index -> asset_value|asset_agid
 
 
 ## Asset index
 
+AssetId_by_AssetAgid
+    asset_agid -> asset_id
+
+AssetAgid_by_AssetId
+    asset_id -> asset_agid
+
 AssetPks_by_AssetIndex:
-    asset_1_cf
-        asset_1 -> [block_height|tx_index|utxo_index|asset_index,block_height|tx_index|utxo_index|asset_index]
-    asset_2_cf 
-        asset_2 -> [block_height|tx_index|utxo_index|asset_index]
+    asset_foo -> [block_height|tx_index|utxo_index|asset_index,block_height|tx_index|utxo_index|asset_index]
+    asset_bar -> [block_height|tx_index|utxo_index|asset_index]
