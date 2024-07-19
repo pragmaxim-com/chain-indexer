@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::api::BlockProcessor;
 use crate::eutxo::eutxo_model::{EuTx, EuTxInput, EuUtxo};
 use crate::model::{AssetId, AssetValue, Block, TxCount, TxIndex};
@@ -94,9 +92,9 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
                         .to_vec();
 
                     let mut db_indexes = Vec::with_capacity(2); // Pre-allocate capacity for 2 elements
-                    db_indexes.push((Cow::Borrowed(SCRIPT_HASH_INDEX), script_hash));
+                    db_indexes.push((0, script_hash));
                     if let Some(address) = address {
-                        db_indexes.push((Cow::Borrowed(ADDRESS_INDEX), address));
+                        db_indexes.push((1, address));
                     }
 
                     EuUtxo {

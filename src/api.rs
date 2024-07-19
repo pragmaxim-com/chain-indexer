@@ -3,8 +3,8 @@ use std::cell::{RefCell, RefMut};
 use lru::LruCache;
 
 use crate::{
-    indexer::RocksDbBatch,
     model::{Block, BlockHash, BlockHeight, Transaction, TxCount, TxHash},
+    rocks_db_batch::RocksDbBatch,
 };
 
 pub trait BlockchainClient {
@@ -67,7 +67,7 @@ pub trait TxService {
         block_height: &BlockHeight,
         tx: &Self::Tx,
         batch: &mut RefMut<RocksDbBatch>,
-    );
+    ) -> Result<(), rocksdb::Error>;
 
     fn persist_inputs(
         &self,

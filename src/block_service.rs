@@ -2,8 +2,8 @@ use crate::{
     api::TxService,
     codec_block,
     codec_tx::TxPkBytes,
-    indexer::RocksDbBatch,
     model::{Block, BlockHash, BlockHeader, BlockHeight, Transaction, TxHash},
+    rocks_db_batch::RocksDbBatch,
 };
 use lru::LruCache;
 use std::cell::RefMut;
@@ -60,12 +60,21 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
         Ok(())
     }
 
+    fn delete_header(
+        &self,
+        block_header: &BlockHeader,
+        batch: &RefCell<RocksDbBatch>,
+    ) -> Result<(), String> {
+    }
+
     pub(crate) fn update_blocks(
         &self,
         blocks: &Vec<Block<Tx>>,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<(), String> {
-        todo!("s")
+        for block in blocks.iter() {
+            block
+        }
     }
 
     fn get_block_by_hash(

@@ -1,7 +1,6 @@
 use chrono::DateTime;
 use core::fmt;
 use derive_more::{AsRef, Display, From, Into};
-use std::borrow::Cow;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BlockHeader {
@@ -82,7 +81,11 @@ impl TryFrom<Box<[u8]>> for TxHash {
 pub type AssetId = Vec<u8>;
 pub type AssetValue = u64;
 
-pub type DbIndexName = Cow<'static, str>;
+pub type DbIndexCfIndex = u8;
+pub type DbIndexAgidWithUtxoPkCf = String;
+pub type DbIndexByAgidCf = String;
+pub type DbAgidByIndexCf = String;
+pub type DbIndexAgid = u32;
 pub type DbIndexValue = Vec<u8>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

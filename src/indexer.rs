@@ -1,6 +1,3 @@
-use rocksdb::ColumnFamily;
-use rocksdb::WriteBatchWithTransaction;
-
 use crate::api::ChainLinker;
 use crate::block_service::BlockService;
 use crate::codec_block;
@@ -8,9 +5,10 @@ use crate::eutxo::eutxo_model::*;
 use crate::info;
 use crate::model::BlockHeader;
 use crate::model::Transaction;
-use crate::model::{Block, BlockHeight, DbIndexName};
+use crate::model::{Block, BlockHeight};
+use crate::rocks_db_batch::RocksDbBatch;
 use crate::storage::Storage;
-use crate::storage::Tx;
+
 use std::cell::RefCell;
 use std::sync::Arc;
 
@@ -35,7 +33,7 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
         }
     }
 
-    fn persist_last_height(
+    fn persist_last_height_and_commit(
         &self,
         height: BlockHeight,
         batch: &RefCell<RocksDbBatch>,
@@ -45,7 +43,8 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
             batch.meta_cf,
             LAST_ADDRESS_HEIGHT_KEY,
             codec_block::block_height_to_bytes(&height),
-        )
+        )?;
+        batch.db_tx.commit()
     }
 
     pub fn get_last_height(&self) -> BlockHeight {
@@ -91,27 +90,7 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
     }
 
     pub(crate) fn persist_blocks(&self, blocks: &Vec<Block<OutTx>>) -> Result<(), String> {
-        let db = self.db_holder.db.write().unwrap();
-        let db_tx = db.transaction();
-
-        let mut binding = db_tx.get_writebatch();
-        let batch = RefCell::new(RocksDbBatch {
-            db_tx: &db_tx,
-            batch: &mut binding,
-            block_hash_by_pk_cf: db.cf_handle(BLOCK_PK_BY_HASH_CF).unwrap(),
-            block_pk_by_hash_cf: db.cf_handle(BLOCK_HASH_BY_PK_CF).unwrap(),
-            tx_hash_by_pk_cf: db.cf_handle(TX_HASH_BY_PK_CF).unwrap(),
-            tx_pk_by_hash_cf: db.cf_handle(TX_PK_BY_HASH_CF).unwrap(),
-            utxo_value_by_pk_cf: db.cf_handle(UTXO_VALUE_BY_PK_CF).unwrap(),
-            utxo_pk_by_input_pk_cf: db.cf_handle(UTXO_PK_BY_INPUT_PK_CF).unwrap(),
-            meta_cf: db.cf_handle(META_CF).unwrap(),
-            index_cf_by_name: self
-                .db_holder
-                .utxo_indexes
-                .iter()
-                .map(|index_name| (index_name.clone(), db.cf_handle(&index_name).unwrap()))
-                .collect::<Vec<(DbIndexName, &ColumnFamily)>>(),
-        });
+        let batch = RefCell::new(RocksDbBatch::new(self.db_holder));
 
         blocks
             .into_iter()
@@ -128,22 +107,9 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
 
         // persist last height to db_tx if Some
         if let Some(block) = blocks.last() {
-            self.persist_last_height(block.header.height, &batch)?;
+            self.persist_last_height_and_commit(block.header.height, &batch)?;
         }
-        db_tx.commit().map_err(|e| e.into_string())?;
+        batch.borrow_mut().commit().map_err(|e| e.into_string())?;
         Ok(())
     }
-}
-
-pub struct RocksDbBatch<'db> {
-    pub(crate) db_tx: &'db Tx<'db>,
-    pub(crate) batch: &'db mut WriteBatchWithTransaction<true>,
-    pub(crate) block_hash_by_pk_cf: &'db ColumnFamily,
-    pub(crate) block_pk_by_hash_cf: &'db ColumnFamily,
-    pub(crate) tx_hash_by_pk_cf: &'db ColumnFamily,
-    pub(crate) tx_pk_by_hash_cf: &'db ColumnFamily,
-    pub(crate) utxo_value_by_pk_cf: &'db ColumnFamily,
-    pub(crate) utxo_pk_by_input_pk_cf: &'db ColumnFamily,
-    pub(crate) meta_cf: &'db ColumnFamily,
-    pub(crate) index_cf_by_name: Vec<(DbIndexName, &'db ColumnFamily)>,
 }

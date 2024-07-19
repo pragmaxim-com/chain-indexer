@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 
-use crate::{info, model::DbIndexName};
+use crate::{db_index_manager::DbIndexManager, info};
 use rocksdb::{OptimisticTransactionDB, Options, SingleThreaded, Transaction};
 
 /// Type alias for a database
@@ -11,11 +11,15 @@ pub(crate) type Tx<'db> = Transaction<'db, Db>;
 
 pub struct Storage {
     pub db: Arc<RwLock<OptimisticTransactionDB<SingleThreaded>>>,
-    pub utxo_indexes: Vec<DbIndexName>,
+    pub db_index_manager: Arc<DbIndexManager>,
 }
 
 impl Storage {
-    pub fn new(db_path: &str, utxo_indexes: Vec<DbIndexName>, cfs: Vec<&'static str>) -> Self {
+    pub fn new(
+        db_path: &str,
+        db_index_manager: Arc<DbIndexManager>,
+        cfs: Vec<&'static str>,
+    ) -> Self {
         let num_cores = num_cpus::get() as i32;
         info!("Number of CPU cores: {}", num_cores);
 
@@ -49,12 +53,23 @@ impl Storage {
                 info!("Creating column family: {}", cf);
                 db.create_cf(cf, &options).unwrap();
             }
-            for cf in utxo_indexes.iter() {
-                info!("Creating column family: {}", cf);
-                db.create_cf(cf, &options).unwrap();
+            for index_agid_with_utxo_pk in db_index_manager.index_agid_with_utxo_pk.iter() {
+                info!("Creating column family: {}", index_agid_with_utxo_pk);
+                db.create_cf(index_agid_with_utxo_pk, &options).unwrap();
+            }
+            for index_by_agid in db_index_manager.index_by_agid.iter() {
+                info!("Creating column family: {}", index_by_agid);
+                db.create_cf(index_by_agid, &options).unwrap();
+            }
+            for agid_by_index in db_index_manager.agid_by_index.iter() {
+                info!("Creating column family: {}", agid_by_index);
+                db.create_cf(agid_by_index, &options).unwrap();
             }
         }
         let db = Arc::new(RwLock::new(db));
-        Storage { db, utxo_indexes }
+        Storage {
+            db,
+            db_index_manager,
+        }
     }
 }

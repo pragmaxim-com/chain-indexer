@@ -1,4 +1,6 @@
-use crate::model::{AssetId, AssetValue, DbIndexName, DbIndexValue, Transaction, TxHash, TxIndex};
+use crate::model::{
+    AssetId, AssetValue, DbIndexCfIndex, DbIndexValue, Transaction, TxHash, TxIndex,
+};
 use derive_more::{AsRef, Display, From, Into};
 
 #[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Display)]
@@ -13,7 +15,7 @@ pub struct UtxoIndex(pub u16);
 #[derive(Debug, Clone)]
 pub struct EuUtxo {
     pub utxo_index: UtxoIndex,
-    pub db_indexes: Vec<(DbIndexName, DbIndexValue)>,
+    pub db_indexes: Vec<(DbIndexCfIndex, DbIndexValue)>,
     pub assets: Vec<(AssetId, AssetValue)>,
     pub utxo_value: UtxoValue,
 }

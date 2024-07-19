@@ -1,5 +1,6 @@
 use ci::api::ChainLinker;
 use ci::block_service::BlockService;
+use ci::db_index_manager::DbIndexManager;
 use ci::eutxo::btc::btc_chain_linker::BtcChainLinker;
 use ci::eutxo::eutxo_block_monitor::EuBlockMonitor;
 use ci::eutxo::eutxo_model::{self, EuTx};
@@ -20,19 +21,21 @@ async fn main() -> Result<(), std::io::Error> {
             let api_host = blockchain.api_host;
             let api_username = blockchain.api_username;
             let api_password = blockchain.api_password;
-            let db_path = format!("{}/{}/{}", blockchain.db_path, "main", blockchain.name);
-            let db_indexes = config.indexer.db_indexes;
+            let db_path: String = format!("{}/{}/{}", blockchain.db_path, "main", blockchain.name);
+            let db_utxo_indexes = config.indexer.db_indexes;
+
             let tx_batch_size = config.indexer.tx_batch_size;
 
             match blockchain.name.as_str() {
                 "btc" => {
+                    let db_index_manager = Arc::new(DbIndexManager { db_utxo_indexes });
                     let db_holder = Arc::new(Storage::new(
                         &db_path,
-                        db_indexes,
+                        db_index_manager,
                         eutxo_model::get_eutxo_column_families(),
                     ));
                     // let db_holder = Arc::new(DbHolder { db: Arc::new(db) });
-                    let tx_service: Arc<EuTxService> = Arc::new(EuTxService {});
+                    let tx_service: Arc<EuTxService> = Arc::new(EuTxService { db_index_manager });
                     let block_service: Arc<BlockService<EuTx>> =
                         Arc::new(BlockService::new(tx_service));
 
