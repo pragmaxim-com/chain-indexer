@@ -55,7 +55,7 @@ UtxoAgid_by_UtxoIndex
     agid_by_index_script_hash_cf: 
         script_hash -> script_hash_agid
 
-AddressAgid_with_UtxoPk:
+IndexAgid_with_UtxoPk:
     agid_by_index_address_cf: 
        addres_agid|block_height|tx_index|utxo_index
     agid_by_script_hash_cf: 
@@ -76,6 +76,5 @@ AssetId_by_AssetAgid
 AssetAgid_by_AssetId
     asset_id -> asset_agid
 
-AssetPks_by_AssetIndex:
-    asset_foo -> [block_height|tx_index|utxo_index|asset_index,block_height|tx_index|utxo_index|asset_index]
-    asset_bar -> [block_height|tx_index|utxo_index|asset_index]
+AssetAgid_with_AssetPk:
+    asset_agid|block_height|tx_index|utxo_index|asset_index
