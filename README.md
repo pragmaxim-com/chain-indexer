@@ -16,11 +16,10 @@ AssetPk      = block_height|tx_index|utxo_index|asset_index
 AssetBirthPk = block_height|tx_index|utxo_index|asset_index
 ```
 
-UtxoIndexes and AssetIndex are seconary indexes that keep entity (asset-id/address/script_hash) under small-size UtxoBirthPk/AssetBirthPk
+**UtxoIndexes** and **AssetIndex** are seconary indexes that keep entity (`asset-id/address/script_hash`) under small-size `UtxoBirthPk/AssetBirthPk`
 and references/relations to all further occurences to them.
 
-Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one
-------------------------------------------------------------
+> Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one
 
 ### Block
 
