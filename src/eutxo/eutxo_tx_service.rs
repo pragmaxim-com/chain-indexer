@@ -4,7 +4,7 @@ use crate::{
     codec_tx::{self, TxPkBytes},
     db_index_manager::DbIndexManager,
     eutxo::eutxo_model::EuTx,
-    model::{BlockHeight, DbIndexCfIndex, DbIndexUtxoBirthPk, TxHash, TxIndex},
+    model::{BlockHeight, DbIndexCfIndex, TxHash, TxIndex},
     rocks_db_batch::RocksDbBatch,
 };
 use byteorder::{BigEndian, ByteOrder};
@@ -26,10 +26,6 @@ pub struct EuTxService {
 }
 
 impl EuTxService {
-    fn get_new_utxo_birth_pk(&self) -> DbIndexUtxoBirthPk {
-        todo!("")
-    }
-
     fn get_utxo_indexes(
         &self,
         index_utxo_birth_pk_by_cf_index: &Vec<(DbIndexCfIndex, DbIndexUtxoBirthPkBytes)>,
@@ -133,12 +129,12 @@ impl EuTxService {
         batch: &mut RocksDbBatch,
     ) -> Result<UtxoBirthPkBytes, rocksdb::Error> {
         let utxo_birth_pk_by_index_cf = batch.utxo_birth_pk_by_index_cf[cf_index as usize];
-        if let Some(index_utxo_birth_pk) = batch
+        if let Some(existing_utxo_birth_pk) = batch
             .db_tx
             .get_cf(utxo_birth_pk_by_index_cf, db_index_value)?
         {
             let utxo_birth_pk_with_utxo_pk = eutxo_codec_utxo::concat_utxo_birth_pk_with_utxo_pk(
-                &index_utxo_birth_pk,
+                &existing_utxo_birth_pk,
                 utxo_pk_bytes,
             );
             let utxo_birth_pk_with_utxo_pk_cf =
@@ -148,22 +144,16 @@ impl EuTxService {
                 utxo_birth_pk_with_utxo_pk,
                 vec![],
             );
-            Ok(index_utxo_birth_pk)
+            Ok(existing_utxo_birth_pk)
         } else {
             let index_by_utxo_birth_pk_cf = batch.index_by_utxo_birth_pk_cf[cf_index];
-            let mut new_utxo_birth_pk_vec = vec![0; 4];
-            BigEndian::write_u32(&mut new_utxo_birth_pk_vec, self.get_new_utxo_birth_pk());
-            batch.db_tx.put_cf(
-                utxo_birth_pk_by_index_cf,
-                &new_utxo_birth_pk_vec,
-                db_index_value,
-            )?;
-            batch.db_tx.put_cf(
-                index_by_utxo_birth_pk_cf,
-                db_index_value,
-                &new_utxo_birth_pk_vec,
-            )?;
-            Ok(new_utxo_birth_pk_vec)
+            batch
+                .db_tx
+                .put_cf(utxo_birth_pk_by_index_cf, utxo_pk_bytes, db_index_value)?;
+            batch
+                .db_tx
+                .put_cf(index_by_utxo_birth_pk_cf, db_index_value, utxo_pk_bytes)?;
+            Ok(utxo_pk_bytes.to_vec())
         }
     }
 }
@@ -237,7 +227,7 @@ impl TxService for EuTxService {
 
             for (cf_index, db_index_value) in utxo.db_indexes.iter() {
                 // first check if IndexValue has been already indexed or it is the first time
-                let index_utxo_birth_pk_bytes: UtxoBirthPkBytes = self
+                let utxo_birth_pk_bytes: UtxoBirthPkBytes = self
                     .persist_utxo_birth_pk_or_relation_with_utxo_pk(
                         *cf_index as usize,
                         db_index_value,
@@ -247,8 +237,7 @@ impl TxService for EuTxService {
                 // append indexes to utxo_value_with_indexes
                 utxo_value_with_indexes[index] = *cf_index;
                 index += 1;
-                utxo_value_with_indexes[index..index + 4]
-                    .copy_from_slice(&index_utxo_birth_pk_bytes);
+                utxo_value_with_indexes[index..index + 4].copy_from_slice(&utxo_birth_pk_bytes);
                 index += 4;
             }
 
