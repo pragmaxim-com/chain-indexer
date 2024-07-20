@@ -53,17 +53,23 @@ impl Storage {
                 info!("Creating column family: {}", cf);
                 db.create_cf(cf, &options).unwrap();
             }
-            for index_agid_with_utxo_pk in db_index_manager.index_agid_with_utxo_pk.iter() {
-                info!("Creating column family: {}", index_agid_with_utxo_pk);
-                db.create_cf(index_agid_with_utxo_pk, &options).unwrap();
+            for index_utxo_birth_pk_with_utxo_pk in
+                db_index_manager.index_utxo_birth_pk_with_utxo_pk.iter()
+            {
+                info!(
+                    "Creating column family: {}",
+                    index_utxo_birth_pk_with_utxo_pk
+                );
+                db.create_cf(index_utxo_birth_pk_with_utxo_pk, &options)
+                    .unwrap();
             }
-            for index_by_agid in db_index_manager.index_by_agid.iter() {
-                info!("Creating column family: {}", index_by_agid);
-                db.create_cf(index_by_agid, &options).unwrap();
+            for index_by_utxo_birth_pk in db_index_manager.index_by_utxo_birth_pk.iter() {
+                info!("Creating column family: {}", index_by_utxo_birth_pk);
+                db.create_cf(index_by_utxo_birth_pk, &options).unwrap();
             }
-            for agid_by_index in db_index_manager.agid_by_index.iter() {
-                info!("Creating column family: {}", agid_by_index);
-                db.create_cf(agid_by_index, &options).unwrap();
+            for utxo_birth_pk_by_index in db_index_manager.utxo_birth_pk_by_index.iter() {
+                info!("Creating column family: {}", utxo_birth_pk_by_index);
+                db.create_cf(utxo_birth_pk_by_index, &options).unwrap();
             }
         }
         let db = Arc::new(RwLock::new(db));

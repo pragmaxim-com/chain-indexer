@@ -9,9 +9,9 @@ use super::eutxo_model::{UtxoIndex, UtxoValue};
 
 pub type UtxoPkBytes = [u8; 8];
 pub type UtxoValueWithIndexes = Vec<u8>;
-pub type AgidBytes = Vec<u8>;
-type AgidWithUtxoPkBytes = [u8; 12];
-pub type DbIndexAgidBytes = [u8; 4];
+pub type UtxoBirthPkBytes = Vec<u8>;
+type UtxoBirthPkWithUtxoPkBytes = [u8; 12];
+pub type DbIndexUtxoBirthPkBytes = [u8; 4];
 
 #[derive(Debug, PartialEq, Clone)]
 struct EutxoPk {
@@ -26,22 +26,22 @@ pub fn utxo_value_to_bytes(utxo_value: &UtxoValue) -> [u8; std::mem::size_of::<U
     bytes
 }
 
-pub fn concat_agid_with_utxo_pk(
-    agid_bytes: &[u8],
+pub fn concat_utxo_birth_pk_with_utxo_pk(
+    utxo_birth_pk_bytes: &[u8],
     utxo_pk_bytes: &UtxoPkBytes,
-) -> AgidWithUtxoPkBytes {
+) -> UtxoBirthPkWithUtxoPkBytes {
     let mut combined_bytes = [0u8; 12];
 
-    combined_bytes[0..4].copy_from_slice(agid_bytes);
+    combined_bytes[0..4].copy_from_slice(utxo_birth_pk_bytes);
     combined_bytes[4..12].copy_from_slice(utxo_pk_bytes);
 
     combined_bytes
 }
 
-pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndex, DbIndexAgidBytes)>) {
+pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndex, DbIndexUtxoBirthPkBytes)>) {
     let utxo_value = UtxoValue(BigEndian::read_u64(&bytes[0..8]));
     let num_pairs = (bytes.len() - 8) / 5;
-    let mut index_agid_by_cf_index = Vec::with_capacity(num_pairs);
+    let mut index_utxo_birth_pk_by_cf_index = Vec::with_capacity(num_pairs);
     let mut index = 8;
     while index < bytes.len() {
         if index + 5 <= bytes.len() {
@@ -50,26 +50,26 @@ pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndex, DbIndexAg
             let db_index_pk = BigEndian::read_u32(&bytes[index..index + 4]);
             index += 4;
             let db_index_pk_bytes: [u8; 4] = db_index_pk.to_be_bytes();
-            index_agid_by_cf_index.push((db_index_id, db_index_pk_bytes));
+            index_utxo_birth_pk_by_cf_index.push((db_index_id, db_index_pk_bytes));
         } else {
             break;
         }
     }
-    (utxo_value, index_agid_by_cf_index)
+    (utxo_value, index_utxo_birth_pk_by_cf_index)
 }
 
 pub fn utxo_to_bytes(
     utxo_value: UtxoValue,
-    index_agid_by_cf_index: Vec<(DbIndexCfIndex, DbIndexAgidBytes)>,
+    index_utxo_birth_pk_by_cf_index: Vec<(DbIndexCfIndex, DbIndexUtxoBirthPkBytes)>,
 ) -> Vec<u8> {
-    let mut utxo_value_with_indexes = vec![0u8; 8 + index_agid_by_cf_index.len() * 5];
+    let mut utxo_value_with_indexes = vec![0u8; 8 + index_utxo_birth_pk_by_cf_index.len() * 5];
     BigEndian::write_u64(&mut utxo_value_with_indexes[0..8], utxo_value.0);
 
     let mut index = 8;
-    for (db_index_id, db_index_agid) in index_agid_by_cf_index {
+    for (db_index_id, db_index_utxo_birth_pk) in index_utxo_birth_pk_by_cf_index {
         utxo_value_with_indexes[index] = db_index_id;
         index += 1;
-        utxo_value_with_indexes[index..index + 4].copy_from_slice(&db_index_agid);
+        utxo_value_with_indexes[index..index + 4].copy_from_slice(&db_index_utxo_birth_pk);
         index += 4;
     }
 

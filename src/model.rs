@@ -82,10 +82,10 @@ pub type AssetId = Vec<u8>;
 pub type AssetValue = u64;
 
 pub type DbIndexCfIndex = u8;
-pub type DbIndexAgidWithUtxoPkCf = String;
-pub type DbIndexByAgidCf = String;
-pub type DbAgidByIndexCf = String;
-pub type DbIndexAgid = u32;
+pub type DbIndexUtxoBirthPkWithUtxoPkCf = String;
+pub type DbIndexByUtxoBirthPkCf = String;
+pub type DbUtxoBirthPkByIndexCf = String;
+pub type DbIndexUtxoBirthPk = u32;
 pub type DbIndexValue = Vec<u8>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

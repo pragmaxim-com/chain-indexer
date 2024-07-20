@@ -1,27 +1,29 @@
-use crate::model::{DbAgidByIndexCf, DbIndexAgidWithUtxoPkCf, DbIndexByAgidCf};
+use crate::model::{
+    DbIndexByUtxoBirthPkCf, DbIndexUtxoBirthPkWithUtxoPkCf, DbUtxoBirthPkByIndexCf,
+};
 
 pub struct DbIndexManager {
-    pub index_agid_with_utxo_pk: Vec<DbIndexAgidWithUtxoPkCf>,
-    pub agid_by_index: Vec<DbAgidByIndexCf>,
-    pub index_by_agid: Vec<DbIndexByAgidCf>,
+    pub index_utxo_birth_pk_with_utxo_pk: Vec<DbIndexUtxoBirthPkWithUtxoPkCf>,
+    pub utxo_birth_pk_by_index: Vec<DbUtxoBirthPkByIndexCf>,
+    pub index_by_utxo_birth_pk: Vec<DbIndexByUtxoBirthPkCf>,
 }
 
 impl DbIndexManager {
-    fn new(db_indexes: Vec<DbIndexAgidWithUtxoPkCf>) -> Self {
-        let agid_by_index = db_indexes
+    fn new(db_indexes: Vec<DbIndexUtxoBirthPkWithUtxoPkCf>) -> Self {
+        let utxo_birth_pk_by_index = db_indexes
             .into_iter()
-            .map(|index_name| format!("agid_by_{}", index_name))
+            .map(|index_name| format!("utxo_birth_pk_by_{}", index_name))
             .collect();
 
-        let index_by_agid = db_indexes
+        let index_by_utxo_birth_pk = db_indexes
             .into_iter()
-            .map(|index_name| format!("{}_by_agid", index_name))
+            .map(|index_name| format!("{}_by_utxo_birth_pk", index_name))
             .collect();
 
         DbIndexManager {
-            index_agid_with_utxo_pk: db_indexes,
-            agid_by_index,
-            index_by_agid,
+            index_utxo_birth_pk_with_utxo_pk: db_indexes,
+            utxo_birth_pk_by_index,
+            index_by_utxo_birth_pk,
         }
     }
 }

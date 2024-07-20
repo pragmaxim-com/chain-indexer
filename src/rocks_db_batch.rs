@@ -16,9 +16,9 @@ pub struct RocksDbBatch<'db> {
     pub(crate) utxo_value_by_pk_cf: &'db ColumnFamily, // TODO eutxo !!
     pub(crate) utxo_pk_by_input_pk_cf: &'db ColumnFamily, // TODO eutxo !!
     pub(crate) meta_cf: &'db ColumnFamily,
-    pub(crate) agid_with_utxo_pk_cf: Vec<&'db ColumnFamily>,
-    pub(crate) index_by_agid_cf: Vec<&'db ColumnFamily>,
-    pub(crate) agid_by_index_cf: Vec<&'db ColumnFamily>,
+    pub(crate) utxo_birth_pk_with_utxo_pk_cf: Vec<&'db ColumnFamily>,
+    pub(crate) index_by_utxo_birth_pk_cf: Vec<&'db ColumnFamily>,
+    pub(crate) utxo_birth_pk_by_index_cf: Vec<&'db ColumnFamily>,
 }
 
 impl<'db> RocksDbBatch<'db> {
@@ -36,21 +36,21 @@ impl<'db> RocksDbBatch<'db> {
             utxo_value_by_pk_cf: db.cf_handle(UTXO_VALUE_BY_PK_CF).unwrap(),
             utxo_pk_by_input_pk_cf: db.cf_handle(UTXO_PK_BY_INPUT_PK_CF).unwrap(),
             meta_cf: db.cf_handle(META_CF).unwrap(),
-            agid_with_utxo_pk_cf: db_holder
+            utxo_birth_pk_with_utxo_pk_cf: db_holder
                 .db_index_manager
-                .index_agid_with_utxo_pk
+                .index_utxo_birth_pk_with_utxo_pk
                 .iter()
                 .map(|cf| db.cf_handle(cf).unwrap())
                 .collect::<Vec<&ColumnFamily>>(),
-            agid_by_index_cf: db_holder
+            utxo_birth_pk_by_index_cf: db_holder
                 .db_index_manager
-                .agid_by_index
+                .utxo_birth_pk_by_index
                 .iter()
                 .map(|cf| db.cf_handle(cf).unwrap())
                 .collect::<Vec<&ColumnFamily>>(),
-            index_by_agid_cf: db_holder
+            index_by_utxo_birth_pk_cf: db_holder
                 .db_index_manager
-                .index_by_agid
+                .index_by_utxo_birth_pk
                 .iter()
                 .map(|cf| db.cf_handle(&cf).unwrap())
                 .collect::<Vec<&ColumnFamily>>(),

@@ -2,7 +2,7 @@ use config::{Config, ConfigError, Environment, File};
 use dotenv::dotenv;
 use serde::Deserialize;
 
-use crate::model::DbIndexAgidWithUtxoPkCf;
+use crate::model::DbIndexUtxoBirthPkWithUtxoPkCf;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
@@ -21,7 +21,7 @@ pub struct BlockchainSettings {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexerSettings {
-    pub db_indexes: Vec<DbIndexAgidWithUtxoPkCf>,
+    pub db_indexes: Vec<DbIndexUtxoBirthPkWithUtxoPkCf>,
     pub tx_batch_size: usize,
 }
 
