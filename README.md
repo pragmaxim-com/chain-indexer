@@ -47,7 +47,7 @@ TxPk_by_txHash:
 
 ### Utxo
 
-Secondary indexes like (script_hash / address) are stored as sequence of pointers to a utxo where it was first born, prefixed with a column family pointer.
+Secondary indexes like (`script_hash/address`) are stored as sequence of pointers to a utxo where it was first born, prefixed with a column family pointer.
 `UtxoPk_by_InputPk` is used to tell whether box is spent or not.
 
 ```
@@ -60,8 +60,8 @@ UtxoPk_by_InputPk:
 
 ## Utxo indexes
 
-We keep secondary indexes (script_hash / address) under small-size `utxo_birth_pk` identifiers which is a unique pointer of their creation.
-Then we keep relations to all following boxes where given indexed entity occurred. Following table shows 2 example secondary indexes script_hash & address.
+We keep secondary indexes (`script_hash/address`) under small-size `utxo_birth_pk` identifiers which is a unique pointer of their creation.
+Then we keep relations to all following boxes where given indexed entity occurred. Following table shows 2 example secondary indexes : `script_hash` & `address`.
 
 ```
 UtxoIndex_by_UtxoBirthPk
