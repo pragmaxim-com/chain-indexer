@@ -1,3 +1,5 @@
+## DB schema
+
 PK           = unique pointer to an object
 BirthPK      = unique pointer to an object of creation
 Hash         = Hash of an object
@@ -17,7 +19,7 @@ and references/relations to all further occurences to them.
 Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one, `utxo_index_cf` is encoded as u8
 ------------------------------------------------------------
 
-## Block
+### Block
 
 We keep `block_hash` uder small-size unique pointer that we use in the rest of the model to refer to the block.
 
@@ -29,7 +31,7 @@ HeightPk_by_BlockHash:
     block_hash -> block_height|block_timestamp
 ```
 
-## Transactions
+### Transactions
 
 We keep `tx_hash` under small-size unique pointer that we use in the rest of the model to refer to the Tx.
 
@@ -41,7 +43,7 @@ TxPk_by_txHash:
     tx_hash -> tx_pk
 ```
 
-## Utxo
+### Utxo
 
 Secondary indexes like (script_hash / address) are stored as sequence of pointers to a utxo where it was first born, prefixed with a column family pointer.
 `UtxoPk_by_InputPk` is used to tell whether box is spent or not.
@@ -54,7 +56,7 @@ UtxoPk_by_InputPk:
     input_pk -> utxo_pk
 ```
 
-# Utxo indexes
+## Utxo indexes
 
 We keep secondary indexes (script_hash / address) under small-size `utxo_birth_pk` identifiers which is a unique pointer of their creation.
 Then we keep relations to all following boxes where given indexed entity occurred. Following table shows 2 example secondary indexes script_hash & address.
@@ -79,7 +81,7 @@ UtxoBirthPk_with_UtxoPk_relations:
        script_hash_utxo_birth_pk|utxo_pk
 ```
 
-## Assets
+### Assets
 
 To keep data small, we keep assets as an array under utxo_pk.
 
@@ -88,7 +90,7 @@ AssetValueAndBirthPk_by_UtxoPk:
     utxo_pk -> [asset_index|asset_value|asset_birth_pk]
 ```
 
-## Asset index
+### Asset index
 
 System of secondary indexes is applied the same as for other parts of a Box.
 
