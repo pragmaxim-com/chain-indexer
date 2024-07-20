@@ -4,7 +4,7 @@ use crate::{
     codec_tx::{self, TxPkBytes},
     db_index_manager::DbIndexManager,
     eutxo::eutxo_model::EuTx,
-    model::{BlockHeight, DbIndexCfIndex, TxHash, TxIndex},
+    model::{BlockHeight, DbIndexCfIndex, DbIndexValue, TxHash, TxIndex},
     rocks_db_batch::RocksDbBatch,
 };
 use byteorder::{BigEndian, ByteOrder};
@@ -15,9 +15,7 @@ use std::{
 };
 
 use super::{
-    eutxo_codec_utxo::{
-        self, DbIndexUtxoBirthPkBytes, UtxoBirthPkBytes, UtxoPkBytes, UtxoValueWithIndexes,
-    },
+    eutxo_codec_utxo::{self, UtxoBirthPkBytes, UtxoPkBytes, UtxoValueWithIndexes},
     eutxo_model::{EuTxInput, EuUtxo},
 };
 
@@ -28,9 +26,9 @@ pub struct EuTxService {
 impl EuTxService {
     fn get_utxo_indexes(
         &self,
-        index_utxo_birth_pk_by_cf_index: &Vec<(DbIndexCfIndex, DbIndexUtxoBirthPkBytes)>,
+        index_utxo_birth_pk_by_cf_index: &Vec<(DbIndexCfIndex, UtxoBirthPkBytes)>,
         mut_batch: &mut RocksDbBatch,
-    ) -> Result<Vec<(DbIndexCfIndex, Vec<u8>)>, rocksdb::Error> {
+    ) -> Result<Vec<(DbIndexCfIndex, DbIndexValue)>, rocksdb::Error> {
         index_utxo_birth_pk_by_cf_index
             .iter()
             .map(|(cf_index, index_utxo_birth_pk)| {
@@ -45,12 +43,12 @@ impl EuTxService {
 
                 let index_value = mut_batch
                     .db_tx
-                    .get_cf(index_by_utxo_birth_pk_cf, &index_utxo_birth_pk)?
+                    .get_cf(index_by_utxo_birth_pk_cf, index_utxo_birth_pk)?
                     .unwrap();
 
                 Ok((*cf_index, index_value))
             })
-            .collect::<Result<Vec<(DbIndexCfIndex, Vec<u8>)>, rocksdb::Error>>()
+            .collect::<Result<Vec<(DbIndexCfIndex, DbIndexValue)>, rocksdb::Error>>()
     }
 
     fn get_outputs(
@@ -69,7 +67,7 @@ impl EuTxService {
                     let (utxo_value, index_utxo_birth_pk_by_cf_index) =
                         eutxo_codec_utxo::bytes_to_utxo(&utxo_value_bytes);
 
-                    let db_indexes: Vec<(DbIndexCfIndex, Vec<u8>)> =
+                    let db_indexes: Vec<(DbIndexCfIndex, DbIndexValue)> =
                         self.get_utxo_indexes(&index_utxo_birth_pk_by_cf_index, mut_batch)?;
 
                     Ok(EuUtxo {
@@ -129,12 +127,12 @@ impl EuTxService {
         batch: &mut RocksDbBatch,
     ) -> Result<UtxoBirthPkBytes, rocksdb::Error> {
         let utxo_birth_pk_by_index_cf = batch.utxo_birth_pk_by_index_cf[cf_index as usize];
-        if let Some(existing_utxo_birth_pk) = batch
+        if let Some(existing_utxo_birth_pk_vec) = batch
             .db_tx
             .get_cf(utxo_birth_pk_by_index_cf, db_index_value)?
         {
             let utxo_birth_pk_with_utxo_pk = eutxo_codec_utxo::concat_utxo_birth_pk_with_utxo_pk(
-                &existing_utxo_birth_pk,
+                &existing_utxo_birth_pk_vec,
                 utxo_pk_bytes,
             );
             let utxo_birth_pk_with_utxo_pk_cf =
@@ -144,6 +142,8 @@ impl EuTxService {
                 utxo_birth_pk_with_utxo_pk,
                 vec![],
             );
+            let existing_utxo_birth_pk = <UtxoPkBytes>::try_from(existing_utxo_birth_pk_vec)
+                .expect("UtxoBirthPk should have exactly 8 bytes");
             Ok(existing_utxo_birth_pk)
         } else {
             let index_by_utxo_birth_pk_cf = batch.index_by_utxo_birth_pk_cf[cf_index];
@@ -153,7 +153,7 @@ impl EuTxService {
             batch
                 .db_tx
                 .put_cf(index_by_utxo_birth_pk_cf, db_index_value, utxo_pk_bytes)?;
-            Ok(utxo_pk_bytes.to_vec())
+            Ok(*utxo_pk_bytes)
         }
     }
 }

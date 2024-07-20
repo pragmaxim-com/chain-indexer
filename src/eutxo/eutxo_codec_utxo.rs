@@ -9,9 +9,8 @@ use super::eutxo_model::{UtxoIndex, UtxoValue};
 
 pub type UtxoPkBytes = [u8; 8];
 pub type UtxoValueWithIndexes = Vec<u8>;
-pub type UtxoBirthPkBytes = Vec<u8>;
-type UtxoBirthPkWithUtxoPkBytes = [u8; 12];
-pub type DbIndexUtxoBirthPkBytes = [u8; 4];
+pub type UtxoBirthPkBytes = UtxoPkBytes;
+type UtxoBirthPkWithUtxoPkBytes = [u8; 16];
 
 #[derive(Debug, PartialEq, Clone)]
 struct EutxoPk {
@@ -30,47 +29,48 @@ pub fn concat_utxo_birth_pk_with_utxo_pk(
     utxo_birth_pk_bytes: &[u8],
     utxo_pk_bytes: &UtxoPkBytes,
 ) -> UtxoBirthPkWithUtxoPkBytes {
-    let mut combined_bytes = [0u8; 12];
+    let mut combined_bytes = [0u8; 16];
 
-    combined_bytes[0..4].copy_from_slice(utxo_birth_pk_bytes);
-    combined_bytes[4..12].copy_from_slice(utxo_pk_bytes);
+    combined_bytes[0..8].copy_from_slice(utxo_birth_pk_bytes);
+    combined_bytes[8..16].copy_from_slice(utxo_pk_bytes);
 
     combined_bytes
 }
 
-pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndex, DbIndexUtxoBirthPkBytes)>) {
+pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndex, UtxoPkBytes)>) {
     let utxo_value = UtxoValue(BigEndian::read_u64(&bytes[0..8]));
-    let num_pairs = (bytes.len() - 8) / 5;
-    let mut index_utxo_birth_pk_by_cf_index = Vec::with_capacity(num_pairs);
+    let num_pairs = (bytes.len() - 8) / 9;
+    let mut utxo_birth_pk_by_cf_index = Vec::with_capacity(num_pairs);
     let mut index = 8;
     while index < bytes.len() {
-        if index + 5 <= bytes.len() {
-            let db_index_id = bytes[index];
+        if index + 9 <= bytes.len() {
+            let cf_index_id = bytes[index];
             index += 1;
-            let db_index_pk = BigEndian::read_u32(&bytes[index..index + 4]);
-            index += 4;
-            let db_index_pk_bytes: [u8; 4] = db_index_pk.to_be_bytes();
-            index_utxo_birth_pk_by_cf_index.push((db_index_id, db_index_pk_bytes));
+            let utxo_birth_pk = &bytes[index..index + 8];
+            index += 8;
+            let utxo_birth_pk_bytes: UtxoPkBytes = <UtxoPkBytes>::try_from(utxo_birth_pk)
+                .expect("UtxoBirthPk should have exactly 8 bytes");
+            utxo_birth_pk_by_cf_index.push((cf_index_id, utxo_birth_pk_bytes));
         } else {
             break;
         }
     }
-    (utxo_value, index_utxo_birth_pk_by_cf_index)
+    (utxo_value, utxo_birth_pk_by_cf_index)
 }
 
 pub fn utxo_to_bytes(
     utxo_value: UtxoValue,
-    index_utxo_birth_pk_by_cf_index: Vec<(DbIndexCfIndex, DbIndexUtxoBirthPkBytes)>,
+    utxo_birth_pk_by_cf_index: Vec<(DbIndexCfIndex, UtxoPkBytes)>,
 ) -> Vec<u8> {
-    let mut utxo_value_with_indexes = vec![0u8; 8 + index_utxo_birth_pk_by_cf_index.len() * 5];
+    let mut utxo_value_with_indexes = vec![0u8; 8 + utxo_birth_pk_by_cf_index.len() * 9];
     BigEndian::write_u64(&mut utxo_value_with_indexes[0..8], utxo_value.0);
 
     let mut index = 8;
-    for (db_index_id, db_index_utxo_birth_pk) in index_utxo_birth_pk_by_cf_index {
+    for (db_index_id, utxo_birth_pk) in utxo_birth_pk_by_cf_index {
         utxo_value_with_indexes[index] = db_index_id;
         index += 1;
-        utxo_value_with_indexes[index..index + 4].copy_from_slice(&db_index_utxo_birth_pk);
-        index += 4;
+        utxo_value_with_indexes[index..index + 8].copy_from_slice(&utxo_birth_pk);
+        index += 8;
     }
 
     utxo_value_with_indexes
@@ -153,7 +153,7 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_roundtrip(utxo_value in any::<u64>(), pairs in prop::collection::vec((any::<u8>(), any::<[u8; 4]>()), 0..100)) {
+        fn test_roundtrip(utxo_value in any::<u64>(), pairs in prop::collection::vec((any::<u8>(), any::<[u8; 8]>()), 0..100)) {
             let utxo_value = UtxoValue(utxo_value);
             let bytes = utxo_to_bytes(utxo_value, pairs.clone());
             let (decoded_utxo_value, decoded_pairs) = bytes_to_utxo(&bytes);
