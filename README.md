@@ -1,10 +1,12 @@
 ## DB schema
 
+```
 PK           = unique pointer to an object
 BirthPK      = unique pointer to an object of creation
 Hash         = Hash of an object
 Index        = Secondary Index
-
+```
+```
 HeightPk     = block_height
 TxPk         = block_height|tx_index
 InputPk      = block_height|tx_index|input_index
@@ -12,11 +14,12 @@ UtxoPk       = block_height|tx_index|utxo_index
 UtxoBirthPk  = block_height|tx_index|utxo_index
 AssetPk      = block_height|tx_index|utxo_index|asset_index
 AssetBirthPk = block_height|tx_index|utxo_index|asset_index
+```
 
-UtxoIndexes and AssetIndex are seconary index that keeps entity (asset-id/address/script_hash) under small-size UtxoBirthPk/AssetBirthPk
+UtxoIndexes and AssetIndex are seconary indexes that keep entity (asset-id/address/script_hash) under small-size UtxoBirthPk/AssetBirthPk
 and references/relations to all further occurences to them.
 
-Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one, `utxo_index_cf` is encoded as u8
+Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one
 ------------------------------------------------------------
 
 ### Block
