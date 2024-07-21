@@ -2,7 +2,7 @@ use byteorder::{BigEndian, ByteOrder};
 
 use crate::{
     codec_tx::TxPkBytes,
-    model::{BlockHeight, DbIndexCfIndex, TxIndex},
+    model::{AssetIndex, BlockHeight, DbIndexCfIndex, TxIndex},
 };
 
 use super::eutxo_model::{UtxoIndex, UtxoValue};
@@ -11,6 +11,10 @@ pub type UtxoPkBytes = [u8; 8];
 pub type UtxoValueWithIndexes = Vec<u8>;
 pub type UtxoBirthPkBytes = UtxoPkBytes;
 type UtxoBirthPkWithUtxoPkBytes = [u8; 16];
+
+pub type AssetPkBytes = [u8; 9];
+pub type AssetBirthPkBytes = AssetPkBytes;
+pub type AssetValueWithIndex = Vec<u8>;
 
 #[derive(Debug, PartialEq, Clone)]
 struct EutxoPk {
@@ -25,14 +29,12 @@ pub fn utxo_value_to_bytes(utxo_value: &UtxoValue) -> [u8; std::mem::size_of::<U
     bytes
 }
 
-pub fn concat_utxo_birth_pk_with_utxo_pk(
-    utxo_birth_pk_bytes: &[u8],
-    utxo_pk_bytes: &UtxoPkBytes,
-) -> UtxoBirthPkWithUtxoPkBytes {
-    let mut combined_bytes = [0u8; 16];
+pub fn concat_birth_pk_with_pk(birth_pk_bytes: &[u8], pk_bytes: &[u8]) -> Vec<u8> {
+    let combined_length = birth_pk_bytes.len() + pk_bytes.len();
+    let mut combined_bytes = Vec::with_capacity(combined_length);
 
-    combined_bytes[0..8].copy_from_slice(utxo_birth_pk_bytes);
-    combined_bytes[8..16].copy_from_slice(utxo_pk_bytes);
+    combined_bytes.extend_from_slice(birth_pk_bytes);
+    combined_bytes.extend_from_slice(pk_bytes);
 
     combined_bytes
 }
@@ -76,11 +78,22 @@ pub fn utxo_to_bytes(
     utxo_value_with_indexes
 }
 
-pub fn pk_bytes(block_height: &BlockHeight, tx_index: &TxIndex, box_index: &u16) -> UtxoPkBytes {
+pub fn utxo_pk_bytes(
+    block_height: &BlockHeight,
+    tx_index: &TxIndex,
+    box_index: &u16,
+) -> UtxoPkBytes {
     let mut bytes: UtxoPkBytes = [0u8; 8];
     BigEndian::write_u32(&mut bytes[0..4], block_height.0);
     BigEndian::write_u16(&mut bytes[4..6], tx_index.0);
     BigEndian::write_u16(&mut bytes[6..8], *box_index);
+    bytes
+}
+
+pub fn asset_pk_bytes(utxo_pk_bytes: &UtxoPkBytes, asset_index: &AssetIndex) -> AssetPkBytes {
+    let mut bytes: AssetPkBytes = [0u8; std::mem::size_of::<AssetPkBytes>()];
+    bytes[0..std::mem::size_of::<UtxoPkBytes>()].copy_from_slice(utxo_pk_bytes);
+    bytes[std::mem::size_of::<UtxoPkBytes>()] = *asset_index;
     bytes
 }
 
@@ -105,7 +118,7 @@ pub fn tx_pk_from_utxo_pk(utxo_pk_bytes: &[u8]) -> TxPkBytes {
 
 impl From<&EutxoPk> for UtxoPkBytes {
     fn from(utxo_id: &EutxoPk) -> UtxoPkBytes {
-        pk_bytes(
+        utxo_pk_bytes(
             &utxo_id.block_height,
             &utxo_id.tx_index,
             &utxo_id.utxo_index.0,

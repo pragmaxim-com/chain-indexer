@@ -79,6 +79,7 @@ impl TryFrom<Box<[u8]>> for TxHash {
 }
 
 pub type AssetId = Vec<u8>;
+pub type AssetIndex = u8;
 pub type AssetValue = u64;
 
 pub type DbIndexCfIndex = u8;

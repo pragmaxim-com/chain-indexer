@@ -4,18 +4,22 @@ use crate::{
     codec_tx::{self, TxPkBytes},
     db_index_manager::DbIndexManager,
     eutxo::eutxo_model::EuTx,
-    model::{BlockHeight, DbIndexCfIndex, DbIndexValue, TxHash, TxIndex},
+    model::{AssetIndex, AssetValue, BlockHeight, DbIndexCfIndex, DbIndexValue, TxHash, TxIndex},
     rocks_db_batch::RocksDbBatch,
 };
 use byteorder::{BigEndian, ByteOrder};
 use lru::LruCache;
+use rocksdb::ColumnFamily;
 use std::{
     cell::{RefCell, RefMut},
+    mem::size_of,
     sync::Arc,
 };
 
 use super::{
-    eutxo_codec_utxo::{self, UtxoBirthPkBytes, UtxoPkBytes, UtxoValueWithIndexes},
+    eutxo_codec_utxo::{
+        self, AssetBirthPkBytes, UtxoBirthPkBytes, UtxoPkBytes, UtxoValueWithIndexes,
+    },
     eutxo_model::{EuTxInput, EuUtxo},
 };
 
@@ -31,7 +35,7 @@ impl EuTxService {
     ) -> Result<Vec<(DbIndexCfIndex, DbIndexValue)>, rocksdb::Error> {
         index_utxo_birth_pk_by_cf_index
             .iter()
-            .map(|(cf_index, index_utxo_birth_pk)| {
+            .map(|(cf_index, utxo_birth_pk)| {
                 let utxo_birth_pk_with_utxo_pk_cf =
                     mut_batch.utxo_birth_pk_with_utxo_pk_cf[*cf_index as usize];
                 let index_by_utxo_birth_pk_cf =
@@ -43,7 +47,7 @@ impl EuTxService {
 
                 let index_value = mut_batch
                     .db_tx
-                    .get_cf(index_by_utxo_birth_pk_cf, index_utxo_birth_pk)?
+                    .get_cf(index_by_utxo_birth_pk_cf, utxo_birth_pk)?
                     .unwrap();
 
                 Ok((*cf_index, index_value))
@@ -106,6 +110,83 @@ impl EuTxService {
             .collect()
     }
 
+    fn persist_assets(
+        &self,
+        utxo_pk_bytes: &UtxoPkBytes,
+        utxo: &EuUtxo,
+        batch: &mut RocksDbBatch,
+    ) -> Result<(), rocksdb::Error> {
+        let assets_by_utxo_pk_cf = batch.assets_by_utxo_pk_cf;
+        let birth_pk_by_index_cf = batch.asset_birth_pk_by_asset_id_cf;
+        let birth_pk_with_pk_cf = batch.asset_birth_pk_with_asset_pk_cf;
+        let index_by_birth_pk_cf = batch.asset_id_by_asset_birth_pk_cf;
+
+        // start building the utxo_value_with_indexes
+        let mut aidx_value_birth_pk = vec![0u8; utxo.db_indexes.len() * 18];
+        let mut index = 0;
+
+        for (asset_index, (asset_id, asset_value)) in utxo.assets.iter().enumerate() {
+            let asset_pk_bytes =
+                eutxo_codec_utxo::asset_pk_bytes(utxo_pk_bytes, &(asset_index as u8));
+
+            let asset_birth_pk_bytes: Vec<u8> = self.persist_birth_pk_or_relation_with_pk(
+                asset_id,
+                &asset_pk_bytes,
+                birth_pk_by_index_cf,
+                birth_pk_with_pk_cf,
+                index_by_birth_pk_cf,
+                batch,
+            )?;
+
+            // append indexes to utxo_value_with_indexes
+            aidx_value_birth_pk[index] = asset_index as u8;
+            index += size_of::<AssetIndex>();
+            BigEndian::write_u64(&mut aidx_value_birth_pk[index..index + 8], *asset_value);
+            index += size_of::<AssetValue>();
+            aidx_value_birth_pk[index..index + 9].copy_from_slice(&asset_birth_pk_bytes);
+            index += size_of::<AssetBirthPkBytes>();
+        }
+
+        self.persist_asset_value_with_index(&utxo_pk_bytes, &aidx_value_birth_pk, batch);
+        Ok(())
+    }
+
+    fn persist_utxo(
+        &self,
+        utxo_pk_bytes: &UtxoPkBytes,
+        utxo: &EuUtxo,
+        batch: &mut RocksDbBatch,
+    ) -> Result<(), rocksdb::Error> {
+        // start building the utxo_value_with_indexes
+        let mut utxo_value_with_indexes = vec![0u8; 8 + utxo.db_indexes.len() * 9];
+        BigEndian::write_u64(&mut utxo_value_with_indexes[0..8], utxo.utxo_value.0);
+        let mut index = 8;
+
+        for (cf_index, index_value) in utxo.db_indexes.iter() {
+            let birth_pk_by_index_cf = batch.utxo_birth_pk_by_index_cf[*cf_index as usize];
+            let birth_pk_with_pk_cf = batch.utxo_birth_pk_with_utxo_pk_cf[*cf_index as usize];
+            let index_by_birth_pk_cf = batch.index_by_utxo_birth_pk_cf[*cf_index as usize];
+            // first check if IndexValue has been already indexed or it is the first time
+            let utxo_birth_pk_bytes: Vec<u8> = self.persist_birth_pk_or_relation_with_pk(
+                index_value,
+                utxo_pk_bytes,
+                birth_pk_by_index_cf,
+                birth_pk_with_pk_cf,
+                index_by_birth_pk_cf,
+                batch,
+            )?;
+            // append indexes to utxo_value_with_indexes
+            utxo_value_with_indexes[index] = *cf_index;
+            index += size_of::<DbIndexCfIndex>();
+            utxo_value_with_indexes[index..index + size_of::<UtxoBirthPkBytes>()]
+                .copy_from_slice(&utxo_birth_pk_bytes);
+            index += size_of::<UtxoBirthPkBytes>();
+        }
+
+        self.persist_utxo_value_with_indexes(&utxo_pk_bytes, &utxo_value_with_indexes, batch);
+        Ok(())
+    }
+
     fn persist_utxo_value_with_indexes(
         &self,
         utxo_pk_bytes: &UtxoPkBytes,
@@ -119,41 +200,44 @@ impl EuTxService {
             .put_cf(utxo_value_by_pk_cf, utxo_pk_bytes, &utxo_value_with_indexes);
     }
 
-    fn persist_utxo_birth_pk_or_relation_with_utxo_pk(
+    fn persist_asset_value_with_index(
         &self,
-        cf_index: usize,
-        db_index_value: &[u8],
         utxo_pk_bytes: &UtxoPkBytes,
+        asset_value_with_index: &UtxoValueWithIndexes,
         batch: &mut RocksDbBatch,
-    ) -> Result<UtxoBirthPkBytes, rocksdb::Error> {
-        let utxo_birth_pk_by_index_cf = batch.utxo_birth_pk_by_index_cf[cf_index as usize];
-        if let Some(existing_utxo_birth_pk_vec) = batch
-            .db_tx
-            .get_cf(utxo_birth_pk_by_index_cf, db_index_value)?
+    ) {
+        let utxo_value_by_pk_cf = batch.utxo_value_by_pk_cf;
+        batch
+            .batch
+            .put_cf(utxo_value_by_pk_cf, utxo_pk_bytes, &asset_value_with_index);
+    }
+
+    fn persist_birth_pk_or_relation_with_pk<'db>(
+        &self,
+        index_value: &[u8],
+        pk_bytes: &[u8],
+        birth_pk_by_index_cf: &'db ColumnFamily,
+        birth_pk_with_pk_cf: &'db ColumnFamily,
+        index_by_birth_pk_cf: &'db ColumnFamily,
+        batch: &mut RocksDbBatch<'db>,
+    ) -> Result<Vec<u8>, rocksdb::Error> {
+        if let Some(existing_birth_pk_vec) =
+            batch.db_tx.get_cf(birth_pk_by_index_cf, index_value)?
         {
-            let utxo_birth_pk_with_utxo_pk = eutxo_codec_utxo::concat_utxo_birth_pk_with_utxo_pk(
-                &existing_utxo_birth_pk_vec,
-                utxo_pk_bytes,
-            );
-            let utxo_birth_pk_with_utxo_pk_cf =
-                batch.utxo_birth_pk_with_utxo_pk_cf[cf_index as usize];
-            batch.batch.put_cf(
-                utxo_birth_pk_with_utxo_pk_cf,
-                utxo_birth_pk_with_utxo_pk,
-                vec![],
-            );
-            let existing_utxo_birth_pk = <UtxoPkBytes>::try_from(existing_utxo_birth_pk_vec)
-                .expect("UtxoBirthPk should have exactly 8 bytes");
-            Ok(existing_utxo_birth_pk)
+            let birth_pk_with_pk =
+                eutxo_codec_utxo::concat_birth_pk_with_pk(&existing_birth_pk_vec, pk_bytes);
+            batch
+                .batch
+                .put_cf(birth_pk_with_pk_cf, birth_pk_with_pk, vec![]);
+            Ok(existing_birth_pk_vec)
         } else {
-            let index_by_utxo_birth_pk_cf = batch.index_by_utxo_birth_pk_cf[cf_index];
             batch
                 .db_tx
-                .put_cf(utxo_birth_pk_by_index_cf, utxo_pk_bytes, db_index_value)?;
+                .put_cf(birth_pk_by_index_cf, pk_bytes, index_value)?;
             batch
                 .db_tx
-                .put_cf(index_by_utxo_birth_pk_cf, db_index_value, utxo_pk_bytes)?;
-            Ok(*utxo_pk_bytes)
+                .put_cf(index_by_birth_pk_cf, index_value, pk_bytes)?;
+            Ok(pk_bytes.to_vec())
         }
     }
 }
@@ -218,30 +302,10 @@ impl TxService for EuTxService {
     ) -> Result<(), rocksdb::Error> {
         for utxo in tx.tx_outputs.iter() {
             let utxo_pk_bytes =
-                eutxo_codec_utxo::pk_bytes(block_height, &tx.tx_index, &utxo.utxo_index.0);
+                eutxo_codec_utxo::utxo_pk_bytes(block_height, &tx.tx_index, &utxo.utxo_index.0);
 
-            // start building the utxo_value_with_indexes
-            let mut utxo_value_with_indexes = vec![0u8; 8 + utxo.db_indexes.len() * 5];
-            BigEndian::write_u64(&mut utxo_value_with_indexes[0..8], utxo.utxo_value.0);
-            let mut index = 8;
-
-            for (cf_index, db_index_value) in utxo.db_indexes.iter() {
-                // first check if IndexValue has been already indexed or it is the first time
-                let utxo_birth_pk_bytes: UtxoBirthPkBytes = self
-                    .persist_utxo_birth_pk_or_relation_with_utxo_pk(
-                        *cf_index as usize,
-                        db_index_value,
-                        &utxo_pk_bytes,
-                        batch,
-                    )?;
-                // append indexes to utxo_value_with_indexes
-                utxo_value_with_indexes[index] = *cf_index;
-                index += 1;
-                utxo_value_with_indexes[index..index + 4].copy_from_slice(&utxo_birth_pk_bytes);
-                index += 4;
-            }
-
-            self.persist_utxo_value_with_indexes(&utxo_pk_bytes, &utxo_value_with_indexes, batch);
+            self.persist_utxo(&utxo_pk_bytes, utxo, batch)?;
+            self.persist_assets(&utxo_pk_bytes, utxo, batch)?;
         }
         Ok(())
     }
@@ -266,7 +330,7 @@ impl TxService for EuTxService {
 
             let utxo_pk = eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index);
             let input_pk =
-                eutxo_codec_utxo::pk_bytes(block_height, &tx.tx_index, &(input_index as u16));
+                eutxo_codec_utxo::utxo_pk_bytes(block_height, &tx.tx_index, &(input_index as u16));
             let utxo_pk_by_input_pk_cf = batch.utxo_pk_by_input_pk_cf;
             batch
                 .batch

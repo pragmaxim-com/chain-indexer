@@ -97,12 +97,12 @@ AssetValueAndBirthPk_by_UtxoPk:
 System of secondary indexes is applied the same as for other parts of a Box.
 
 ```
-AssetId_by_AssetAgid
+AssetId_by_AssetBirthPk
     asset_birth_pk -> asset_id
 
-AssetAgid_by_AssetId
+AssetBirthPk_by_AssetId
     asset_id -> asset_birth_pk
 
-AssetAgid_with_AssetPk_relations:
+AssetBirthPk_with_AssetPk_relations:
     asset_birth_pk|asset_pk
 ```
