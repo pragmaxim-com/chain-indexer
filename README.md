@@ -89,7 +89,7 @@ To keep data small, we keep assets as an array under utxo_pk.
 
 ```
 AssetValueAndBirthPk_by_UtxoPk:
-    utxo_pk -> [asset_index|asset_value|asset_birth_pk]
+    utxo_pk -> [asset_value|asset_birth_pk]
 ```
 
 ### Asset index

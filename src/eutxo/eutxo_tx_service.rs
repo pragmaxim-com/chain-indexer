@@ -4,7 +4,7 @@ use crate::{
     codec_tx::{self, TxPkBytes},
     db_index_manager::DbIndexManager,
     eutxo::eutxo_model::EuTx,
-    model::{AssetIndex, AssetValue, BlockHeight, DbIndexCfIndex, DbIndexValue, TxHash, TxIndex},
+    model::{AssetId, AssetValue, BlockHeight, DbIndexCfIndex, DbIndexValue, TxHash, TxIndex},
     rocks_db_batch::RocksDbBatch,
 };
 use byteorder::{BigEndian, ByteOrder};
@@ -18,7 +18,8 @@ use std::{
 
 use super::{
     eutxo_codec_utxo::{
-        self, AssetBirthPkBytes, UtxoBirthPkBytes, UtxoPkBytes, UtxoValueWithIndexes,
+        self, AssetBirthPkBytes, AssetValueWithIndex, UtxoBirthPkBytes, UtxoPkBytes,
+        UtxoValueWithIndexes,
     },
     eutxo_model::{EuTxInput, EuUtxo},
 };
@@ -28,6 +29,32 @@ pub struct EuTxService {
 }
 
 impl EuTxService {
+    fn get_assets(
+        &self,
+        birth_pk_bytes: &[u8],
+        mut_batch: &mut RocksDbBatch,
+    ) -> Result<Vec<(AssetId, AssetValue)>, rocksdb::Error> {
+        let assets_by_utxo_pk_cf = mut_batch.assets_by_utxo_pk_cf;
+        let asset_id_by_asset_birth_pk_cf = mut_batch.asset_id_by_asset_birth_pk_cf;
+        if let Some(asset_value_birth_pk_bytes) = mut_batch
+            .db_tx
+            .get_cf(assets_by_utxo_pk_cf, birth_pk_bytes)?
+        {
+            eutxo_codec_utxo::get_asset_value_and_birth_pks(&asset_value_birth_pk_bytes)
+                .iter()
+                .map(|(asset_value, birth_pk)| {
+                    let asset_id = mut_batch
+                        .db_tx
+                        .get_cf(asset_id_by_asset_birth_pk_cf, birth_pk)?
+                        .unwrap();
+                    Ok((asset_id, *asset_value))
+                })
+                .collect::<Result<Vec<(AssetId, AssetValue)>, rocksdb::Error>>()
+        } else {
+            Ok(vec![])
+        }
+    }
+
     fn get_utxo_indexes(
         &self,
         index_utxo_birth_pk_by_cf_index: &Vec<(DbIndexCfIndex, UtxoBirthPkBytes)>,
@@ -74,10 +101,13 @@ impl EuTxService {
                     let db_indexes: Vec<(DbIndexCfIndex, DbIndexValue)> =
                         self.get_utxo_indexes(&index_utxo_birth_pk_by_cf_index, mut_batch)?;
 
+                    let assets: Vec<(AssetId, AssetValue)> =
+                        self.get_assets(&utxo_pk, mut_batch)?;
+
                     Ok(EuUtxo {
                         utxo_index,
                         db_indexes,
-                        assets: vec![], // todo
+                        assets,
                         utxo_value,
                     })
                 })
@@ -116,38 +146,40 @@ impl EuTxService {
         utxo: &EuUtxo,
         batch: &mut RocksDbBatch,
     ) -> Result<(), rocksdb::Error> {
-        let assets_by_utxo_pk_cf = batch.assets_by_utxo_pk_cf;
-        let birth_pk_by_index_cf = batch.asset_birth_pk_by_asset_id_cf;
-        let birth_pk_with_pk_cf = batch.asset_birth_pk_with_asset_pk_cf;
-        let index_by_birth_pk_cf = batch.asset_id_by_asset_birth_pk_cf;
+        if utxo.assets.len() > 0 {
+            let birth_pk_by_index_cf = batch.asset_birth_pk_by_asset_id_cf;
+            let birth_pk_with_pk_cf = batch.asset_birth_pk_with_asset_pk_cf;
+            let index_by_birth_pk_cf = batch.asset_id_by_asset_birth_pk_cf;
 
-        // start building the utxo_value_with_indexes
-        let mut aidx_value_birth_pk = vec![0u8; utxo.db_indexes.len() * 18];
-        let mut index = 0;
+            // start building the utxo_value_with_indexes
+            let mut asset_value_birth_pk = vec![0u8; utxo.db_indexes.len() * 17];
+            let mut idx = 0;
 
-        for (asset_index, (asset_id, asset_value)) in utxo.assets.iter().enumerate() {
-            let asset_pk_bytes =
-                eutxo_codec_utxo::asset_pk_bytes(utxo_pk_bytes, &(asset_index as u8));
+            for (asset_index, (asset_id, asset_value)) in utxo.assets.iter().enumerate() {
+                let asset_pk_bytes =
+                    eutxo_codec_utxo::asset_pk_bytes(utxo_pk_bytes, &(asset_index as u8));
 
-            let asset_birth_pk_bytes: Vec<u8> = self.persist_birth_pk_or_relation_with_pk(
-                asset_id,
-                &asset_pk_bytes,
-                birth_pk_by_index_cf,
-                birth_pk_with_pk_cf,
-                index_by_birth_pk_cf,
-                batch,
-            )?;
+                let asset_birth_pk_bytes: Vec<u8> = self.persist_birth_pk_or_relation_with_pk(
+                    asset_id,
+                    &asset_pk_bytes,
+                    birth_pk_by_index_cf,
+                    birth_pk_with_pk_cf,
+                    index_by_birth_pk_cf,
+                    batch,
+                )?;
 
-            // append indexes to utxo_value_with_indexes
-            aidx_value_birth_pk[index] = asset_index as u8;
-            index += size_of::<AssetIndex>();
-            BigEndian::write_u64(&mut aidx_value_birth_pk[index..index + 8], *asset_value);
-            index += size_of::<AssetValue>();
-            aidx_value_birth_pk[index..index + 9].copy_from_slice(&asset_birth_pk_bytes);
-            index += size_of::<AssetBirthPkBytes>();
+                // append indexes to utxo_value_with_indexes
+                BigEndian::write_u64(
+                    &mut asset_value_birth_pk[idx..idx + size_of::<AssetValue>()],
+                    *asset_value,
+                );
+                idx += size_of::<AssetValue>();
+                asset_value_birth_pk[idx..idx + size_of::<AssetBirthPkBytes>()]
+                    .copy_from_slice(&asset_birth_pk_bytes);
+                idx += size_of::<AssetBirthPkBytes>();
+            }
+            self.persist_asset_value_with_index(&utxo_pk_bytes, &asset_value_birth_pk, batch);
         }
-
-        self.persist_asset_value_with_index(&utxo_pk_bytes, &aidx_value_birth_pk, batch);
         Ok(())
     }
 
@@ -203,13 +235,13 @@ impl EuTxService {
     fn persist_asset_value_with_index(
         &self,
         utxo_pk_bytes: &UtxoPkBytes,
-        asset_value_with_index: &UtxoValueWithIndexes,
+        asset_value_with_index: &AssetValueWithIndex,
         batch: &mut RocksDbBatch,
     ) {
-        let utxo_value_by_pk_cf = batch.utxo_value_by_pk_cf;
+        let assets_by_utxo_pk_cf = batch.assets_by_utxo_pk_cf;
         batch
             .batch
-            .put_cf(utxo_value_by_pk_cf, utxo_pk_bytes, &asset_value_with_index);
+            .put_cf(assets_by_utxo_pk_cf, utxo_pk_bytes, &asset_value_with_index);
     }
 
     fn persist_birth_pk_or_relation_with_pk<'db>(
