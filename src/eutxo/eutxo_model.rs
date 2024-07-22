@@ -69,5 +69,9 @@ pub fn get_eutxo_column_families() -> Vec<&'static str> {
         TX_PK_BY_HASH_CF,
         UTXO_VALUE_BY_PK_CF,
         UTXO_PK_BY_INPUT_PK_CF,
+        ASSETS_BY_UTXO_PK_CF,
+        ASSET_ID_BY_ASSET_BIRTH_PK_CF,
+        ASSET_BIRTH_PK_BY_ASSET_ID_CF,
+        ASSET_BIRTH_PK_WITH_ASSET_PK_CF,
     ]
 }

@@ -3,7 +3,7 @@ use crate::model::{
 };
 
 pub struct DbIndexManager {
-    pub index_utxo_birth_pk_with_utxo_pk: Vec<DbIndexUtxoBirthPkWithUtxoPkCf>,
+    pub utxo_birth_pk_relations: Vec<DbIndexUtxoBirthPkWithUtxoPkCf>,
     pub utxo_birth_pk_by_index: Vec<DbUtxoBirthPkByIndexCf>,
     pub index_by_utxo_birth_pk: Vec<DbIndexByUtxoBirthPkCf>,
 }
@@ -21,7 +21,7 @@ impl DbIndexManager {
             .collect();
 
         DbIndexManager {
-            index_utxo_birth_pk_with_utxo_pk: db_indexes.clone(),
+            utxo_birth_pk_relations: db_indexes.clone(),
             utxo_birth_pk_by_index,
             index_by_utxo_birth_pk,
         }

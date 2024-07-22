@@ -53,8 +53,7 @@ impl Storage {
                 info!("Creating column family: {}", cf);
                 db.create_cf(cf, &options).unwrap();
             }
-            for index_utxo_birth_pk_with_utxo_pk in
-                db_index_manager.index_utxo_birth_pk_with_utxo_pk.iter()
+            for index_utxo_birth_pk_with_utxo_pk in db_index_manager.utxo_birth_pk_relations.iter()
             {
                 info!(
                     "Creating column family: {}",

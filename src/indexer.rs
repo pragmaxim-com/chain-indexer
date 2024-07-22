@@ -109,7 +109,7 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
             utxo_birth_pk_with_utxo_pk_cf: self
                 .db_holder
                 .db_index_manager
-                .index_utxo_birth_pk_with_utxo_pk
+                .utxo_birth_pk_relations
                 .iter()
                 .map(|cf| db.cf_handle(cf).unwrap())
                 .collect::<Vec<&ColumnFamily>>(),
@@ -150,7 +150,7 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
         if let Some(block) = blocks.last() {
             self.persist_last_height(block.header.height, &batch)?;
         }
-        //        batch.borrow().db_tx.commit().map_err(|e| e.into_string())?;
+        db_tx.commit().map_err(|e| e.into_string())?;
         Ok(())
     }
 }
