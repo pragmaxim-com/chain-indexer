@@ -93,13 +93,13 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
         let batch = RefCell::new(RocksDbBatch::new(self.db_holder));
 
         blocks
-            .into_iter()
+            .iter()
             .map(|block| self.chain_link(block, &batch, &mut vec![]).unwrap())
             .for_each(|linked_blocks| match linked_blocks.len() {
                 0 => panic!("Blocks vector is empty"),
                 1 => linked_blocks
                     .into_iter()
-                    .for_each(|block| self.service.persist_block(block, &batch).unwrap()),
+                    .for_each(|block| self.service.persist_block(&block, &batch).unwrap()),
                 _ => {
                     self.service.update_blocks(&linked_blocks, &batch).unwrap();
                 }

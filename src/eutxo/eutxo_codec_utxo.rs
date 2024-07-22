@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use byteorder::{BigEndian, ByteOrder};
 
 use crate::{
@@ -7,8 +9,8 @@ use crate::{
 
 use super::eutxo_model::{UtxoIndex, UtxoValue};
 
-pub type UtxoPkBytes = [u8; 8];
 pub type UtxoValueWithIndexes = Vec<u8>;
+pub type UtxoPkBytes = [u8; 8];
 pub type UtxoBirthPkBytes = UtxoPkBytes;
 type UtxoBirthPkWithUtxoPkBytes = [u8; 16];
 
@@ -56,6 +58,37 @@ pub fn concat_birth_pk_with_pk(birth_pk_bytes: &[u8], pk_bytes: &[u8]) -> Vec<u8
     combined_bytes.extend_from_slice(pk_bytes);
 
     combined_bytes
+}
+
+pub fn split_birth_pk_with_pk(relation_bytes: &[u8]) -> (UtxoBirthPkBytes, UtxoPkBytes) {
+    assert!(
+        relation_bytes.len() == 16,
+        "Combined bytes length must be exactly 16"
+    );
+
+    let mut birth_pk_bytes = [0u8; 8];
+    let mut pk_bytes = [0u8; 8];
+
+    birth_pk_bytes.copy_from_slice(&relation_bytes[0..8]);
+    pk_bytes.copy_from_slice(&relation_bytes[8..16]);
+
+    (birth_pk_bytes, pk_bytes)
+}
+
+pub fn split_asset_birth_pk_with_pk(relation_bytes: &[u8]) -> (AssetBirthPkBytes, AssetPkBytes) {
+    let total_size = size_of::<AssetBirthPkBytes>() + size_of::<AssetPkBytes>();
+    assert!(
+        relation_bytes.len() == total_size,
+        "Relation bytes have wrong length",
+    );
+
+    let mut birth_pk_bytes = [0u8; size_of::<AssetBirthPkBytes>()];
+    let mut pk_bytes = [0u8; size_of::<AssetPkBytes>()];
+
+    birth_pk_bytes.copy_from_slice(&relation_bytes[0..size_of::<AssetBirthPkBytes>()]);
+    pk_bytes.copy_from_slice(&relation_bytes[8..total_size]);
+
+    (birth_pk_bytes, pk_bytes)
 }
 
 pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndex, UtxoPkBytes)>) {
@@ -213,5 +246,22 @@ mod tests {
         assert_eq!(result[0].1, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
         assert_eq!(result[1].0, 43);
         assert_eq!(result[1].1, [10, 11, 12, 13, 14, 15, 16, 17, 18]);
+    }
+
+    #[test]
+    fn test_relations_roundtrip() {
+        let birth_pk: UtxoBirthPkBytes = [1, 2, 3, 4, 5, 6, 7, 8];
+        let pk: UtxoPkBytes = [9, 10, 11, 12, 13, 14, 15, 16];
+
+        // Concatenate the byte arrays
+        let combined = concat_birth_pk_with_pk(&birth_pk, &pk);
+        assert_eq!(combined.len(), 16);
+
+        // Split the combined byte array back into the original arrays
+        let (birth_pk_split, pk_split) = split_birth_pk_with_pk(&combined);
+
+        // Assert that the original arrays match the split arrays
+        assert_eq!(birth_pk_split, birth_pk);
+        assert_eq!(pk_split, pk);
     }
 }

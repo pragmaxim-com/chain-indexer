@@ -183,6 +183,67 @@ impl EuTxService {
         Ok(())
     }
 
+    fn remove_assets(
+        &self,
+        utxo_pk_bytes: &UtxoPkBytes,
+        assets: Vec<(AssetId, AssetValue)>,
+        batch: &mut RocksDbBatch,
+    ) -> Result<(), rocksdb::Error> {
+        let birth_pk_by_index_cf = batch.asset_birth_pk_by_asset_id_cf;
+        let birth_pk_with_pk_cf = batch.asset_birth_pk_with_asset_pk_cf;
+        let index_by_birth_pk_cf = batch.asset_id_by_asset_birth_pk_cf;
+
+        for (asset_index, (asset_id, asset_value)) in assets.iter().enumerate() {
+            let asset_birth_pk = batch
+                .db_tx
+                .get_cf(birth_pk_by_index_cf, asset_value.to_be_bytes())?
+                .unwrap();
+
+            let asset_pk_bytes =
+                eutxo_codec_utxo::asset_pk_bytes(utxo_pk_bytes, &(asset_index as u8));
+
+            // find and remove relations if any, if there are no relations yet, it was a new index and we delete it
+            let mut relations_counter = 0;
+            let relations_to_delete = batch
+                .db_tx
+                .prefix_iterator_cf(birth_pk_with_pk_cf, &asset_birth_pk)
+                .filter_map(|result| match result {
+                    Ok((relation, _)) => {
+                        relations_counter += 1;
+                        let (_, asset_pk) =
+                            eutxo_codec_utxo::split_asset_birth_pk_with_pk(&relation);
+                        if asset_pk == asset_pk_bytes {
+                            Some(Ok(relation.to_vec()))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(e) => Some(Err(e)),
+                })
+                .collect::<Result<Vec<Vec<u8>>, rocksdb::Error>>()
+                .and_then(|relations_to_delete| {
+                    relations_to_delete
+                        .iter()
+                        .map(|relation_to_delete| {
+                            batch
+                                .db_tx
+                                .delete_cf(birth_pk_with_pk_cf, relation_to_delete)
+                        })
+                        .collect::<Result<Vec<()>, rocksdb::Error>>()
+                });
+            if relations_counter == 0 {
+                batch
+                    .db_tx
+                    .delete_cf(index_by_birth_pk_cf, &asset_birth_pk)?;
+                batch
+                    .db_tx
+                    .delete_cf(birth_pk_by_index_cf, asset_value.to_be_bytes())?;
+            }
+        }
+        self.remove_asset_value_with_indexes(utxo_pk_bytes, batch)?;
+        Ok(())
+    }
+
     fn persist_utxo(
         &self,
         utxo_pk_bytes: &UtxoPkBytes,
@@ -219,6 +280,59 @@ impl EuTxService {
         Ok(())
     }
 
+    fn remove_utxo_indexes(
+        &self,
+        utxo_pk_bytes: &UtxoPkBytes,
+        db_indexes: &Vec<(DbIndexCfIndex, DbIndexValue)>,
+        batch: &mut RocksDbBatch,
+    ) -> Result<(), rocksdb::Error> {
+        for (cf_index, index_value) in db_indexes {
+            let birth_pk_by_index_cf = batch.utxo_birth_pk_by_index_cf[*cf_index as usize];
+            let birth_pk_with_pk_cf = batch.utxo_birth_pk_with_utxo_pk_cf[*cf_index as usize];
+            let index_by_birth_pk_cf = batch.index_by_utxo_birth_pk_cf[*cf_index as usize];
+
+            let birth_pk = batch
+                .db_tx
+                .get_cf(birth_pk_by_index_cf, index_value)?
+                .unwrap();
+
+            // find and remove relations if any, if there are no relations yet, it was a new index and we delete it
+            let mut relations_counter = 0;
+            let relations_to_delete = batch
+                .db_tx
+                .prefix_iterator_cf(birth_pk_with_pk_cf, &birth_pk)
+                .filter_map(|result| match result {
+                    Ok((relation, _)) => {
+                        relations_counter += 1;
+                        let (_, utxo_pk) = eutxo_codec_utxo::split_birth_pk_with_pk(&relation);
+                        if utxo_pk == *utxo_pk_bytes {
+                            Some(Ok(relation.to_vec()))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(e) => Some(Err(e)),
+                })
+                .collect::<Result<Vec<Vec<u8>>, rocksdb::Error>>()
+                .and_then(|relations_to_delete| {
+                    relations_to_delete
+                        .iter()
+                        .map(|relation_to_delete| {
+                            batch
+                                .db_tx
+                                .delete_cf(birth_pk_with_pk_cf, relation_to_delete)
+                        })
+                        .collect::<Result<Vec<()>, rocksdb::Error>>()
+                });
+            if relations_counter == 0 {
+                batch.db_tx.delete_cf(index_by_birth_pk_cf, &birth_pk)?;
+                batch.db_tx.delete_cf(birth_pk_by_index_cf, index_value)?;
+            }
+        }
+        self.remove_utxo_value_with_indexes(utxo_pk_bytes, batch)?;
+        Ok(())
+    }
+
     fn persist_utxo_value_with_indexes(
         &self,
         utxo_pk_bytes: &UtxoPkBytes,
@@ -230,6 +344,24 @@ impl EuTxService {
         batch
             .batch
             .put_cf(utxo_value_by_pk_cf, utxo_pk_bytes, &utxo_value_with_indexes);
+    }
+
+    fn remove_utxo_value_with_indexes(
+        &self,
+        utxo_pk_bytes: &UtxoPkBytes,
+        batch: &mut RocksDbBatch,
+    ) -> Result<(), rocksdb::Error> {
+        let utxo_value_by_pk_cf = batch.utxo_value_by_pk_cf;
+        batch.db_tx.delete_cf(utxo_value_by_pk_cf, utxo_pk_bytes)
+    }
+
+    fn remove_asset_value_with_indexes(
+        &self,
+        utxo_pk_bytes: &UtxoPkBytes,
+        batch: &mut RocksDbBatch,
+    ) -> Result<(), rocksdb::Error> {
+        let assets_by_utxo_pk_cf = batch.assets_by_utxo_pk_cf;
+        batch.db_tx.delete_cf(assets_by_utxo_pk_cf, utxo_pk_bytes)
     }
 
     fn persist_asset_value_with_index(
@@ -319,10 +451,32 @@ impl TxService for EuTxService {
             .batch
             .put_cf(tx_hash_by_pk_cf, tx_pk_bytes, &tx.tx_hash);
 
-        tx_pk_by_tx_hash_lru_cache.put(tx.tx_hash, tx_pk_bytes);
         batch
             .db_tx
-            .put_cf(tx_pk_by_hash_cf, &tx.tx_hash, tx_pk_bytes)
+            .put_cf(tx_pk_by_hash_cf, &tx.tx_hash, tx_pk_bytes)?;
+
+        tx_pk_by_tx_hash_lru_cache.put(tx.tx_hash, tx_pk_bytes);
+        Ok(())
+    }
+
+    fn remove_tx(
+        &self,
+        block_height: &BlockHeight,
+        tx: &EuTx,
+        batch: &mut RefMut<RocksDbBatch>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+    ) -> Result<(), rocksdb::Error> {
+        let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
+        let tx_hash_by_pk_cf = batch.tx_hash_by_pk_cf;
+        let tx_pk_by_hash_cf = batch.tx_pk_by_hash_cf;
+
+        batch.db_tx.delete_cf(tx_hash_by_pk_cf, tx_pk_bytes)?;
+
+        batch.db_tx.delete_cf(tx_pk_by_hash_cf, &tx.tx_hash)?;
+
+        tx_pk_by_tx_hash_lru_cache.pop(&tx.tx_hash);
+
+        Ok(())
     }
 
     // Method to process the outputs of a transaction
@@ -338,6 +492,22 @@ impl TxService for EuTxService {
 
             self.persist_utxo(&utxo_pk_bytes, utxo, batch)?;
             self.persist_assets(&utxo_pk_bytes, utxo, batch)?;
+        }
+        Ok(())
+    }
+
+    fn remove_outputs(
+        &self,
+        block_height: &BlockHeight,
+        tx: &EuTx,
+        batch: &mut RefMut<RocksDbBatch>,
+    ) -> Result<(), rocksdb::Error> {
+        for utxo in tx.tx_outputs.iter() {
+            let utxo_pk_bytes =
+                eutxo_codec_utxo::utxo_pk_bytes(block_height, &tx.tx_index, &utxo.utxo_index.0);
+
+            self.remove_utxo_indexes(&utxo_pk_bytes, &utxo.db_indexes, batch)?;
+            self.remove_assets(&utxo_pk_bytes, utxo.assets, batch)?;
         }
         Ok(())
     }

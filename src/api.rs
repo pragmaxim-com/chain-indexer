@@ -3,6 +3,7 @@ use std::cell::{RefCell, RefMut};
 use lru::LruCache;
 
 use crate::{
+    codec_tx::TxPkBytes,
     model::{Block, BlockHash, BlockHeight, Transaction, TxCount, TxHash},
     rocks_db_batch::RocksDbBatch,
 };
@@ -59,10 +60,25 @@ pub trait TxService {
         block_height: &BlockHeight,
         tx: &Self::Tx,
         batch: &mut RefMut<RocksDbBatch>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, [u8; 6]>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+    ) -> Result<(), rocksdb::Error>;
+
+    fn remove_tx(
+        &self,
+        block_height: &BlockHeight,
+        tx: &Self::Tx,
+        batch: &mut RefMut<RocksDbBatch>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
 
     fn persist_outputs(
+        &self,
+        block_height: &BlockHeight,
+        tx: &Self::Tx,
+        batch: &mut RefMut<RocksDbBatch>,
+    ) -> Result<(), rocksdb::Error>;
+
+    fn remove_outputs(
         &self,
         block_height: &BlockHeight,
         tx: &Self::Tx,
@@ -74,7 +90,7 @@ pub trait TxService {
         block_height: &BlockHeight,
         tx: &Self::Tx,
         batch: &mut RefMut<RocksDbBatch>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, [u8; 6]>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     );
 }
 

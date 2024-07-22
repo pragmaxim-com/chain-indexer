@@ -28,11 +28,10 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
 
     pub(crate) fn persist_block(
         &self,
-        block: Block<Tx>,
+        block: &Block<Tx>,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<(), String> {
         let mut batch = batch.borrow_mut();
-        self.persist_header(&block.header, &mut batch)?;
         let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
         let mut block_height_by_hash_lru_cache = self.block_by_hash_lru_cache.borrow_mut();
 
@@ -56,25 +55,75 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
                 );
             }
         }
-        block_height_by_hash_lru_cache.put(block.header.hash, block);
+        self.persist_header(&block, &mut batch, &mut block_height_by_hash_lru_cache)?;
         Ok(())
     }
 
-    fn delete_header(
+    pub(crate) fn remove_block(
         &self,
-        block_header: &BlockHeader,
+        block: &Block<Tx>,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<(), String> {
+        let mut batch = batch.borrow_mut();
+        let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
+        let mut block_height_by_hash_lru_cache = self.block_by_hash_lru_cache.borrow_mut();
+
+        for tx in block.txs.iter() {
+            self.tx_service
+                .remove_tx(
+                    &block.header.height,
+                    tx,
+                    &mut batch,
+                    &mut tx_pk_by_tx_hash_lru_cache,
+                )
+                .map_err(|e| e.into_string())?;
+            self.tx_service
+                .remove_outputs(&block.header.height, tx, &mut batch);
+            if !tx.is_coinbase() {
+                self.tx_service.remove_inputs(
+                    &block.header.height,
+                    tx,
+                    &mut batch,
+                    &mut tx_pk_by_tx_hash_lru_cache,
+                );
+            }
+        }
+        self.remove_header(
+            &block.header,
+            &mut batch,
+            &mut block_height_by_hash_lru_cache,
+        )
     }
 
     pub(crate) fn update_blocks(
         &self,
         blocks: &Vec<Block<Tx>>,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<(), String> {
+    ) -> Result<Vec<Block<Tx>>, String> {
+        let removed_blocks: Result<Vec<Block<Tx>>, String> = blocks
+            .iter()
+            .map(|block| {
+                if let Some(block_to_remove) =
+                    self.get_block_by_height(block.header.height, batch)?
+                {
+                    self.remove_block(&block_to_remove, batch)?;
+                    Ok(Some(block_to_remove))
+                } else {
+                    Ok(None)
+                }
+            })
+            .filter_map(|result| match result {
+                Ok(Some(foo)) => Some(Ok(foo)),
+                Ok(None) => None,
+                Err(e) => Some(Err(e)),
+            })
+            .collect();
+
         for block in blocks.iter() {
-            block
+            self.persist_block(block, batch)?;
         }
+
+        removed_blocks
     }
 
     fn get_block_by_hash(
@@ -133,20 +182,50 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
 
     pub(crate) fn persist_header(
         &self,
-        block_header: &BlockHeader,
+        block: &Block<Tx>,
         batch: &mut RefMut<RocksDbBatch>,
+        block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Block<Tx>>,
     ) -> Result<(), String> {
+        let block_header = block.header;
         let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
         let block_hash_by_pk_cf = batch.block_hash_by_pk_cf;
+
+        let header_bytes = codec_block::block_header_to_bytes(&block_header);
         batch
             .batch
             .put_cf(&block_hash_by_pk_cf, height_bytes, block_header.hash.0);
-
-        let header_bytes = codec_block::block_header_to_bytes(&block_header);
         batch
             .db_tx
             .put_cf(batch.block_pk_by_hash_cf, block_header.hash.0, header_bytes)
             .map_err(|e| e.to_string())?;
+
+        block_height_by_hash_lru_cache.put(block.header.hash, block.clone());
+
+        Ok(())
+    }
+
+    pub(crate) fn remove_header(
+        &self,
+        block_header: &BlockHeader,
+        batch: &mut RefMut<RocksDbBatch>,
+        block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Block<Tx>>,
+    ) -> Result<(), String> {
+        let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
+        let block_hash_by_pk_cf = batch.block_hash_by_pk_cf;
+
+        let header_bytes = codec_block::block_header_to_bytes(&block_header);
+        batch
+            .db_tx
+            .delete_cf(&block_hash_by_pk_cf, height_bytes)
+            .map_err(|e| e.to_string())?;
+
+        batch
+            .db_tx
+            .delete_cf(batch.block_pk_by_hash_cf, block_header.hash.0)
+            .map_err(|e| e.to_string())?;
+
+        block_height_by_hash_lru_cache.pop(&block_header.hash);
+
         Ok(())
     }
 }
