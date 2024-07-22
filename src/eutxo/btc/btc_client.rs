@@ -30,9 +30,9 @@ impl TryFrom<bitcoin::Block> for Block<bitcoin::Transaction> {
         let height = block.bip34_block_height().map_err(|e| e.to_string())?;
         let header = BlockHeader {
             height: (height as u32).into(),
-            timestamp: (block.header.time as i64).into(),
+            timestamp: block.header.time.into(),
             hash: block.block_hash().to_byte_array().into(),
-            parent_hash: block.header.prev_blockhash.to_byte_array().into(),
+            prev_hash: block.header.prev_blockhash.to_byte_array().into(),
         };
         Ok(Block::new(header, block.txdata))
     }
@@ -77,9 +77,9 @@ impl BlockchainClient for BtcClient {
                 // for performance reasons, we don't call existing From implementation due to hight calculation
                 let header = BlockHeader {
                     height,
-                    timestamp: (block.header.time as i64).into(),
+                    timestamp: block.header.time.into(),
                     hash: block.block_hash().to_byte_array().into(),
-                    parent_hash: block.header.prev_blockhash.to_byte_array().into(),
+                    prev_hash: block.header.prev_blockhash.to_byte_array().into(),
                 };
                 Ok(Block::new(header, block.txdata))
             })

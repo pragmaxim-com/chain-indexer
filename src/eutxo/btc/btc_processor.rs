@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::api::BlockProcessor;
 use crate::eutxo::eutxo_model::{EuTx, EuTxInput, EuUtxo};
 use crate::model::{AssetId, AssetValue, Block, TxCount, TxIndex};
@@ -57,10 +55,9 @@ impl From<&Block<bitcoin::Transaction>> for Block<EuTx> {
 impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
     fn from(tx: (&TxIndex, &bitcoin::Transaction)) -> Self {
         EuTx {
-            is_coinbase: tx.1.is_coinbase(),
             tx_hash: tx.1.compute_txid().to_byte_array().into(),
             tx_index: tx.0.clone(),
-            ins: tx
+            tx_inputs: tx
                 .1
                 .input
                 .iter()
@@ -69,7 +66,7 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
                     utxo_index: (input.previous_output.vout as u16).into(),
                 })
                 .collect(),
-            outs: tx
+            tx_outputs: tx
                 .1
                 .output
                 .iter()
@@ -81,7 +78,7 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
                         Some(address.to_string().into_bytes())
                     } else if let Some(pk) = out.script_pubkey.p2pk_public_key() {
                         Some(
-                            bitcoin::Address::p2pkh(pk.pubkey_hash(), bitcoin::Network::Bitcoin)
+                            Address::p2pkh(pk.pubkey_hash(), Network::Bitcoin)
                                 .to_string()
                                 .into_bytes(),
                         )
@@ -95,16 +92,16 @@ impl From<(&TxIndex, &bitcoin::Transaction)> for EuTx {
                         .to_vec();
 
                     let mut db_indexes = Vec::with_capacity(2); // Pre-allocate capacity for 2 elements
-                    db_indexes.push((Cow::Borrowed(SCRIPT_HASH_INDEX), script_hash));
+                    db_indexes.push((0, script_hash));
                     if let Some(address) = address {
-                        db_indexes.push((Cow::Borrowed(ADDRESS_INDEX), address));
+                        db_indexes.push((1, address));
                     }
 
                     EuUtxo {
-                        index: (out_index as u16).into(),
+                        utxo_index: (out_index as u16).into(),
                         db_indexes,
                         assets: EMPTY_VEC,
-                        value: out.value.to_sat().into(),
+                        utxo_value: out.value.to_sat().into(),
                     }
                 })
                 .collect(),

@@ -1,0 +1,2 @@
+chain-link only at the tip 
+keep only utxo service in utxo, TxService should be generic as we don't want to reimplement it for account-based chains
