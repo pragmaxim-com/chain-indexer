@@ -12,7 +12,6 @@ use super::eutxo_model::{UtxoIndex, UtxoValue};
 pub type UtxoValueWithIndexes = Vec<u8>;
 pub type UtxoPkBytes = [u8; 8];
 pub type UtxoBirthPkBytes = UtxoPkBytes;
-type UtxoBirthPkWithUtxoPkBytes = [u8; 16];
 
 pub type AssetPkBytes = [u8; 9];
 pub type AssetBirthPkBytes = AssetPkBytes;

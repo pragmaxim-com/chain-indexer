@@ -9,7 +9,7 @@ pub struct DbIndexManager {
 }
 
 impl DbIndexManager {
-    fn new(db_indexes: &Vec<DbIndexUtxoBirthPkWithUtxoPkCf>) -> Self {
+    pub fn new(db_indexes: &Vec<DbIndexUtxoBirthPkWithUtxoPkCf>) -> Self {
         let utxo_birth_pk_by_index = db_indexes
             .into_iter()
             .map(|index_name| format!("utxo_birth_pk_by_{}", index_name))

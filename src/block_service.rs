@@ -193,7 +193,6 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
         let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
         let block_hash_by_pk_cf = batch.block_hash_by_pk_cf;
 
-        let header_bytes = codec_block::block_header_to_bytes(&block_header);
         batch
             .db_tx
             .delete_cf(&block_hash_by_pk_cf, height_bytes)

@@ -305,7 +305,7 @@ impl EuTxService {
             let birth_pk_with_pk_cf = batch.utxo_birth_pk_with_utxo_pk_cf[*cf_index as usize];
             let index_by_birth_pk_cf = batch.index_by_utxo_birth_pk_cf[*cf_index as usize];
 
-            Self::remove_indexed_entry(
+            self.remove_indexed_entry(
                 utxo_pk_bytes,
                 index_value,
                 birth_pk_by_index_cf,
@@ -313,13 +313,14 @@ impl EuTxService {
                 index_by_birth_pk_cf,
                 batch,
                 eutxo_codec_utxo::get_utxo_pk_from_relation,
-            );
+            )?;
         }
         self.remove_utxo_value_with_indexes(utxo_pk_bytes, batch)?;
         Ok(())
     }
 
     fn remove_indexed_entry<const N: usize, F>(
+        &self,
         pk_bytes: &[u8; N],
         index_value: &[u8],
         birth_pk_by_index_cf: &ColumnFamily,
@@ -363,7 +364,7 @@ impl EuTxService {
                             .delete_cf(birth_pk_with_pk_cf, relation_to_delete)
                     })
                     .collect::<Result<Vec<()>, rocksdb::Error>>()
-            });
+            })?;
         if relations_counter == 0 {
             batch.db_tx.delete_cf(index_by_birth_pk_cf, &birth_pk)?;
             batch.db_tx.delete_cf(birth_pk_by_index_cf, index_value)?;
@@ -381,10 +382,10 @@ impl EuTxService {
         let birth_pk_with_pk_cf = batch.asset_birth_pk_with_asset_pk_cf;
         let index_by_birth_pk_cf = batch.asset_id_by_asset_birth_pk_cf;
 
-        for (asset_index, (asset_id, asset_value)) in assets.iter().enumerate() {
+        for (asset_index, (_, asset_value)) in assets.iter().enumerate() {
             let asset_pk_bytes =
                 eutxo_codec_utxo::asset_pk_bytes(utxo_pk_bytes, &(asset_index as u8));
-            Self::remove_indexed_entry(
+            self.remove_indexed_entry(
                 &asset_pk_bytes,
                 &asset_value.to_be_bytes(),
                 birth_pk_by_index_cf,
@@ -392,7 +393,7 @@ impl EuTxService {
                 index_by_birth_pk_cf,
                 batch,
                 eutxo_codec_utxo::get_asset_pk_from_relation,
-            );
+            )?;
         }
         self.remove_asset_value_with_indexes(utxo_pk_bytes, batch)?;
         Ok(())
@@ -522,7 +523,7 @@ impl TxService for EuTxService {
 
         tx_pk_by_tx_hash_lru_cache.put(tx.tx_hash, tx_pk_bytes);
 
-        self.persist_outputs(block_height, tx, batch);
+        self.persist_outputs(block_height, tx, batch)?;
         if !tx.is_coinbase() {
             self.persist_inputs(block_height, tx, batch, tx_pk_by_tx_hash_lru_cache);
         }

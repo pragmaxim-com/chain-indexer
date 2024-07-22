@@ -28,14 +28,16 @@ async fn main() -> Result<(), std::io::Error> {
 
             match blockchain.name.as_str() {
                 "btc" => {
-                    let db_index_manager = Arc::new(DbIndexManager { db_utxo_indexes });
+                    let db_index_manager = Arc::new(DbIndexManager::new(&db_utxo_indexes));
                     let db_holder = Arc::new(Storage::new(
                         &db_path,
-                        db_index_manager,
+                        Arc::clone(&db_index_manager),
                         eutxo_model::get_eutxo_column_families(),
                     ));
                     // let db_holder = Arc::new(DbHolder { db: Arc::new(db) });
-                    let tx_service: Arc<EuTxService> = Arc::new(EuTxService { db_index_manager });
+                    let tx_service: Arc<EuTxService> = Arc::new(EuTxService {
+                        db_index_manager: Arc::clone(&db_index_manager),
+                    });
                     let block_service: Arc<BlockService<EuTx>> =
                         Arc::new(BlockService::new(tx_service));
 
