@@ -33,18 +33,19 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
         }
     }
 
-    fn persist_last_height_and_commit(
+    fn persist_last_height(
         &self,
         height: BlockHeight,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<(), rocksdb::Error> {
         let batch = batch.borrow_mut();
-        batch.db_tx.put_cf(
+        let db_tx = batch.db_tx;
+        db_tx.put_cf(
             batch.meta_cf,
             LAST_ADDRESS_HEIGHT_KEY,
             codec_block::block_height_to_bytes(&height),
         )?;
-        batch.db_tx.commit()
+        Ok(())
     }
 
     pub fn get_last_height(&self) -> BlockHeight {
@@ -90,7 +91,7 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
     }
 
     pub(crate) fn persist_blocks(&self, blocks: &Vec<Block<OutTx>>) -> Result<(), String> {
-        let batch = RefCell::new(RocksDbBatch::new(self.db_holder));
+        let batch = RefCell::new(RocksDbBatch::new(Arc::clone(&self.db_holder)));
 
         blocks
             .iter()
@@ -107,9 +108,9 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
 
         // persist last height to db_tx if Some
         if let Some(block) = blocks.last() {
-            self.persist_last_height_and_commit(block.header.height, &batch)?;
+            self.persist_last_height(block.header.height, &batch)?;
         }
-        batch.borrow_mut().commit().map_err(|e| e.into_string())?;
+        //        batch.borrow().db_tx.commit().map_err(|e| e.into_string())?;
         Ok(())
     }
 }

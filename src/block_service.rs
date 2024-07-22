@@ -44,16 +44,6 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
                     &mut tx_pk_by_tx_hash_lru_cache,
                 )
                 .map_err(|e| e.into_string())?;
-            self.tx_service
-                .persist_outputs(&block.header.height, tx, &mut batch);
-            if !tx.is_coinbase() {
-                self.tx_service.persist_inputs(
-                    &block.header.height,
-                    tx,
-                    &mut batch,
-                    &mut tx_pk_by_tx_hash_lru_cache,
-                );
-            }
         }
         self.persist_header(&block, &mut batch, &mut block_height_by_hash_lru_cache)?;
         Ok(())
@@ -77,16 +67,6 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
                     &mut tx_pk_by_tx_hash_lru_cache,
                 )
                 .map_err(|e| e.into_string())?;
-            self.tx_service
-                .remove_outputs(&block.header.height, tx, &mut batch);
-            if !tx.is_coinbase() {
-                self.tx_service.remove_inputs(
-                    &block.header.height,
-                    tx,
-                    &mut batch,
-                    &mut tx_pk_by_tx_hash_lru_cache,
-                );
-            }
         }
         self.remove_header(
             &block.header,

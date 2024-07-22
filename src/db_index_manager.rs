@@ -9,7 +9,7 @@ pub struct DbIndexManager {
 }
 
 impl DbIndexManager {
-    fn new(db_indexes: Vec<DbIndexUtxoBirthPkWithUtxoPkCf>) -> Self {
+    fn new(db_indexes: &Vec<DbIndexUtxoBirthPkWithUtxoPkCf>) -> Self {
         let utxo_birth_pk_by_index = db_indexes
             .into_iter()
             .map(|index_name| format!("utxo_birth_pk_by_{}", index_name))
@@ -21,7 +21,7 @@ impl DbIndexManager {
             .collect();
 
         DbIndexManager {
-            index_utxo_birth_pk_with_utxo_pk: db_indexes,
+            index_utxo_birth_pk_with_utxo_pk: db_indexes.clone(),
             utxo_birth_pk_by_index,
             index_by_utxo_birth_pk,
         }

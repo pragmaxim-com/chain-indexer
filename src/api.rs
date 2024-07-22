@@ -70,28 +70,6 @@ pub trait TxService {
         batch: &mut RefMut<RocksDbBatch>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
-
-    fn persist_outputs(
-        &self,
-        block_height: &BlockHeight,
-        tx: &Self::Tx,
-        batch: &mut RefMut<RocksDbBatch>,
-    ) -> Result<(), rocksdb::Error>;
-
-    fn remove_outputs(
-        &self,
-        block_height: &BlockHeight,
-        tx: &Self::Tx,
-        batch: &mut RefMut<RocksDbBatch>,
-    ) -> Result<(), rocksdb::Error>;
-
-    fn persist_inputs(
-        &self,
-        block_height: &BlockHeight,
-        tx: &Self::Tx,
-        batch: &mut RefMut<RocksDbBatch>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
-    );
 }
 
 pub trait BlockMonitor<Tx: Clone> {

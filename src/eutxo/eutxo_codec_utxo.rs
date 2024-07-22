@@ -60,7 +60,7 @@ pub fn concat_birth_pk_with_pk(birth_pk_bytes: &[u8], pk_bytes: &[u8]) -> Vec<u8
     combined_bytes
 }
 
-pub fn split_birth_pk_with_pk(relation_bytes: &[u8]) -> (UtxoBirthPkBytes, UtxoPkBytes) {
+pub fn get_utxo_pk_from_relation(relation_bytes: &[u8]) -> UtxoPkBytes {
     assert!(
         relation_bytes.len() == 16,
         "Combined bytes length must be exactly 16"
@@ -72,10 +72,10 @@ pub fn split_birth_pk_with_pk(relation_bytes: &[u8]) -> (UtxoBirthPkBytes, UtxoP
     birth_pk_bytes.copy_from_slice(&relation_bytes[0..8]);
     pk_bytes.copy_from_slice(&relation_bytes[8..16]);
 
-    (birth_pk_bytes, pk_bytes)
+    pk_bytes
 }
 
-pub fn split_asset_birth_pk_with_pk(relation_bytes: &[u8]) -> (AssetBirthPkBytes, AssetPkBytes) {
+pub fn get_asset_pk_from_relation(relation_bytes: &[u8]) -> AssetPkBytes {
     let total_size = size_of::<AssetBirthPkBytes>() + size_of::<AssetPkBytes>();
     assert!(
         relation_bytes.len() == total_size,
@@ -88,7 +88,7 @@ pub fn split_asset_birth_pk_with_pk(relation_bytes: &[u8]) -> (AssetBirthPkBytes
     birth_pk_bytes.copy_from_slice(&relation_bytes[0..size_of::<AssetBirthPkBytes>()]);
     pk_bytes.copy_from_slice(&relation_bytes[8..total_size]);
 
-    (birth_pk_bytes, pk_bytes)
+    pk_bytes
 }
 
 pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndex, UtxoPkBytes)>) {
@@ -113,7 +113,7 @@ pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndex, UtxoPkByt
 }
 
 pub fn utxo_to_bytes(
-    utxo_value: UtxoValue,
+    utxo_value: &UtxoValue,
     utxo_birth_pk_by_cf_index: Vec<(DbIndexCfIndex, UtxoPkBytes)>,
 ) -> Vec<u8> {
     let mut utxo_value_with_indexes = vec![0u8; 8 + utxo_birth_pk_by_cf_index.len() * 9];
@@ -220,7 +220,7 @@ mod tests {
         #[test]
         fn test_roundtrip(utxo_value in any::<u64>(), pairs in prop::collection::vec((any::<u8>(), any::<[u8; 8]>()), 0..100)) {
             let utxo_value = UtxoValue(utxo_value);
-            let bytes = utxo_to_bytes(utxo_value, pairs.clone());
+            let bytes = utxo_to_bytes(&utxo_value, pairs.clone());
             let (decoded_utxo_value, decoded_pairs) = bytes_to_utxo(&bytes);
             assert_eq!(utxo_value.0, decoded_utxo_value.0);
             assert_eq!(pairs, decoded_pairs);
@@ -258,10 +258,9 @@ mod tests {
         assert_eq!(combined.len(), 16);
 
         // Split the combined byte array back into the original arrays
-        let (birth_pk_split, pk_split) = split_birth_pk_with_pk(&combined);
+        let pk_split = get_utxo_pk_from_relation(&combined);
 
         // Assert that the original arrays match the split arrays
-        assert_eq!(birth_pk_split, birth_pk);
         assert_eq!(pk_split, pk);
     }
 }
