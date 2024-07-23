@@ -113,7 +113,7 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<Option<Rc<Block<Tx>>>, rocksdb::Error> {
         if let Some(value) = self.block_by_hash_lru_cache.borrow_mut().get(block_hash) {
-            Ok(Some(value.clone()))
+            Ok(Some(Rc::clone(value)))
         } else {
             let header_opt = self.get_block_header_by_hash(block_hash, batch)?;
             match header_opt {
