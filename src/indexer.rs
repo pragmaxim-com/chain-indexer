@@ -10,6 +10,7 @@ use crate::model::Transaction;
 use crate::model::{Block, BlockHeight};
 use crate::rocks_db_batch::RocksDbBatch;
 use crate::storage::Storage;
+use std::rc::Rc;
 
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -61,38 +62,44 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
 
     fn chain_link(
         &self,
-        block: &Block<OutTx>,
+        block: Rc<Block<OutTx>>, // Use Rc to manage ownership and avoid lifetimes issues
         batch: &RefCell<RocksDbBatch>,
-        winning_fork: &mut Vec<Block<OutTx>>,
-    ) -> Result<Vec<Block<OutTx>>, String> {
+        winning_fork: &mut Vec<Rc<Block<OutTx>>>, // Use Rc for the vector as well
+    ) -> Result<Vec<Rc<Block<OutTx>>>, String> {
         let header = block.header;
         let prev_header: Option<BlockHeader> = self
             .service
             .get_block_header_by_hash(&header.prev_hash, batch)
             .unwrap();
+
         if header.height.0 == 1 {
-            winning_fork.insert(0, block.clone());
+            winning_fork.insert(0, Rc::clone(&block)); // Clone the Rc, not the block
             Ok(winning_fork.clone())
         } else if prev_header.is_some_and(|ph| ph.height.0 == header.height.0 - 1) {
-            winning_fork.insert(0, block.clone());
+            winning_fork.insert(0, Rc::clone(&block));
             Ok(winning_fork.clone())
         } else if prev_header.is_none() {
             info!(
                 "Fork detected at {}@{}, downloading parent {}",
                 header.height, header.hash, header.prev_hash,
             );
-            let downloaded_prev_block = self
-                .chain_linker
-                .get_processed_block_by_hash(header.prev_hash)?;
+            let downloaded_prev_block = Rc::new(
+                self.chain_linker
+                    .get_processed_block_by_hash(header.prev_hash)?,
+            );
 
-            winning_fork.insert(0, block.clone());
-            self.chain_link(&downloaded_prev_block, batch, winning_fork)
+            winning_fork.insert(0, Rc::clone(&block));
+            self.chain_link(downloaded_prev_block, batch, winning_fork)
         } else {
             panic!("Unexpected condition") // todo pretty print blocks
         }
     }
 
-    pub(crate) fn persist_blocks(&self, blocks: &Vec<Block<OutTx>>) -> Result<(), String> {
+    pub(crate) fn persist_blocks(
+        &self,
+        blocks: Vec<Block<OutTx>>,
+        chain_link: bool,
+    ) -> Result<(), String> {
         let db = self.db_holder.db.write().unwrap();
         let db_tx = db.transaction();
         let mut binding = db_tx.get_writebatch();
@@ -133,24 +140,38 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
             asset_birth_pk_with_asset_pk_cf: db.cf_handle(ASSET_BIRTH_PK_WITH_ASSET_PK_CF).unwrap(),
         });
 
-        blocks
-            .iter()
-            .map(|block| self.chain_link(block, &batch, &mut vec![]).unwrap())
-            .for_each(|linked_blocks| match linked_blocks.len() {
-                0 => panic!("Blocks vector is empty"),
-                1 => linked_blocks
-                    .into_iter()
-                    .for_each(|block| self.service.persist_block(&block, &batch).unwrap()),
-                _ => {
-                    self.service.update_blocks(&linked_blocks, &batch).unwrap();
+        let last_block_height = blocks
+            .into_iter()
+            .map(|block| {
+                if chain_link {
+                    self.chain_link(Rc::new(block), &batch, &mut vec![])
+                        .unwrap()
+                } else {
+                    vec![Rc::new(block)]
                 }
-            });
+            })
+            .map(|linked_blocks| match linked_blocks.len() {
+                0 => panic!("Blocks vector is empty"),
+                1 => {
+                    let last_height = linked_blocks.last().unwrap().header.height;
+                    linked_blocks
+                        .into_iter()
+                        .for_each(|block| self.service.persist_block(block, &batch).unwrap());
+                    last_height
+                }
+                _ => {
+                    let last_height = linked_blocks.last().unwrap().header.height;
+                    self.service.update_blocks(linked_blocks, &batch).unwrap();
+                    last_height
+                }
+            })
+            .last();
 
-        // persist last height to db_tx if Some
-        if let Some(block) = blocks.last() {
-            self.persist_last_height(block.header.height, &batch)?;
+        // persist last height to db_tx and commit
+        if let Some(height) = last_block_height {
+            self.persist_last_height(height, &batch)?;
+            db_tx.commit().map_err(|e| e.into_string())?;
         }
-        db_tx.commit().map_err(|e| e.into_string())?;
         Ok(())
     }
 }

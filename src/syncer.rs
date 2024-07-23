@@ -60,18 +60,15 @@ impl<InTx: Send + Clone + 'static, OutTx: Transaction + Send + Clone + 'static>
                 tokio::task::spawn_blocking(move || chain_linker.process_batch(&blocks, tx_count))
             })
             .buffered(num_cpus::get())
-            .inspect(|res| match res {
+            .map(|res| match res {
                 Ok((block_batch, tx_count)) => {
-                    self.monitor.monitor(block_batch, tx_count);
+                    let chain_link = block_batch
+                        .last()
+                        .is_some_and(|b| best_height.0 < b.header.height.0 + 1000);
+                    self.monitor.monitor(&block_batch, &tx_count);
                     self.indexer
-                        .persist_blocks(block_batch)
-                        .unwrap_or_else(|e| {
-                            panic!(
-                                "Unable to persist blocks at height {} due to {}",
-                                block_batch.get(0).unwrap().header.height,
-                                e
-                            )
-                        })
+                        .persist_blocks(block_batch, chain_link)
+                        .unwrap_or_else(|e| panic!("Unable to persist blocks due to {}", e))
                 }
                 Err(e) => panic!("Unable to process blocks: {:?}", e),
             })

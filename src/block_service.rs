@@ -6,8 +6,8 @@ use crate::{
     rocks_db_batch::RocksDbBatch,
 };
 use lru::LruCache;
-use std::cell::RefMut;
 use std::{cell::RefCell, num::NonZeroUsize, sync::Arc};
+use std::{cell::RefMut, rc::Rc};
 
 pub struct BlockService<Tx: Transaction + Clone> {
     pub(crate) tx_service: Arc<dyn TxService<Tx = Tx>>,
@@ -28,7 +28,7 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
 
     pub(crate) fn persist_block(
         &self,
-        block: &Block<Tx>,
+        block: Rc<Block<Tx>>,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<(), String> {
         let mut batch = batch.borrow_mut();
@@ -77,7 +77,7 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
 
     pub(crate) fn update_blocks(
         &self,
-        blocks: &Vec<Block<Tx>>,
+        blocks: Vec<Rc<Block<Tx>>>,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<Vec<Block<Tx>>, String> {
         let removed_blocks: Result<Vec<Block<Tx>>, String> = blocks
@@ -99,7 +99,7 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
             })
             .collect();
 
-        for block in blocks.iter() {
+        for block in blocks.into_iter() {
             self.persist_block(block, batch)?;
         }
 
