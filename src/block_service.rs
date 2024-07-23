@@ -11,7 +11,7 @@ use std::{cell::RefMut, rc::Rc};
 
 pub struct BlockService<Tx: Transaction + Clone> {
     pub(crate) tx_service: Arc<dyn TxService<Tx = Tx>>,
-    pub(crate) block_by_hash_lru_cache: RefCell<LruCache<BlockHash, Block<Tx>>>,
+    pub(crate) block_by_hash_lru_cache: RefCell<LruCache<BlockHash, Rc<Block<Tx>>>>,
     pub(crate) tx_pk_by_tx_hash_lru_cache: RefCell<LruCache<TxHash, TxPkBytes>>,
 }
 
@@ -45,13 +45,14 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
                 )
                 .map_err(|e| e.into_string())?;
         }
-        self.persist_header(&block, &mut batch, &mut block_height_by_hash_lru_cache)?;
+        self.persist_header(&block.header, &mut batch)?;
+        block_height_by_hash_lru_cache.put(block.header.hash, Rc::clone(&block));
         Ok(())
     }
 
     pub(crate) fn remove_block(
         &self,
-        block: &Block<Tx>,
+        block: Rc<Block<Tx>>,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<(), String> {
         let mut batch = batch.borrow_mut();
@@ -79,14 +80,14 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
         &self,
         blocks: Vec<Rc<Block<Tx>>>,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Vec<Block<Tx>>, String> {
-        let removed_blocks: Result<Vec<Block<Tx>>, String> = blocks
+    ) -> Result<Vec<Rc<Block<Tx>>>, String> {
+        let removed_blocks: Result<Vec<Rc<Block<Tx>>>, String> = blocks
             .iter()
             .map(|block| {
                 if let Some(block_to_remove) =
                     self.get_block_by_height(block.header.height, batch)?
                 {
-                    self.remove_block(&block_to_remove, batch)?;
+                    self.remove_block(Rc::clone(&block_to_remove), batch)?;
                     Ok(Some(block_to_remove))
                 } else {
                     Ok(None)
@@ -110,7 +111,7 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
         &self,
         block_hash: &BlockHash,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Option<Block<Tx>>, rocksdb::Error> {
+    ) -> Result<Option<Rc<Block<Tx>>>, rocksdb::Error> {
         if let Some(value) = self.block_by_hash_lru_cache.borrow_mut().get(block_hash) {
             Ok(Some(value.clone()))
         } else {
@@ -121,7 +122,7 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
                         .tx_service
                         .get_txs_by_height(&block_header.height, batch)?;
 
-                    Ok(Some(Block::new(block_header, txs)))
+                    Ok(Some(Rc::new(Block::new(block_header, txs))))
                 }
                 None => Ok(None),
             }
@@ -132,7 +133,7 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
         &self,
         block_height: BlockHeight,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<Option<Block<Tx>>, rocksdb::Error> {
+    ) -> Result<Option<Rc<Block<Tx>>>, rocksdb::Error> {
         let mut_batch = batch.borrow_mut();
         let height_bytes = codec_block::block_height_to_bytes(&block_height);
         let hash_bytes = mut_batch
@@ -162,11 +163,9 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
 
     pub(crate) fn persist_header(
         &self,
-        block: &Block<Tx>,
+        block_header: &BlockHeader,
         batch: &mut RefMut<RocksDbBatch>,
-        block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Block<Tx>>,
     ) -> Result<(), String> {
-        let block_header = block.header;
         let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
         let block_hash_by_pk_cf = batch.block_hash_by_pk_cf;
 
@@ -179,8 +178,6 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
             .put_cf(batch.block_pk_by_hash_cf, block_header.hash.0, header_bytes)
             .map_err(|e| e.to_string())?;
 
-        block_height_by_hash_lru_cache.put(block.header.hash, block.clone());
-
         Ok(())
     }
 
@@ -188,7 +185,7 @@ impl<Tx: Transaction + Clone> BlockService<Tx> {
         &self,
         block_header: &BlockHeader,
         batch: &mut RefMut<RocksDbBatch>,
-        block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Block<Tx>>,
+        block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
     ) -> Result<(), String> {
         let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
         let block_hash_by_pk_cf = batch.block_hash_by_pk_cf;

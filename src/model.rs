@@ -89,8 +89,8 @@ pub type DbUtxoBirthPkByIndexCf = String;
 pub type DbIndexUtxoBirthPk = u32;
 pub type DbIndexValue = Vec<u8>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Block<T: Clone> {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Block<T> {
     pub header: BlockHeader,
     pub txs: Vec<T>,
 }
