@@ -76,21 +76,27 @@ impl EuTxService {
         let utxo_pk_by_input_pk_cf = batch.utxo_pk_by_input_pk_cf;
         let tx_pk_by_hash_cf = batch.tx_pk_by_hash_cf;
         for (input_index, tx_input) in tx.tx_inputs.iter().enumerate() {
-            let tx_pk_bytes = tx_pk_by_tx_hash_lru_cache
+            let utxo_pk = tx_pk_by_tx_hash_lru_cache
                 .get(&tx_input.tx_hash)
-                .map(|f| f.to_vec())
-                .or(batch
-                    .db_tx
-                    .get_cf(tx_pk_by_hash_cf, tx_input.tx_hash)
-                    .unwrap())
+                .map(|tx_pk_bytes| {
+                    eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index)
+                })
+                .or_else(|| {
+                    batch
+                        .db_tx
+                        .get_cf(tx_pk_by_hash_cf, tx_input.tx_hash)
+                        .unwrap()
+                        .map(|tx_pk_bytes| {
+                            eutxo_codec_utxo::utxo_pk_bytes_from(&tx_pk_bytes, &tx_input.utxo_index)
+                        })
+                })
                 .unwrap();
 
-            let utxo_pk = eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index);
             let input_pk =
                 eutxo_codec_utxo::utxo_pk_bytes(block_height, &tx.tx_index, &(input_index as u16));
             batch
                 .batch
-                .put_cf(utxo_pk_by_input_pk_cf, input_pk, utxo_pk)
+                .put_cf(utxo_pk_by_input_pk_cf, &input_pk, &utxo_pk)
         }
     }
 
@@ -227,12 +233,20 @@ impl EuTxService {
             let index_by_birth_pk_cf = batch.asset_id_by_asset_birth_pk_cf;
 
             // start building the utxo_value_with_indexes
-            let mut asset_value_birth_pk = vec![0u8; utxo.db_indexes.len() * 17];
+            let asset_elem_size = size_of::<AssetValue>() + size_of::<AssetBirthPkBytes>();
+            let mut asset_value_birth_pk = vec![0u8; utxo.db_indexes.len() * asset_elem_size];
             let mut idx = 0;
 
             for (asset_index, (asset_id, asset_value)) in utxo.assets.iter().enumerate() {
                 let asset_pk_bytes =
                     eutxo_codec_utxo::asset_pk_bytes(utxo_pk_bytes, &(asset_index as u8));
+
+                // append indexes to utxo_value_with_indexes
+                BigEndian::write_u64(
+                    &mut asset_value_birth_pk[idx..idx + size_of::<AssetValue>()],
+                    *asset_value,
+                );
+                idx += size_of::<AssetValue>();
 
                 let asset_birth_pk_bytes: Vec<u8> = self.persist_birth_pk_or_relation_with_pk(
                     asset_id,
@@ -243,12 +257,6 @@ impl EuTxService {
                     batch,
                 )?;
 
-                // append indexes to utxo_value_with_indexes
-                BigEndian::write_u64(
-                    &mut asset_value_birth_pk[idx..idx + size_of::<AssetValue>()],
-                    *asset_value,
-                );
-                idx += size_of::<AssetValue>();
                 asset_value_birth_pk[idx..idx + size_of::<AssetBirthPkBytes>()]
                     .copy_from_slice(&asset_birth_pk_bytes);
                 idx += size_of::<AssetBirthPkBytes>();
@@ -265,15 +273,24 @@ impl EuTxService {
         batch: &mut RocksDbBatch,
     ) -> Result<(), rocksdb::Error> {
         // start building the utxo_value_with_indexes
-        let mut utxo_value_with_indexes = vec![0u8; 8 + utxo.db_indexes.len() * 9];
-        BigEndian::write_u64(&mut utxo_value_with_indexes[0..8], utxo.utxo_value.0);
-        let mut index = 8;
+        let index_elem_length = size_of::<DbIndexCfIndex>() + size_of::<UtxoBirthPkBytes>();
+
+        let mut utxo_value_with_indexes =
+            vec![0u8; size_of::<u64>() + (utxo.db_indexes.len() * index_elem_length)];
+        BigEndian::write_u64(
+            &mut utxo_value_with_indexes[0..size_of::<UtxoBirthPkBytes>()],
+            utxo.utxo_value.0,
+        );
+        let mut index = size_of::<UtxoBirthPkBytes>();
 
         for (cf_index, index_value) in utxo.db_indexes.iter() {
             let birth_pk_by_index_cf = batch.utxo_birth_pk_by_index_cf[*cf_index as usize];
             let birth_pk_with_pk_cf = batch.utxo_birth_pk_with_utxo_pk_cf[*cf_index as usize];
             let index_by_birth_pk_cf = batch.index_by_utxo_birth_pk_cf[*cf_index as usize];
-            // first check if IndexValue has been already indexed or it is the first time
+
+            utxo_value_with_indexes[index] = *cf_index;
+            index += size_of::<DbIndexCfIndex>();
+
             let utxo_birth_pk_bytes: Vec<u8> = self.persist_birth_pk_or_relation_with_pk(
                 index_value,
                 utxo_pk_bytes,
@@ -282,9 +299,6 @@ impl EuTxService {
                 index_by_birth_pk_cf,
                 batch,
             )?;
-            // append indexes to utxo_value_with_indexes
-            utxo_value_with_indexes[index] = *cf_index;
-            index += size_of::<DbIndexCfIndex>();
             utxo_value_with_indexes[index..index + size_of::<UtxoBirthPkBytes>()]
                 .copy_from_slice(&utxo_birth_pk_bytes);
             index += size_of::<UtxoBirthPkBytes>();
@@ -409,7 +423,7 @@ impl EuTxService {
         let utxo_value_by_pk_cf = batch.utxo_value_by_pk_cf;
         batch
             .batch
-            .put_cf(utxo_value_by_pk_cf, utxo_pk_bytes, &utxo_value_with_indexes);
+            .put_cf(utxo_value_by_pk_cf, utxo_pk_bytes, utxo_value_with_indexes);
     }
 
     fn remove_utxo_value_with_indexes(
@@ -439,7 +453,7 @@ impl EuTxService {
         let assets_by_utxo_pk_cf = batch.assets_by_utxo_pk_cf;
         batch
             .batch
-            .put_cf(assets_by_utxo_pk_cf, utxo_pk_bytes, &asset_value_with_index);
+            .put_cf(assets_by_utxo_pk_cf, utxo_pk_bytes, asset_value_with_index);
     }
 
     fn persist_birth_pk_or_relation_with_pk<'db>(
@@ -458,15 +472,15 @@ impl EuTxService {
                 eutxo_codec_utxo::concat_birth_pk_with_pk(&existing_birth_pk_vec, pk_bytes);
             batch
                 .batch
-                .put_cf(birth_pk_with_pk_cf, birth_pk_with_pk, vec![]);
+                .put_cf(birth_pk_with_pk_cf, &birth_pk_with_pk, vec![]);
             Ok(existing_birth_pk_vec)
         } else {
             batch
                 .db_tx
-                .put_cf(birth_pk_by_index_cf, pk_bytes, index_value)?;
+                .put_cf(birth_pk_by_index_cf, index_value, pk_bytes)?;
             batch
                 .db_tx
-                .put_cf(index_by_birth_pk_cf, index_value, pk_bytes)?;
+                .put_cf(index_by_birth_pk_cf, pk_bytes, index_value)?;
             Ok(pk_bytes.to_vec())
         }
     }
@@ -515,11 +529,11 @@ impl TxService for EuTxService {
         let tx_pk_by_hash_cf = batch.tx_pk_by_hash_cf;
         batch
             .batch
-            .put_cf(tx_hash_by_pk_cf, tx_pk_bytes, &tx.tx_hash);
+            .put_cf(tx_hash_by_pk_cf, &tx_pk_bytes, &tx.tx_hash);
 
         batch
             .db_tx
-            .put_cf(tx_pk_by_hash_cf, &tx.tx_hash, tx_pk_bytes)?;
+            .put_cf(tx_pk_by_hash_cf, &tx.tx_hash, &tx_pk_bytes)?;
 
         tx_pk_by_tx_hash_lru_cache.put(tx.tx_hash, tx_pk_bytes);
 

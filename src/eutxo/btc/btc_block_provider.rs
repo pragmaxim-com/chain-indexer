@@ -1,26 +1,26 @@
 use crate::{
-    api::{BlockProcessor, BlockchainClient, ChainLinker},
+    api::{BlockProcessor, BlockchainClient, BlockProvider},
     eutxo::eutxo_model::EuTx,
     model::{Block, BlockHash, BlockHeight, TxCount},
 };
 
 use super::{btc_client::BtcClient, btc_processor::BtcProcessor};
 
-pub struct BtcChainLinker {
+pub struct BtcBlockProvider {
     pub client: BtcClient,
     pub processor: BtcProcessor,
 }
 
-impl BtcChainLinker {
+impl BtcBlockProvider {
     pub fn new(api_host: &str, api_username: &str, api_password: &str) -> Self {
-        BtcChainLinker {
+        BtcBlockProvider {
             client: BtcClient::new(api_host, api_username, api_password),
             processor: BtcProcessor {},
         }
     }
 }
 
-impl ChainLinker for BtcChainLinker {
+impl BlockProvider for BtcBlockProvider {
     type InTx = bitcoin::Transaction;
     type OutTx = EuTx;
 

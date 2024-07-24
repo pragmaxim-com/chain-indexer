@@ -2,6 +2,7 @@ use crate::{
     api::TxService,
     codec_block,
     codec_tx::TxPkBytes,
+    info,
     model::{Block, BlockHash, BlockHeader, BlockHeight, Transaction, TxHash},
     rocks_db_batch::RocksDbBatch,
 };
@@ -81,12 +82,14 @@ impl<Tx: Transaction> BlockService<Tx> {
         blocks: Vec<Rc<Block<Tx>>>,
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<Vec<Rc<Block<Tx>>>, String> {
+        info!("Updating {} blocks", blocks.len());
         let removed_blocks: Result<Vec<Rc<Block<Tx>>>, String> = blocks
             .iter()
             .map(|block| {
                 if let Some(block_to_remove) =
                     self.get_block_by_height(block.header.height, batch)?
                 {
+                    info!("Removing block {}", block_to_remove.header);
                     self.remove_block(Rc::clone(&block_to_remove), batch)?;
                     Ok(Some(block_to_remove))
                 } else {
@@ -100,6 +103,7 @@ impl<Tx: Transaction> BlockService<Tx> {
             })
             .collect();
 
+        info!("Persisting {} blocks in new fork", blocks.len());
         for block in blocks.into_iter() {
             self.persist_block(block, batch)?;
         }

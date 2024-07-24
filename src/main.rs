@@ -1,7 +1,7 @@
-use ci::api::ChainLinker;
+use ci::api::BlockProvider;
 use ci::block_service::BlockService;
 use ci::db_index_manager::DbIndexManager;
-use ci::eutxo::btc::btc_chain_linker::BtcChainLinker;
+use ci::eutxo::btc::btc_block_provider::BtcBlockProvider;
 use ci::eutxo::eutxo_block_monitor::EuBlockMonitor;
 use ci::eutxo::eutxo_model::{self, EuTx};
 use ci::eutxo::eutxo_tx_service::EuTxService;
@@ -41,16 +41,20 @@ async fn main() -> Result<(), std::io::Error> {
                     let block_service: Arc<BlockService<EuTx>> =
                         Arc::new(BlockService::new(tx_service));
 
-                    let chain_linker: Arc<
-                        dyn ChainLinker<InTx = bitcoin::Transaction, OutTx = EuTx> + Send + Sync,
-                    > = Arc::new(BtcChainLinker::new(&api_host, &api_username, &api_password));
+                    let block_provider: Arc<
+                        dyn BlockProvider<InTx = bitcoin::Transaction, OutTx = EuTx> + Send + Sync,
+                    > = Arc::new(BtcBlockProvider::new(
+                        &api_host,
+                        &api_username,
+                        &api_password,
+                    ));
                     let syncer = ChainSyncer::new(
-                        Arc::clone(&chain_linker),
+                        Arc::clone(&block_provider),
                         Arc::new(EuBlockMonitor::new(1000)),
                         Arc::new(Indexer::new(
                             db_holder,
                             block_service,
-                            Arc::clone(&chain_linker),
+                            Arc::clone(&block_provider),
                         )),
                     );
                     syncer.sync(tx_batch_size).await;

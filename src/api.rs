@@ -30,7 +30,7 @@ pub trait BlockProcessor {
     ) -> (Vec<Block<Self::OutTx>>, TxCount);
 }
 
-pub trait ChainLinker {
+pub trait BlockProvider {
     type InTx: Send;
     type OutTx: Send;
 

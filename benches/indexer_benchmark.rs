@@ -1,12 +1,13 @@
 use std::{sync::Arc, time::Duration};
 
 use ci::{
-    api::{BlockProcessor, BlockchainClient, ChainLinker},
+    api::{BlockProcessor, BlockProvider, BlockchainClient},
     block_service::BlockService,
     db_index_manager::DbIndexManager,
     eutxo::{
         btc::{
-            btc_chain_linker::BtcChainLinker, btc_client::BtcClient, btc_processor::BtcProcessor,
+            btc_block_provider::BtcBlockProvider, btc_client::BtcClient,
+            btc_processor::BtcProcessor,
         },
         eutxo_model::{self, EuTx},
         eutxo_tx_service::EuTxService,
@@ -40,13 +41,17 @@ fn criterion_benchmark(c: &mut Criterion) {
         db_index_manager: Arc::clone(&db_index_manager),
     });
     let block_service: Arc<BlockService<EuTx>> = Arc::new(BlockService::new(tx_service));
-    let chain_linker: Arc<
-        dyn ChainLinker<InTx = bitcoin::Transaction, OutTx = EuTx> + Send + Sync,
-    > = Arc::new(BtcChainLinker::new(&api_host, &api_username, &api_password));
+    let block_provider: Arc<
+        dyn BlockProvider<InTx = bitcoin::Transaction, OutTx = EuTx> + Send + Sync,
+    > = Arc::new(BtcBlockProvider::new(
+        &api_host,
+        &api_username,
+        &api_password,
+    ));
     let indexer = Arc::new(Indexer::new(
         db_holder,
         block_service,
-        Arc::clone(&chain_linker),
+        Arc::clone(&block_provider),
     ));
     info!("Initiating download");
     let batch_size = 100_000;

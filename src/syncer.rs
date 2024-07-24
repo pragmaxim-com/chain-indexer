@@ -1,5 +1,5 @@
 use crate::{
-    api::{BlockMonitor, ChainLinker},
+    api::{BlockMonitor, BlockProvider},
     indexer::Indexer,
     info,
     model::Transaction,
@@ -14,27 +14,27 @@ use std::sync::{
 
 pub struct ChainSyncer<InTx: Send + 'static, OutTx: Transaction + Send + 'static> {
     pub is_shutdown: Arc<AtomicBool>,
-    pub chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
+    pub block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
     pub monitor: Arc<dyn BlockMonitor<OutTx>>,
     pub indexer: Arc<Indexer<InTx, OutTx>>,
 }
 
 impl<InTx: Send + 'static, OutTx: Transaction + Send + 'static> ChainSyncer<InTx, OutTx> {
     pub fn new(
-        chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
+        block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
         monitor: Arc<dyn BlockMonitor<OutTx>>,
         indexer: Arc<Indexer<InTx, OutTx>>,
     ) -> Self {
         ChainSyncer {
             is_shutdown: Arc::new(AtomicBool::new(false)),
-            chain_linker,
+            block_provider,
             monitor,
             indexer,
         }
     }
 
     pub async fn sync(&self, min_batch_size: usize) {
-        let best_height = self.chain_linker.get_best_block().unwrap().header.height;
+        let best_height = self.block_provider.get_best_block().unwrap().header.height;
         let last_height = self.indexer.get_last_height().0 + 1;
         // let check_forks: bool = best_height - last_height < 1000;
         info!("Initiating index from {} to {}", last_height, best_height);
@@ -42,9 +42,9 @@ impl<InTx: Send + 'static, OutTx: Transaction + Send + 'static> ChainSyncer<InTx
 
         tokio_stream::iter(heights)
             .map(|height| {
-                let chain_linker = Arc::clone(&self.chain_linker);
+                let block_provider = Arc::clone(&self.block_provider);
                 tokio::task::spawn_blocking(move || {
-                    chain_linker.get_block_by_height(height.into()).unwrap()
+                    block_provider.get_block_by_height(height.into()).unwrap()
                 })
             })
             .buffered(num_cpus::get())
@@ -54,8 +54,8 @@ impl<InTx: Send + 'static, OutTx: Transaction + Send + 'static> ChainSyncer<InTx
             })
             .min_batch_with_weight(min_batch_size, |block| block.txs.len())
             .map(|(blocks, tx_count)| {
-                let chain_linker = Arc::clone(&self.chain_linker);
-                tokio::task::spawn_blocking(move || chain_linker.process_batch(&blocks, tx_count))
+                let block_provider = Arc::clone(&self.block_provider);
+                tokio::task::spawn_blocking(move || block_provider.process_batch(&blocks, tx_count))
             })
             .buffered(num_cpus::get())
             .map(|res| match res {

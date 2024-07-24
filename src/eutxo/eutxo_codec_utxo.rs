@@ -148,9 +148,9 @@ pub fn asset_pk_bytes(utxo_pk_bytes: &UtxoPkBytes, asset_index: &AssetIndex) -> 
     bytes
 }
 
-pub fn utxo_pk_bytes_from(tx_pk_bytes: Vec<u8>, utxo_index: &UtxoIndex) -> UtxoPkBytes {
+pub fn utxo_pk_bytes_from(tx_pk_bytes: &[u8], utxo_index: &UtxoIndex) -> UtxoPkBytes {
     let mut bytes: UtxoPkBytes = [0u8; 8];
-    bytes[0..6].copy_from_slice(&tx_pk_bytes);
+    bytes[0..6].copy_from_slice(tx_pk_bytes);
     BigEndian::write_u16(&mut bytes[6..8], utxo_index.0);
     bytes
 }

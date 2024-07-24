@@ -1,6 +1,6 @@
 use rocksdb::ColumnFamily;
 
-use crate::api::ChainLinker;
+use crate::api::BlockProvider;
 use crate::block_service::BlockService;
 use crate::codec_block;
 use crate::eutxo::eutxo_model::*;
@@ -20,19 +20,19 @@ pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 pub struct Indexer<InTx: Send, OutTx: Transaction + Send> {
     pub db_holder: Arc<Storage>,
     service: Arc<BlockService<OutTx>>,
-    chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
+    block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
 }
 
 impl<InTx: Send, OutTx: Transaction + Send> Indexer<InTx, OutTx> {
     pub fn new(
         db: Arc<Storage>,
         service: Arc<BlockService<OutTx>>,
-        chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
+        block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
     ) -> Self {
         Indexer {
             db_holder: db,
             service,
-            chain_linker,
+            block_provider,
         }
     }
 
@@ -86,7 +86,7 @@ impl<InTx: Send, OutTx: Transaction + Send> Indexer<InTx, OutTx> {
                 block.header.height, block.header.hash, block.header.prev_hash,
             );
             let downloaded_prev_block = Rc::new(
-                self.chain_linker
+                self.block_provider
                     .get_processed_block_by_hash(block.header.prev_hash)?,
             );
 
