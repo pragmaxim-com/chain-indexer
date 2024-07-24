@@ -2,11 +2,10 @@ use std::time::Duration;
 
 use ci::{
     api::{BlockProcessor, BlockchainClient},
-    eutxo::btc::{
-        btc_client::{BtcBlock, BtcClient},
-        btc_processor::BtcProcessor,
-    },
-    info, settings,
+    eutxo::btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
+    info,
+    model::Block,
+    settings,
 };
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
@@ -23,9 +22,9 @@ fn criterion_benchmark(c: &mut Criterion) {
     let batch_size = 50000;
     let start_height = 1 as u32;
     let end_height = start_height + batch_size;
-    let mut blocks: Vec<BtcBlock> = Vec::with_capacity(batch_size as usize);
+    let mut blocks: Vec<Block<bitcoin::Transaction>> = Vec::with_capacity(batch_size as usize);
     for height in start_height..end_height {
-        blocks.push(btc_client.get_block_by_height(height).unwrap());
+        blocks.push(btc_client.get_block_by_height(height.into()).unwrap());
     }
     info!("Initiating processing");
     let mut group = c.benchmark_group("processor");

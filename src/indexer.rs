@@ -95,7 +95,7 @@ impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx>
         }
     }
 
-    pub(crate) fn persist_blocks(
+    pub fn persist_blocks(
         &self,
         blocks: Vec<Block<OutTx>>,
         chain_link: bool,
