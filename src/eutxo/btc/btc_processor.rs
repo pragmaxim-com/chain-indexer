@@ -41,7 +41,7 @@ impl BlockProcessor for BtcProcessor {
 impl From<&Block<bitcoin::Transaction>> for Block<EuTx> {
     fn from(block: &Block<bitcoin::Transaction>) -> Self {
         Block::new(
-            block.header,
+            block.header.clone(),
             block
                 .txs
                 .iter()

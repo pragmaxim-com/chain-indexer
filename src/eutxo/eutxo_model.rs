@@ -3,13 +3,13 @@ use crate::model::{
 };
 use derive_more::{AsRef, Display, From, Into};
 
-#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct InputIndex(u16);
 
-#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct UtxoValue(pub u64);
 
-#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct UtxoIndex(pub u16);
 
 #[derive(Debug, Clone)]

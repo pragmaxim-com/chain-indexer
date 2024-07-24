@@ -4,7 +4,7 @@ use bitcoin_hashes::Hash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BtcTx {
     pub height: BlockHeight, // expensive to calculate
     pub delegate: bitcoin::Block,

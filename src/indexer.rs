@@ -66,26 +66,28 @@ impl<InTx: Send, OutTx: Transaction + Send> Indexer<InTx, OutTx> {
         batch: &RefCell<RocksDbBatch>,
         winning_fork: &mut Vec<Rc<Block<OutTx>>>, // Use Rc for the vector as well
     ) -> Result<Vec<Rc<Block<OutTx>>>, String> {
-        let header = block.header;
         let prev_header: Option<BlockHeader> = self
             .service
-            .get_block_header_by_hash(&header.prev_hash, batch)
+            .get_block_header_by_hash(&block.header.prev_hash, batch)
             .unwrap();
 
-        if header.height.0 == 1 {
+        if block.header.height.0 == 1 {
             winning_fork.insert(0, Rc::clone(&block)); // Clone the Rc, not the block
             Ok(winning_fork.clone())
-        } else if prev_header.is_some_and(|ph| ph.height.0 == header.height.0 - 1) {
+        } else if prev_header
+            .as_ref()
+            .is_some_and(|ph| ph.height.0 == block.header.height.0 - 1)
+        {
             winning_fork.insert(0, Rc::clone(&block));
             Ok(winning_fork.clone())
         } else if prev_header.is_none() {
             info!(
                 "Fork detected at {}@{}, downloading parent {}",
-                header.height, header.hash, header.prev_hash,
+                block.header.height, block.header.hash, block.header.prev_hash,
             );
             let downloaded_prev_block = Rc::new(
                 self.chain_linker
-                    .get_processed_block_by_hash(header.prev_hash)?,
+                    .get_processed_block_by_hash(block.header.prev_hash)?,
             );
 
             winning_fork.insert(0, Rc::clone(&block));

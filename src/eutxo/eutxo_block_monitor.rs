@@ -30,12 +30,15 @@ impl BlockMonitor<EuTx> for EuBlockMonitor {
         let new_total_tx_count = total_tx_count.0 + tx_count;
         if new_total_tx_count > total_tx_count.1 + self.min_tx_count_report {
             *total_tx_count = (new_total_tx_count, new_total_tx_count);
-            let last_block = block_batch.last().unwrap().header;
+            let last_block = block_batch.last().unwrap();
             let total_time = self.start_time.elapsed().as_secs();
             let txs_per_sec = format!("{:.1}", new_total_tx_count as f64 / total_time as f64);
             info!(
                 "Block @ {} from {} at {} txs/sec, total {}",
-                last_block.height, last_block.timestamp, txs_per_sec, new_total_tx_count
+                last_block.header.height,
+                last_block.header.timestamp,
+                txs_per_sec,
+                new_total_tx_count
             );
         } else {
             *total_tx_count = (new_total_tx_count, total_tx_count.1);

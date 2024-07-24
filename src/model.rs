@@ -2,7 +2,7 @@ use chrono::DateTime;
 use core::fmt;
 use derive_more::{AsRef, Display, From, Into};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockHeader {
     pub height: BlockHeight,
     pub timestamp: BlockTimestamp,
@@ -47,7 +47,7 @@ impl fmt::Display for BlockHash {
 
 pub type TxCount = usize;
 
-#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct TxIndex(pub u16);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]

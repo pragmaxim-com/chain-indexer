@@ -153,7 +153,7 @@ impl<Tx: Transaction> BlockService<Tx> {
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<Option<BlockHeader>, rocksdb::Error> {
         if let Some(value) = self.block_by_hash_lru_cache.borrow_mut().get(block_hash) {
-            return Ok(Some(value.header));
+            return Ok(Some(value.header.clone()));
         } else {
             let batch = batch.borrow_mut();
             let header_bytes = batch.db_tx.get_cf(batch.block_pk_by_hash_cf, block_hash)?;
