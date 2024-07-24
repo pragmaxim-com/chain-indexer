@@ -17,13 +17,13 @@ use std::sync::Arc;
 
 pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 
-pub struct Indexer<InTx: Send + Clone, OutTx: Transaction + Send + Clone> {
+pub struct Indexer<InTx: Send, OutTx: Transaction + Send> {
     pub db_holder: Arc<Storage>,
     service: Arc<BlockService<OutTx>>,
     chain_linker: Arc<dyn ChainLinker<InTx = InTx, OutTx = OutTx> + Send + Sync>,
 }
 
-impl<InTx: Send + Clone, OutTx: Transaction + Send + Clone> Indexer<InTx, OutTx> {
+impl<InTx: Send, OutTx: Transaction + Send> Indexer<InTx, OutTx> {
     pub fn new(
         db: Arc<Storage>,
         service: Arc<BlockService<OutTx>>,

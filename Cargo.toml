@@ -43,5 +43,5 @@ name = "btc_processor_benchmark"
 harness = false
 
 [[bench]]
-name = "eutxo_indexer_benchmark"
+name = "indexer_benchmark"
 harness = false

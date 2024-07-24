@@ -9,13 +9,13 @@ use lru::LruCache;
 use std::{cell::RefCell, num::NonZeroUsize, sync::Arc};
 use std::{cell::RefMut, rc::Rc};
 
-pub struct BlockService<Tx: Transaction + Clone> {
+pub struct BlockService<Tx: Transaction> {
     pub(crate) tx_service: Arc<dyn TxService<Tx = Tx>>,
     pub(crate) block_by_hash_lru_cache: RefCell<LruCache<BlockHash, Rc<Block<Tx>>>>,
     pub(crate) tx_pk_by_tx_hash_lru_cache: RefCell<LruCache<TxHash, TxPkBytes>>,
 }
 
-impl<Tx: Transaction + Clone> BlockService<Tx> {
+impl<Tx: Transaction> BlockService<Tx> {
     pub fn new(service: Arc<dyn TxService<Tx = Tx>>) -> Self {
         BlockService {
             tx_service: service,

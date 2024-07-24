@@ -9,7 +9,7 @@ use crate::{
 };
 
 pub trait BlockchainClient {
-    type Tx: Send + Clone;
+    type Tx: Send;
 
     fn get_best_block(&self) -> Result<Block<Self::Tx>, String>;
 
@@ -18,8 +18,8 @@ pub trait BlockchainClient {
 }
 
 pub trait BlockProcessor {
-    type InTx: Send + Clone;
-    type OutTx: Send + Clone;
+    type InTx: Send;
+    type OutTx: Send;
 
     fn process(&self, block: &Block<Self::InTx>) -> Block<Self::OutTx>;
 
@@ -31,8 +31,8 @@ pub trait BlockProcessor {
 }
 
 pub trait ChainLinker {
-    type InTx: Send + Clone;
-    type OutTx: Send + Clone;
+    type InTx: Send;
+    type OutTx: Send;
 
     fn process_batch(
         &self,
@@ -47,7 +47,7 @@ pub trait ChainLinker {
     fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::OutTx>, String>;
 }
 pub trait TxService {
-    type Tx: Transaction + Clone;
+    type Tx: Transaction;
 
     fn get_txs_by_height(
         &self,
@@ -72,6 +72,6 @@ pub trait TxService {
     ) -> Result<(), rocksdb::Error>;
 }
 
-pub trait BlockMonitor<Tx: Clone> {
+pub trait BlockMonitor<Tx> {
     fn monitor(&self, block_batch: &Vec<Block<Tx>>, tx_count: &TxCount);
 }

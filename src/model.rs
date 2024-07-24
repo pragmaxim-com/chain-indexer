@@ -95,7 +95,7 @@ pub struct Block<T> {
     pub txs: Vec<T>,
 }
 
-impl<T: Clone> Block<T> {
+impl<T> Block<T> {
     pub fn new(header: BlockHeader, txs: Vec<T>) -> Self {
         Self { header, txs }
     }
