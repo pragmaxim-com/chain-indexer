@@ -31,7 +31,7 @@ impl<Tx: Transaction> BlockService<Tx> {
         &self,
         blocks: Vec<Rc<Block<Tx>>>,
         batch: &RefCell<RocksDbBatch>,
-    ) -> Result<(), String> {
+    ) -> Result<(), rocksdb::Error> {
         let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
         let mut block_height_by_hash_lru_cache = self.block_by_hash_lru_cache.borrow_mut();
         let mut batch = batch.borrow_mut();
@@ -54,12 +54,9 @@ impl<Tx: Transaction> BlockService<Tx> {
         block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
         batch: &mut RefMut<RocksDbBatch>,
-    ) -> Result<(), String> {
-        for tx in block.txs.iter() {
-            self.tx_service
-                .persist_tx(&block.header.height, tx, batch, tx_pk_by_tx_hash_lru_cache)
-                .map_err(|e| e.into_string())?;
-        }
+    ) -> Result<(), rocksdb::Error> {
+        self.tx_service
+            .persist_txs(&block, batch, tx_pk_by_tx_hash_lru_cache)?;
         self.persist_header(&block.header, batch)?;
         block_height_by_hash_lru_cache.put(block.header.hash, Rc::clone(&block));
         Ok(())
@@ -119,7 +116,8 @@ impl<Tx: Transaction> BlockService<Tx> {
 
         info!("Persisting {} blocks in new fork", blocks.len());
 
-        self.persist_blocks(blocks, batch)?;
+        self.persist_blocks(blocks, batch)
+            .map_err(|e| e.into_string())?;
 
         removed_blocks
     }
@@ -182,7 +180,7 @@ impl<Tx: Transaction> BlockService<Tx> {
         &self,
         block_header: &BlockHeader,
         batch: &mut RefMut<RocksDbBatch>,
-    ) -> Result<(), String> {
+    ) -> Result<(), rocksdb::Error> {
         let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
         let block_hash_by_pk_cf = batch.block_hash_by_pk_cf;
 
@@ -192,8 +190,7 @@ impl<Tx: Transaction> BlockService<Tx> {
             .put_cf(&block_hash_by_pk_cf, height_bytes, block_header.hash.0);
         batch
             .db_tx
-            .put_cf(batch.block_pk_by_hash_cf, block_header.hash.0, header_bytes)
-            .map_err(|e| e.to_string())?;
+            .put_cf(batch.block_pk_by_hash_cf, block_header.hash.0, header_bytes)?;
 
         Ok(())
     }

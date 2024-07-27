@@ -12,7 +12,7 @@ use crate::{
     db_index_manager::DbIndexManager,
     eutxo::eutxo_model::EuTx,
     model::{
-        AssetId, AssetValue, BlockHeight, DbIndexCfIndex, DbIndexValue, Transaction, TxHash,
+        AssetId, AssetValue, Block, BlockHeight, DbIndexCfIndex, DbIndexValue, Transaction, TxHash,
         TxIndex,
     },
     rocks_db_batch::RocksDbBatch,
@@ -515,6 +515,18 @@ impl TxService for EuTxService {
                 })
             })
             .collect()
+    }
+
+    fn persist_txs(
+        &self,
+        block: &Block<EuTx>,
+        batch: &mut RefMut<RocksDbBatch>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+    ) -> Result<(), rocksdb::Error> {
+        for tx in block.txs.iter() {
+            self.persist_tx(&block.header.height, tx, batch, tx_pk_by_tx_hash_lru_cache)?;
+        }
+        Ok(())
     }
 
     fn persist_tx(

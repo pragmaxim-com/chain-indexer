@@ -55,6 +55,13 @@ pub trait TxService {
         batch: &RefCell<RocksDbBatch>,
     ) -> Result<Vec<Self::Tx>, rocksdb::Error>;
 
+    fn persist_txs(
+        &self,
+        block: &Block<Self::Tx>,
+        batch: &mut RefMut<RocksDbBatch>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+    ) -> Result<(), rocksdb::Error>;
+
     fn persist_tx(
         &self,
         block_height: &BlockHeight,
