@@ -27,26 +27,40 @@ impl<Tx: Transaction> BlockService<Tx> {
         }
     }
 
+    pub(crate) fn persist_blocks(
+        &self,
+        blocks: Vec<Rc<Block<Tx>>>,
+        batch: &RefCell<RocksDbBatch>,
+    ) -> Result<(), String> {
+        let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
+        let mut block_height_by_hash_lru_cache = self.block_by_hash_lru_cache.borrow_mut();
+        let mut batch = batch.borrow_mut();
+
+        for block in blocks {
+            self.persist_block(
+                block,
+                &mut block_height_by_hash_lru_cache,
+                &mut tx_pk_by_tx_hash_lru_cache,
+                &mut batch,
+            )?;
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn persist_block(
         &self,
         block: Rc<Block<Tx>>,
-        batch: &RefCell<RocksDbBatch>,
+        block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
+        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        batch: &mut RefMut<RocksDbBatch>,
     ) -> Result<(), String> {
-        let mut batch = batch.borrow_mut();
-        let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
-        let mut block_height_by_hash_lru_cache = self.block_by_hash_lru_cache.borrow_mut();
-
         for tx in block.txs.iter() {
             self.tx_service
-                .persist_tx(
-                    &block.header.height,
-                    tx,
-                    &mut batch,
-                    &mut tx_pk_by_tx_hash_lru_cache,
-                )
+                .persist_tx(&block.header.height, tx, batch, tx_pk_by_tx_hash_lru_cache)
                 .map_err(|e| e.into_string())?;
         }
-        self.persist_header(&block.header, &mut batch)?;
+        self.persist_header(&block.header, batch)?;
         block_height_by_hash_lru_cache.put(block.header.hash, Rc::clone(&block));
         Ok(())
     }
@@ -104,9 +118,8 @@ impl<Tx: Transaction> BlockService<Tx> {
             .collect();
 
         info!("Persisting {} blocks in new fork", blocks.len());
-        for block in blocks.into_iter() {
-            self.persist_block(block, batch)?;
-        }
+
+        self.persist_blocks(blocks, batch)?;
 
         removed_blocks
     }

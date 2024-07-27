@@ -156,9 +156,7 @@ impl<InTx: Send, OutTx: Transaction + Send> Indexer<InTx, OutTx> {
                 0 => panic!("Blocks vector is empty"),
                 1 => {
                     let last_height = linked_blocks.last().unwrap().header.height;
-                    linked_blocks
-                        .into_iter()
-                        .for_each(|block| self.service.persist_block(block, &batch).unwrap());
+                    self.service.persist_blocks(linked_blocks, &batch).unwrap();
                     last_height
                 }
                 _ => {
