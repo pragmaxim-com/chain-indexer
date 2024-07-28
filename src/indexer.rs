@@ -128,9 +128,7 @@ impl<'db, CF: ChainFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
                     }
                     _ => {
                         let last_height = linked_blocks.last().unwrap().header.height;
-                        self.service
-                            .update_blocks(linked_blocks, &mut batch)
-                            .unwrap();
+                        self.service.update_blocks(linked_blocks, &batch).unwrap();
                         last_height
                     }
                 })
