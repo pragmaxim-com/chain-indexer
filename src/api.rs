@@ -5,7 +5,7 @@ use lru::LruCache;
 use crate::{
     codec_tx::TxPkBytes,
     model::{Block, BlockHash, BlockHeight, Transaction, TxCount, TxHash},
-    rocks_db_batch::RocksDbBatch,
+    rocks_db_batch::{ChainFamilies, RocksDbBatch},
 };
 
 pub trait BlockchainClient {
@@ -46,19 +46,20 @@ pub trait BlockProvider {
 
     fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::OutTx>, String>;
 }
-pub trait TxService {
+pub trait TxService<'db> {
+    type CF: ChainFamilies<'db>;
     type Tx: Transaction;
 
     fn get_txs_by_height(
         &self,
         block_height: &BlockHeight,
-        batch: &RefCell<RocksDbBatch>,
+        batch: &RocksDbBatch<'db, Self::CF>,
     ) -> Result<Vec<Self::Tx>, rocksdb::Error>;
 
     fn persist_txs(
         &self,
         block: &Block<Self::Tx>,
-        batch: &mut RefMut<RocksDbBatch>,
+        batch: &RocksDbBatch<'db, Self::CF>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
 
@@ -66,7 +67,7 @@ pub trait TxService {
         &self,
         block_height: &BlockHeight,
         tx: &Self::Tx,
-        batch: &mut RefMut<RocksDbBatch>,
+        batch: &RocksDbBatch<'db, Self::CF>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
 
@@ -74,11 +75,18 @@ pub trait TxService {
         &self,
         block_height: &BlockHeight,
         tx: &Self::Tx,
-        batch: &mut RefMut<RocksDbBatch>,
+        batch: &RocksDbBatch<'db, Self::CF>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
 }
 
 pub trait BlockMonitor<Tx> {
     fn monitor(&self, block_batch: &Vec<Block<Tx>>, tx_count: &TxCount);
+}
+
+pub trait BatchOperation<'db, CF: ChainFamilies<'db>> {
+    fn execute(
+        &self,
+        f: Box<dyn FnOnce(RocksDbBatch<'db, CF>) -> Result<(), String> + 'db>,
+    ) -> Result<(), String>;
 }

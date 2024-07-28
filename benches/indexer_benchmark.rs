@@ -1,14 +1,14 @@
-use std::{sync::Arc, time::Duration};
+use std::{fs, sync::Arc, time::Duration};
 
 use ci::{
     api::{BlockProcessor, BlockProvider, BlockchainClient},
     block_service::BlockService,
-    db_index_manager::DbIndexManager,
     eutxo::{
         btc::{
             btc_block_provider::BtcBlockProvider, btc_client::BtcClient,
             btc_processor::BtcProcessor,
         },
+        eutxo_index_manager::DbIndexManager,
         eutxo_model::{self, EuTx},
         eutxo_tx_service::EuTxService,
     },
@@ -28,6 +28,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     let api_password = blockchain.api_password;
     let db_path = format!("{}/{}/{}", blockchain.db_path, "benchmark", blockchain.name);
     let db_indexes = config.indexer.db_indexes;
+
+    fs::remove_dir_all(&db_path).unwrap();
 
     let btc_client = BtcClient::new(&api_host, &api_username, &api_password);
     let processor = BtcProcessor {};
@@ -70,7 +72,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     group.throughput(Throughput::Elements(batch_size as u64));
     group.warm_up_time(Duration::from_millis(100));
     group.measurement_time(Duration::from_millis(1000));
-    group.bench_function(BenchmarkId::from_parameter("processor"), |bencher| {
+    group.bench_function(BenchmarkId::from_parameter("indexing"), |bencher| {
         bencher.iter(|| {
             let xs = blocks.drain(0..10).collect();
             indexer.persist_blocks(xs, false)
