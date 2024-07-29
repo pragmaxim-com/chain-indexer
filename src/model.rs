@@ -106,3 +106,19 @@ pub trait Transaction {
     fn hash(&self) -> &TxHash;
     fn index(&self) -> &TxIndex;
 }
+
+pub const META_CF: &str = "META_CF";
+pub const BLOCK_HASH_BY_PK_CF: &str = "BLOCK_HASH_BY_PK_CF";
+pub const BLOCK_PK_BY_HASH_CF: &str = "BLOCK_PK_BY_HASH_CF";
+pub const TX_HASH_BY_PK_CF: &str = "TX_HASH_BY_PK_CF";
+pub const TX_PK_BY_HASH_CF: &str = "TX_PK_BY_HASH_CF";
+
+pub fn get_shared_column_families() -> Vec<&'static str> {
+    vec![
+        META_CF,
+        BLOCK_HASH_BY_PK_CF,
+        BLOCK_PK_BY_HASH_CF,
+        TX_HASH_BY_PK_CF,
+        TX_PK_BY_HASH_CF,
+    ]
+}

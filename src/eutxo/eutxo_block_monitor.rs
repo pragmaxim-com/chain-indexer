@@ -34,7 +34,8 @@ impl BlockMonitor<EuTx> for EuBlockMonitor {
             let total_time = self.start_time.elapsed().as_secs();
             let txs_per_sec = format!("{:.1}", new_total_tx_count as f64 / total_time as f64);
             info!(
-                "Block @ {} from {} at {} txs/sec, total {}",
+                "{} Blocks @ {} from {} at {} txs/sec, total {}",
+                block_batch.len(),
                 last_block.header.height,
                 last_block.header.timestamp,
                 txs_per_sec,
