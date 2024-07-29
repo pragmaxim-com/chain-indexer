@@ -1,6 +1,6 @@
 use rocksdb::ColumnFamily;
 
-use crate::rocks_db_batch::ChainFamilies;
+use crate::rocks_db_batch::CustomFamilies;
 
 pub struct EutxoFamilies<'db> {
     pub(crate) utxo_value_by_pk_cf: &'db ColumnFamily,
@@ -14,4 +14,4 @@ pub struct EutxoFamilies<'db> {
     pub(crate) asset_birth_pk_with_asset_pk_cf: &'db ColumnFamily,
 }
 
-impl<'db> ChainFamilies<'db> for EutxoFamilies<'db> {}
+impl<'db> CustomFamilies<'db> for EutxoFamilies<'db> {}

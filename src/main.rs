@@ -1,16 +1,14 @@
-use ci::api::{BatchExecutor, BlockProvider};
+use ci::api::Storage;
 use ci::block_service::BlockService;
-use ci::db_options;
 use ci::eutxo::btc::btc_block_provider::BtcBlockProvider;
-use ci::eutxo::eutxo_batch_executor::EutxoBatchExecutor;
 use ci::eutxo::eutxo_block_monitor::EuBlockMonitor;
 use ci::eutxo::eutxo_index_manager::DbIndexManager;
-use ci::eutxo::eutxo_model::{self, EuTx};
+use ci::eutxo::eutxo_model::EuTx;
 use ci::eutxo::eutxo_tx_service::EuTxService;
 use ci::indexer::Indexer;
 use ci::settings::AppConfig;
-use ci::storage::Storage;
 use ci::syncer::ChainSyncer;
+use ci::{api::BlockProvider, eutxo::eutxo_storage};
 use std::sync::Arc;
 
 #[tokio::main]
@@ -30,30 +28,16 @@ async fn main() -> Result<(), std::io::Error> {
 
             match blockchain.name.as_str() {
                 "btc" => {
-                    let db_index_manager = Arc::new(DbIndexManager::new(&db_indexes));
-                    let options: db_options::get_db_options();
-                    let existing_cfs =
-                        OptimisticTransactionDB::<SingleThreaded>::list_cf(&options, db_path)
-                            .unwrap_or(vec![]);
+                    let db_index_manager = DbIndexManager::new(&db_indexes);
 
-                    let mut db = OptimisticTransactionDB::<SingleThreaded>::open_cf(
-                        &options,
-                        db_path,
-                        &existing_cfs,
-                    )
-                    .unwrap();
-
-                    let batch_executor = Arc::new(EutxoBatchExecutor::new(
-                        &mut db,
-                        options,
-                        db_indexes,
-                        existing_cfs,
-                    ));
-                    let tx_service: Arc<EuTxService> = Arc::new(EuTxService {
-                        db_index_manager: Arc::clone(&db_index_manager),
-                    });
-                    let block_service: Arc<BlockService<EuTx>> =
-                        Arc::new(BlockService::new(tx_service));
+                    let db = eutxo_storage::get_db(&db_index_manager, &db_path);
+                    let families = eutxo_storage::get_families(&db_index_manager, &db);
+                    let storage = Storage {
+                        db: &db,
+                        families: &families,
+                    };
+                    let tx_service: Arc<EuTxService> = Arc::new(EuTxService {});
+                    let block_service = Arc::new(BlockService::new(tx_service));
 
                     let block_provider: Arc<
                         dyn BlockProvider<InTx = bitcoin::Transaction, OutTx = EuTx> + Send + Sync,
@@ -66,8 +50,7 @@ async fn main() -> Result<(), std::io::Error> {
                         Arc::clone(&block_provider),
                         Arc::new(EuBlockMonitor::new(1000)),
                         Arc::new(Indexer::new(
-                            Arc::clone(&batch_executor.db),
-                            batch_executor,
+                            &storage,
                             block_service,
                             Arc::clone(&block_provider),
                         )),

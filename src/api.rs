@@ -1,11 +1,10 @@
-use std::cell::{RefCell, RefMut};
-
 use lru::LruCache;
+use rocksdb::{OptimisticTransactionDB, SingleThreaded, WriteBatchWithTransaction};
 
 use crate::{
     codec_tx::TxPkBytes,
     model::{Block, BlockHash, BlockHeight, Transaction, TxCount, TxHash},
-    rocks_db_batch::{ChainFamilies, RocksDbBatch},
+    rocks_db_batch::{CustomFamilies, Families},
 };
 
 pub trait BlockchainClient {
@@ -47,19 +46,22 @@ pub trait BlockProvider {
     fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::OutTx>, String>;
 }
 pub trait TxService<'db> {
-    type CF: ChainFamilies<'db>;
+    type CF: CustomFamilies<'db>;
     type Tx: Transaction;
 
     fn get_txs_by_height(
         &self,
         block_height: &BlockHeight,
-        batch: &RocksDbBatch<'db, Self::CF>,
+        families: &Families<'db, Self::CF>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
     ) -> Result<Vec<Self::Tx>, rocksdb::Error>;
 
     fn persist_txs(
         &self,
         block: &Block<Self::Tx>,
-        batch: &RocksDbBatch<'db, Self::CF>,
+        families: &Families<'db, Self::CF>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
+        batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
 
@@ -67,7 +69,9 @@ pub trait TxService<'db> {
         &self,
         block_height: &BlockHeight,
         tx: &Self::Tx,
-        batch: &RocksDbBatch<'db, Self::CF>,
+        families: &Families<'db, Self::CF>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
+        batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
 
@@ -75,7 +79,8 @@ pub trait TxService<'db> {
         &self,
         block_height: &BlockHeight,
         tx: &Self::Tx,
-        batch: &RocksDbBatch<'db, Self::CF>,
+        families: &Families<'db, Self::CF>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
 }
@@ -84,9 +89,7 @@ pub trait BlockMonitor<Tx> {
     fn monitor(&self, block_batch: &Vec<Block<Tx>>, tx_count: &TxCount);
 }
 
-pub trait BatchOperation<'db, CF: ChainFamilies<'db>> {
-    fn execute(
-        &self,
-        f: Box<dyn FnOnce(RocksDbBatch<'db, CF>) -> Result<(), String> + 'db>,
-    ) -> Result<(), String>;
+pub struct Storage<'db, CF: CustomFamilies<'db>> {
+    pub db: &'db OptimisticTransactionDB<SingleThreaded>,
+    pub families: &'db Families<'db, CF>,
 }

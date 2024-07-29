@@ -1,13 +1,7 @@
-use std::cell::RefCell;
-use std::cell::RefMut;
-
 use rocksdb::ColumnFamily;
-use rocksdb::OptimisticTransactionDB;
-use rocksdb::Transaction;
-use rocksdb::WriteBatchWithTransaction;
 
 // Define a trait for blockchain-specific fields
-pub trait ChainFamilies<'db> {}
+pub trait CustomFamilies<'db> {}
 
 pub struct SharedFamilies<'db> {
     pub(crate) meta_cf: &'db ColumnFamily,
@@ -17,12 +11,10 @@ pub struct SharedFamilies<'db> {
     pub(crate) tx_pk_by_hash_cf: &'db ColumnFamily,
 }
 
-pub struct RocksDbBatch<'db, CF>
+pub struct Families<'db, CF>
 where
-    CF: ChainFamilies<'db>,
+    CF: CustomFamilies<'db>,
 {
-    pub(crate) db_tx: RefCell<Transaction<'db, OptimisticTransactionDB>>,
-    pub(crate) batch: RefCell<WriteBatchWithTransaction<true>>,
     pub(crate) shared: SharedFamilies<'db>,
     pub(crate) custom: CF,
 }

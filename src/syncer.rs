@@ -3,7 +3,7 @@ use crate::{
     indexer::Indexer,
     info,
     model::Transaction,
-    rocks_db_batch::ChainFamilies,
+    rocks_db_batch::CustomFamilies,
 };
 use futures::stream::StreamExt;
 
@@ -15,7 +15,7 @@ use std::sync::{
 
 pub struct ChainSyncer<
     'db,
-    CF: ChainFamilies<'db>,
+    CF: CustomFamilies<'db>,
     InTx: Send + 'static,
     OutTx: Transaction + Send + 'static,
 > {
@@ -25,7 +25,7 @@ pub struct ChainSyncer<
     pub indexer: Arc<Indexer<'db, CF, InTx, OutTx>>,
 }
 
-impl<'db, CF: ChainFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Send + 'static>
+impl<'db, CF: CustomFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Send + 'static>
     ChainSyncer<'db, CF, InTx, OutTx>
 {
     pub fn new(
@@ -86,9 +86,8 @@ impl<'db, CF: ChainFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Sen
         if !self.is_shutdown.load(Ordering::SeqCst) {
             info!("Acquiring db lock for flushing closing...");
             self.indexer
+                .storage
                 .db
-                .write()
-                .unwrap()
                 .flush()
                 .expect("Failed to flush RocksDB");
             self.is_shutdown.store(true, Ordering::SeqCst);
@@ -97,7 +96,7 @@ impl<'db, CF: ChainFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Sen
     }
 }
 
-impl<'db, CF: ChainFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Send + 'static> Drop
+impl<'db, CF: CustomFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Send + 'static> Drop
     for ChainSyncer<'db, CF, InTx, OutTx>
 {
     fn drop(&mut self) {

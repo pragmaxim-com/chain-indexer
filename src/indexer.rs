@@ -1,43 +1,39 @@
 use rocksdb::OptimisticTransactionDB;
-use rocksdb::SingleThreaded;
+use rocksdb::OptimisticTransactionOptions;
+use rocksdb::WriteOptions;
 
-use crate::api::BatchOperation;
 use crate::api::BlockProvider;
+use crate::api::Storage;
 use crate::block_service::BlockService;
 use crate::codec_block;
 use crate::info;
 use crate::model::BlockHeader;
 use crate::model::Transaction;
-use crate::model::META_CF;
 use crate::model::{Block, BlockHeight};
-use crate::rocks_db_batch::ChainFamilies;
-use crate::rocks_db_batch::RocksDbBatch;
+use crate::rocks_db_batch::CustomFamilies;
+use crate::rocks_db_batch::Families;
 use std::rc::Rc;
 
 use std::sync::Arc;
-use std::sync::RwLock;
 
 pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
 
-pub struct Indexer<'db, CF: ChainFamilies<'db>, InTx: Send, OutTx: Transaction + Send> {
-    pub db: Arc<RwLock<OptimisticTransactionDB<SingleThreaded>>>,
-    batch_executor: Arc<dyn BatchOperation<'db, CF>>,
+pub struct Indexer<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send> {
+    pub storage: &'db Storage<'db, CF>,
     service: Arc<BlockService<'db, OutTx, CF>>,
     block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
 }
 
-impl<'db, CF: ChainFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
+impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
     Indexer<'db, CF, InTx, OutTx>
 {
     pub fn new(
-        db: Arc<RwLock<OptimisticTransactionDB<SingleThreaded>>>,
-        batch_executor: Arc<dyn BatchOperation<'db, CF>>,
+        storage: &'db Storage<'db, CF>,
         service: Arc<BlockService<'db, OutTx, CF>>,
         block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
     ) -> Self {
         Indexer {
-            db,
-            batch_executor,
+            storage,
             service,
             block_provider,
         }
@@ -46,11 +42,11 @@ impl<'db, CF: ChainFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
     fn persist_last_height(
         &self,
         height: BlockHeight,
-        batch: &RocksDbBatch<'db, CF>,
+        families: &Families<'db, CF>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
     ) -> Result<(), rocksdb::Error> {
-        let db_tx = batch.db_tx.borrow();
         db_tx.put_cf(
-            batch.shared.meta_cf,
+            families.shared.meta_cf,
             LAST_ADDRESS_HEIGHT_KEY,
             codec_block::block_height_to_bytes(&height),
         )?;
@@ -58,8 +54,12 @@ impl<'db, CF: ChainFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
     }
 
     pub fn get_last_height(&self) -> BlockHeight {
-        let db = self.db.read().unwrap();
-        db.get_cf(db.cf_handle(META_CF).unwrap(), LAST_ADDRESS_HEIGHT_KEY)
+        self.storage
+            .db
+            .get_cf(
+                self.storage.families.shared.meta_cf,
+                LAST_ADDRESS_HEIGHT_KEY,
+            )
             .unwrap()
             .map_or(0.into(), |height| {
                 codec_block::bytes_to_block_height(&height)
@@ -69,12 +69,12 @@ impl<'db, CF: ChainFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
     fn chain_link(
         &self,
         block: Rc<Block<OutTx>>, // Use Rc to manage ownership and avoid lifetimes issues
-        batch: &RocksDbBatch<'db, CF>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
         winning_fork: &mut Vec<Rc<Block<OutTx>>>, // Use Rc for the vector as well
     ) -> Result<Vec<Rc<Block<OutTx>>>, String> {
         let prev_header: Option<BlockHeader> = self
             .service
-            .get_block_header_by_hash(&block.header.prev_hash, batch)
+            .get_block_header_by_hash(&block.header.prev_hash, self.storage.families, db_tx)
             .unwrap();
 
         if block.header.height.0 == 1 {
@@ -97,7 +97,7 @@ impl<'db, CF: ChainFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
             );
 
             winning_fork.insert(0, Rc::clone(&block));
-            self.chain_link(downloaded_prev_block, batch, winning_fork)
+            self.chain_link(downloaded_prev_block, db_tx, winning_fork)
         } else {
             panic!("Unexpected condition") // todo pretty print blocks
         }
@@ -108,41 +108,53 @@ impl<'db, CF: ChainFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
         blocks: Vec<Block<OutTx>>,
         chain_link: bool,
     ) -> Result<(), String> {
-        self.batch_executor.execute(Box::new(|batch| {
-            let last_block_height = blocks
-                .into_iter()
-                .map(|block| {
-                    if chain_link {
-                        self.chain_link(Rc::new(block), &batch, &mut vec![])
-                            .unwrap()
-                    } else {
-                        vec![Rc::new(block)]
-                    }
-                })
-                .map(|linked_blocks| match linked_blocks.len() {
-                    0 => panic!("Blocks vector is empty"),
-                    1 => {
-                        let last_height = linked_blocks.last().unwrap().header.height;
-                        self.service.persist_blocks(linked_blocks, &batch).unwrap();
-                        last_height
-                    }
-                    _ => {
-                        let last_height = linked_blocks.last().unwrap().header.height;
-                        self.service.update_blocks(linked_blocks, &batch).unwrap();
-                        last_height
-                    }
-                })
-                .last();
+        let mut write_options = WriteOptions::default();
+        write_options.disable_wal(true);
 
-            // persist last height to db_tx and commit
-            if let Some(height) = last_block_height {
-                self.persist_last_height(height, &batch)
-                    .map_err(|e| e.into_string())?;
-                batch.db_tx.borrow().commit().map_err(|e| e.into_string())?;
-                // db.compact_range_cf_opt(cf, start, end, opts)
-                // db.flush()?
-            }
-            Ok(())
-        }))
+        let db_tx = self
+            .storage
+            .db
+            .transaction_opt(&write_options, &OptimisticTransactionOptions::default());
+
+        let mut batch = db_tx.get_writebatch();
+
+        let last_block_height = blocks
+            .into_iter()
+            .map(|block| {
+                if chain_link {
+                    self.chain_link(Rc::new(block), &db_tx, &mut vec![])
+                        .unwrap()
+                } else {
+                    vec![Rc::new(block)]
+                }
+            })
+            .map(|linked_blocks| match linked_blocks.len() {
+                0 => panic!("Blocks vector is empty"),
+                1 => {
+                    let last_height = linked_blocks.last().unwrap().header.height;
+                    self.service
+                        .persist_blocks(linked_blocks, self.storage.families, &db_tx, &mut batch)
+                        .unwrap();
+                    last_height
+                }
+                _ => {
+                    let last_height = linked_blocks.last().unwrap().header.height;
+                    self.service
+                        .update_blocks(linked_blocks, self.storage.families, &db_tx, &mut batch)
+                        .unwrap();
+                    last_height
+                }
+            })
+            .last();
+
+        // persist last height to db_tx and commit
+        if let Some(height) = last_block_height {
+            self.persist_last_height(height, self.storage.families, &db_tx)
+                .map_err(|e| e.into_string())?;
+            db_tx.commit().map_err(|e| e.into_string())?;
+            // db.compact_range_cf_opt(cf, start, end, opts)
+            // db.flush()?
+        }
+        Ok(())
     }
 }

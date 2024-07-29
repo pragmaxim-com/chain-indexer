@@ -2,7 +2,7 @@ use rocksdb::Options;
 
 use crate::info;
 
-fn get_db_options() -> Options {
+pub fn get_db_options() -> Options {
     let num_cores = num_cpus::get() as i32;
     info!("Number of CPU cores: {}", num_cores);
 
