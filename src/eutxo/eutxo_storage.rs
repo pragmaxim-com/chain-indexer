@@ -1,4 +1,4 @@
-use rocksdb::{ColumnFamily, OptimisticTransactionDB, SingleThreaded};
+use rocksdb::{ColumnFamily, OptimisticTransactionDB, Options, SingleThreaded};
 
 use crate::{
     db_options,
@@ -23,28 +23,41 @@ pub fn get_db(
             .unwrap();
 
     if existing_cfs.is_empty() {
-        let mut cfs: Vec<&str> = model::get_shared_column_families();
-        let mut eutxo_cfs: Vec<&str> = eutxo_model::get_eutxo_column_families();
+        let mut cf_compaction_enabled_opts = Options::default();
+        cf_compaction_enabled_opts.set_disable_auto_compactions(false);
+        let mut cfs = model::get_shared_column_families();
+        let mut eutxo_cfs = eutxo_model::get_eutxo_column_families();
         cfs.append(&mut eutxo_cfs);
-        for cf in cfs.into_iter() {
-            info!("Creating column family: {}", cf);
-            db.create_cf(cf, &options).unwrap();
+        for (cf, compaction) in cfs.into_iter() {
+            info!("Creating column family {}, compaction {}", cf, compaction);
+            if compaction {
+                db.create_cf(cf, &cf_compaction_enabled_opts).unwrap();
+            } else {
+                db.create_cf(cf, &options).unwrap();
+            }
         }
         for index_utxo_birth_pk_with_utxo_pk in db_index_manager.utxo_birth_pk_relations.iter() {
             info!(
-                "Creating column family: {}",
-                index_utxo_birth_pk_with_utxo_pk
+                "Creating column family {}, compaction {}",
+                index_utxo_birth_pk_with_utxo_pk, false
             );
             db.create_cf(index_utxo_birth_pk_with_utxo_pk, &options)
                 .unwrap();
         }
         for index_by_utxo_birth_pk in db_index_manager.index_by_utxo_birth_pk.iter() {
-            info!("Creating column family: {}", index_by_utxo_birth_pk);
+            info!(
+                "Creating column family {}, compaction {}",
+                index_by_utxo_birth_pk, false
+            );
             db.create_cf(index_by_utxo_birth_pk, &options).unwrap();
         }
         for utxo_birth_pk_by_index in db_index_manager.utxo_birth_pk_by_index.iter() {
-            info!("Creating column family: {}", utxo_birth_pk_by_index);
-            db.create_cf(utxo_birth_pk_by_index, &options).unwrap();
+            info!(
+                "Creating column family {}, compaction {}",
+                utxo_birth_pk_by_index, true
+            );
+            db.create_cf(utxo_birth_pk_by_index, &cf_compaction_enabled_opts)
+                .unwrap();
         }
     }
     db

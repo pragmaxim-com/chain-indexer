@@ -29,7 +29,6 @@ async fn main() -> Result<(), std::io::Error> {
             match blockchain.name.as_str() {
                 "btc" => {
                     let db_index_manager = DbIndexManager::new(&db_indexes);
-
                     let db = eutxo_storage::get_db(&db_index_manager, &db_path);
                     let families = eutxo_storage::get_families(&db_index_manager, &db);
                     let storage = Storage {

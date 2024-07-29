@@ -1,5 +1,6 @@
 use crate::model::{
-    AssetId, AssetValue, DbIndexCfIndex, DbIndexValue, Transaction, TxHash, TxIndex,
+    AssetId, AssetValue, CompactionEnabled, DbIndexCfIndex, DbIndexValue, Transaction, TxHash,
+    TxIndex,
 };
 use derive_more::{AsRef, Display, From, Into};
 
@@ -55,13 +56,13 @@ pub const ASSET_ID_BY_ASSET_BIRTH_PK_CF: &str = "ASSET_ID_BY_ASSET_BIRTH_PK_CF";
 pub const ASSET_BIRTH_PK_BY_ASSET_ID_CF: &str = "ASSET_BIRTH_PK_BY_ASSET_ID_CF";
 pub const ASSET_BIRTH_PK_WITH_ASSET_PK_CF: &str = "ASSET_BIRTH_PK_WITH_ASSET_PK_CF";
 
-pub fn get_eutxo_column_families() -> Vec<&'static str> {
+pub fn get_eutxo_column_families() -> Vec<(&'static str, CompactionEnabled)> {
     vec![
-        UTXO_VALUE_BY_PK_CF,
-        UTXO_PK_BY_INPUT_PK_CF,
-        ASSETS_BY_UTXO_PK_CF,
-        ASSET_ID_BY_ASSET_BIRTH_PK_CF,
-        ASSET_BIRTH_PK_BY_ASSET_ID_CF,
-        ASSET_BIRTH_PK_WITH_ASSET_PK_CF,
+        (UTXO_VALUE_BY_PK_CF, false),
+        (UTXO_PK_BY_INPUT_PK_CF, false),
+        (ASSETS_BY_UTXO_PK_CF, false),
+        (ASSET_ID_BY_ASSET_BIRTH_PK_CF, false),
+        (ASSET_BIRTH_PK_BY_ASSET_ID_CF, true),
+        (ASSET_BIRTH_PK_WITH_ASSET_PK_CF, false),
     ]
 }

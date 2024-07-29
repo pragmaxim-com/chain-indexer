@@ -1,7 +1,7 @@
 use std::{fs, sync::Arc, time::Duration};
 
 use ci::{
-    api::{BlockProcessor, BlockProvider, BlockchainClient},
+    api::{BlockProcessor, BlockProvider, BlockchainClient, Storage},
     block_service::BlockService,
     eutxo::{
         btc::{
@@ -9,14 +9,14 @@ use ci::{
             btc_processor::BtcProcessor,
         },
         eutxo_index_manager::DbIndexManager,
-        eutxo_model::{self, EuTx},
+        eutxo_model::EuTx,
+        eutxo_storage,
         eutxo_tx_service::EuTxService,
     },
     indexer::Indexer,
     info,
     model::Block,
     settings,
-    storage::Storage,
 };
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
@@ -33,16 +33,17 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let btc_client = BtcClient::new(&api_host, &api_username, &api_password);
     let processor = BtcProcessor {};
-    let db_index_manager = Arc::new(DbIndexManager::new(&db_indexes));
-    let db_holder = Arc::new(Storage::new(
-        &db_path,
-        Arc::clone(&db_index_manager),
-        eutxo_model::get_eutxo_column_families(),
-    ));
-    let tx_service: Arc<EuTxService> = Arc::new(EuTxService {
-        db_index_manager: Arc::clone(&db_index_manager),
-    });
-    let block_service: Arc<BlockService<EuTx>> = Arc::new(BlockService::new(tx_service));
+    let db_index_manager = DbIndexManager::new(&db_indexes);
+    let db = eutxo_storage::get_db(&db_index_manager, &db_path);
+    let get_families = eutxo_storage::get_families(&db_index_manager, &db);
+    let families = get_families;
+    let storage = Storage {
+        db: &db,
+        families: &families,
+    };
+    let tx_service: Arc<EuTxService> = Arc::new(EuTxService {});
+    let block_service = Arc::new(BlockService::new(tx_service));
+
     let block_provider: Arc<
         dyn BlockProvider<InTx = bitcoin::Transaction, OutTx = EuTx> + Send + Sync,
     > = Arc::new(BtcBlockProvider::new(
@@ -50,8 +51,9 @@ fn criterion_benchmark(c: &mut Criterion) {
         &api_username,
         &api_password,
     ));
+
     let indexer = Arc::new(Indexer::new(
-        db_holder,
+        &storage,
         block_service,
         Arc::clone(&block_provider),
     ));
