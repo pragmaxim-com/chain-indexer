@@ -108,8 +108,8 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
         blocks: Vec<Block<OutTx>>,
         chain_link: bool,
     ) -> Result<(), String> {
-        let mut write_options = WriteOptions::default();
-        write_options.disable_wal(true);
+        let write_options = WriteOptions::default();
+        // write_options.disable_wal(true); // should improve performance but I cannot flush memtable to disk
 
         let db_tx = self
             .storage
@@ -151,9 +151,15 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
         if let Some(height) = last_block_height {
             self.persist_last_height(height, self.storage.families, &db_tx)
                 .map_err(|e| e.into_string())?;
-            db_tx.commit().map_err(|e| e.into_string())?;
+
+            db_tx.commit().map_err(|e| {
+                eprintln!("Failed to commit transaction: {}", e);
+                e.into_string()
+            })?;
+            // let mut flush_options = FlushOptions::default();
+            // flush_options.set_wait(true);
+            // self.storage.db.flush_opt(&flush_options)?;
             // db.compact_range_cf_opt(cf, start, end, opts)
-            // db.flush()?
         }
         Ok(())
     }

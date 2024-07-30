@@ -12,16 +12,21 @@ impl DbIndexManager {
     pub fn new(db_indexes: &Vec<DbIndexUtxoBirthPkWithUtxoPkCf>) -> Self {
         let utxo_birth_pk_by_index = db_indexes
             .into_iter()
-            .map(|index_name| format!("utxo_birth_pk_by_{}", index_name))
+            .map(|index_name| format!("UTXO_BIRTH_PK_BY_{}", index_name))
             .collect();
 
         let index_by_utxo_birth_pk = db_indexes
             .into_iter()
-            .map(|index_name| format!("{}_by_utxo_birth_pk", index_name))
+            .map(|index_name| format!("{}_BY_UTXO_BIRTH_PK", index_name))
+            .collect();
+
+        let utxo_birth_pk_relations = db_indexes
+            .into_iter()
+            .map(|index_name| format!("{}_RELATIONS", index_name))
             .collect();
 
         DbIndexManager {
-            utxo_birth_pk_relations: db_indexes.clone(),
+            utxo_birth_pk_relations,
             utxo_birth_pk_by_index,
             index_by_utxo_birth_pk,
         }
