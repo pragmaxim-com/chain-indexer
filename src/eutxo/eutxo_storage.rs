@@ -25,10 +25,10 @@ pub fn get_db(
     if existing_cfs.is_empty() {
         let mut cf_compaction_enabled_opts = Options::default();
         cf_compaction_enabled_opts.set_disable_auto_compactions(false);
-        let mut cfs = model::get_shared_column_families();
-        let mut eutxo_cfs = eutxo_model::get_eutxo_column_families();
-        cfs.append(&mut eutxo_cfs);
-        for (cf, compaction) in cfs.into_iter() {
+        let shared_cfs = model::get_shared_column_families();
+        let eutxo_cfs = eutxo_model::get_eutxo_column_families();
+        let all_cfs = [shared_cfs, eutxo_cfs].concat();
+        for (cf, compaction) in all_cfs.into_iter() {
             info!("Creating column family {}, compaction {}", cf, compaction);
             if compaction {
                 db.create_cf(cf, &cf_compaction_enabled_opts).unwrap();

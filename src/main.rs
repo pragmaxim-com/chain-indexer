@@ -6,9 +6,11 @@ use ci::eutxo::eutxo_index_manager::DbIndexManager;
 use ci::eutxo::eutxo_model::EuTx;
 use ci::eutxo::eutxo_tx_service::EuTxService;
 use ci::indexer::Indexer;
+use ci::info;
 use ci::settings::AppConfig;
 use ci::syncer::ChainSyncer;
 use ci::{api::BlockProvider, eutxo::eutxo_storage};
+use rocksdb::{FlushOptions, OptimisticTransactionDB, SingleThreaded};
 use std::sync::Arc;
 
 #[tokio::main]
@@ -30,7 +32,7 @@ async fn main() -> Result<(), std::io::Error> {
                 "btc" => {
                     let db_index_manager = DbIndexManager::new(&db_indexes);
                     let db = eutxo_storage::get_db(&db_index_manager, &db_path);
-                    let families = eutxo_storage::get_families(&db_index_manager, &db);
+                    let families = Arc::new(eutxo_storage::get_families(&db_index_manager, &db));
                     let storage = Storage {
                         db: &db,
                         families: &families,
@@ -54,6 +56,24 @@ async fn main() -> Result<(), std::io::Error> {
                             Arc::clone(&block_provider),
                         )),
                     );
+                    tokio::task::spawn(async move {
+                        match tokio::signal::ctrl_c().await {
+                            Ok(()) => {
+                                info!("Received interrupt signal");
+                                let opts = FlushOptions::default();
+                                let all_cfs = eutxo_storage::get_families(&db_index_manager, &db);
+                                db.flush_cfs_opt(&all_cfs.get_all_families(), &opts)
+                                    .unwrap();
+                                info!("RocksDB successfully flushed and closed.");
+                                std::process::exit(0);
+                            }
+                            Err(err) => {
+                                eprintln!("Unable to listen for shutdown signal: {}", err);
+                                std::process::exit(1);
+                            }
+                        }
+                    });
+
                     syncer.sync(tx_batch_size).await;
                     Ok(())
                 }

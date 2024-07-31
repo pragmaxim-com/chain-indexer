@@ -108,8 +108,8 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
         blocks: Vec<Block<OutTx>>,
         chain_link: bool,
     ) -> Result<(), String> {
-        let write_options = WriteOptions::default();
-        // write_options.disable_wal(true); // should improve performance but I cannot flush memtable to disk
+        let mut write_options = WriteOptions::default();
+        write_options.disable_wal(true);
 
         let db_tx = self
             .storage
@@ -156,9 +156,7 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
                 eprintln!("Failed to commit transaction: {}", e);
                 e.into_string()
             })?;
-            // let mut flush_options = FlushOptions::default();
-            // flush_options.set_wait(true);
-            // self.storage.db.flush_opt(&flush_options)?;
+            // self.storage.db.flush_cfs_opt(cfs, opts)
             // db.compact_range_cf_opt(cf, start, end, opts)
         }
         Ok(())
