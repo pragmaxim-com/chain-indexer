@@ -1,5 +1,7 @@
+use std::sync::Arc;
+
 use lru::LruCache;
-use rocksdb::{OptimisticTransactionDB, SingleThreaded, WriteBatchWithTransaction};
+use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction};
 
 use crate::{
     codec_tx::TxPkBytes,
@@ -52,15 +54,13 @@ pub trait TxService<'db> {
     fn get_txs_by_height(
         &self,
         block_height: &BlockHeight,
-        families: &Families<'db, Self::CF>,
-        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB<MultiThreaded>>,
     ) -> Result<Vec<Self::Tx>, rocksdb::Error>;
 
     fn persist_txs(
         &self,
         block: &Block<Self::Tx>,
-        families: &Families<'db, Self::CF>,
-        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
@@ -69,8 +69,7 @@ pub trait TxService<'db> {
         &self,
         block_height: &BlockHeight,
         tx: &Self::Tx,
-        families: &Families<'db, Self::CF>,
-        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
@@ -79,8 +78,7 @@ pub trait TxService<'db> {
         &self,
         block_height: &BlockHeight,
         tx: &Self::Tx,
-        families: &Families<'db, Self::CF>,
-        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB<MultiThreaded>>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
     ) -> Result<(), rocksdb::Error>;
 }
@@ -90,6 +88,6 @@ pub trait BlockMonitor<Tx> {
 }
 
 pub struct Storage<'db, CF: CustomFamilies<'db>> {
-    pub db: &'db OptimisticTransactionDB<SingleThreaded>,
+    pub db: Arc<OptimisticTransactionDB<MultiThreaded>>,
     pub families: &'db Families<'db, CF>,
 }

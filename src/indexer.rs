@@ -1,3 +1,4 @@
+use rocksdb::MultiThreaded;
 use rocksdb::OptimisticTransactionDB;
 use rocksdb::OptimisticTransactionOptions;
 use rocksdb::WriteOptions;
@@ -11,7 +12,6 @@ use crate::model::BlockHeader;
 use crate::model::Transaction;
 use crate::model::{Block, BlockHeight};
 use crate::rocks_db_batch::CustomFamilies;
-use crate::rocks_db_batch::Families;
 use std::rc::Rc;
 
 use std::sync::Arc;
@@ -42,11 +42,10 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
     fn persist_last_height(
         &self,
         height: BlockHeight,
-        families: &Families<'db, CF>,
-        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB<MultiThreaded>>,
     ) -> Result<(), rocksdb::Error> {
         db_tx.put_cf(
-            families.shared.meta_cf,
+            &self.storage.families.shared.meta_cf,
             LAST_ADDRESS_HEIGHT_KEY,
             codec_block::block_height_to_bytes(&height),
         )?;
@@ -57,7 +56,7 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
         self.storage
             .db
             .get_cf(
-                self.storage.families.shared.meta_cf,
+                &self.storage.families.shared.meta_cf,
                 LAST_ADDRESS_HEIGHT_KEY,
             )
             .unwrap()
@@ -69,12 +68,12 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
     fn chain_link(
         &self,
         block: Rc<Block<OutTx>>, // Use Rc to manage ownership and avoid lifetimes issues
-        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB>,
+        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB<MultiThreaded>>,
         winning_fork: &mut Vec<Rc<Block<OutTx>>>, // Use Rc for the vector as well
     ) -> Result<Vec<Rc<Block<OutTx>>>, String> {
         let prev_header: Option<BlockHeader> = self
             .service
-            .get_block_header_by_hash(&block.header.prev_hash, self.storage.families, db_tx)
+            .get_block_header_by_hash(&block.header.prev_hash, db_tx)
             .unwrap();
 
         if block.header.height.0 == 1 {
@@ -111,7 +110,7 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
         let mut write_options = WriteOptions::default();
         write_options.disable_wal(true);
 
-        let db_tx = self
+        let db_tx: rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>> = self
             .storage
             .db
             .transaction_opt(&write_options, &OptimisticTransactionOptions::default());
@@ -133,14 +132,14 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
                 1 => {
                     let last_height = linked_blocks.last().unwrap().header.height;
                     self.service
-                        .persist_blocks(linked_blocks, self.storage.families, &db_tx, &mut batch)
+                        .persist_blocks(linked_blocks, &db_tx, &mut batch)
                         .unwrap();
                     last_height
                 }
                 _ => {
                     let last_height = linked_blocks.last().unwrap().header.height;
                     self.service
-                        .update_blocks(linked_blocks, self.storage.families, &db_tx, &mut batch)
+                        .update_blocks(linked_blocks, &db_tx, &mut batch)
                         .unwrap();
                     last_height
                 }
@@ -149,15 +148,13 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
 
         // persist last height to db_tx and commit
         if let Some(height) = last_block_height {
-            self.persist_last_height(height, self.storage.families, &db_tx)
+            self.persist_last_height(height, &db_tx)
                 .map_err(|e| e.into_string())?;
 
             db_tx.commit().map_err(|e| {
                 eprintln!("Failed to commit transaction: {}", e);
                 e.into_string()
             })?;
-            // self.storage.db.flush_cfs_opt(cfs, opts)
-            // db.compact_range_cf_opt(cf, start, end, opts)
         }
         Ok(())
     }

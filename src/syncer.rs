@@ -22,7 +22,7 @@ pub struct ChainSyncer<
     pub is_shutdown: Arc<AtomicBool>,
     pub block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
     pub monitor: Arc<dyn BlockMonitor<OutTx>>,
-    pub indexer: Arc<Indexer<'db, CF, InTx, OutTx>>,
+    pub indexer: &'db Indexer<'db, CF, InTx, OutTx>,
 }
 
 impl<'db, CF: CustomFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Send + 'static>
@@ -31,7 +31,7 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Se
     pub fn new(
         block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
         monitor: Arc<dyn BlockMonitor<OutTx>>,
-        indexer: Arc<Indexer<'db, CF, InTx, OutTx>>,
+        indexer: &'db Indexer<'db, CF, InTx, OutTx>,
     ) -> Self {
         ChainSyncer {
             is_shutdown: Arc::new(AtomicBool::new(false)),
