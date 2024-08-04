@@ -6,7 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rocksdb = { git = "https://github.com/rust-rocksdb/rust-rocksdb", default-features = false, rev = "1cf906dc4087f06631820f13855e6b27bd21b972" }
+rocksdb = { git = "https://github.com/rust-rocksdb/rust-rocksdb", default-features = false, features = [
+    "multi-threaded-cf",
+], rev = "6943a2d06064780a26c6ec581c3182bc8e2f6a5a" }
 bitcoin = "0.32.0"
 bitcoincore-rpc = "0.19.0"
 bitcoin_hashes = "0.14.0"

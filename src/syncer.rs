@@ -87,6 +87,8 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Se
             info!("Acquiring db lock for flushing closing...");
             self.indexer
                 .storage
+                .write()
+                .unwrap()
                 .db
                 .flush()
                 .expect("Failed to flush RocksDB");
