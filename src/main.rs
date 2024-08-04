@@ -2,6 +2,7 @@ use ci::api::Storage;
 use ci::eutxo::eutxo_model::*;
 
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use ci::block_service::BlockService;
 use ci::eutxo::btc::btc_block_provider::BtcBlockProvider;
@@ -76,12 +77,13 @@ async fn main() -> Result<(), std::io::Error> {
                                 .unwrap(),
                         },
                     });
-                    let storage = Storage {
+
+                    let storage = Arc::new(RwLock::new(Storage {
                         db: Arc::clone(&db),
-                        families: &families,
-                    };
-                    let tx_service = EuTxService::new(&families);
-                    let block_service = Arc::new(BlockService::new(&tx_service, &families));
+                    }));
+
+                    let tx_service = Arc::new(EuTxService {});
+                    let block_service = Arc::new(BlockService::new(tx_service));
 
                     let block_provider: Arc<
                         dyn BlockProvider<InTx = bitcoin::Transaction, OutTx = EuTx> + Send + Sync,
@@ -90,19 +92,23 @@ async fn main() -> Result<(), std::io::Error> {
                         &api_username,
                         &api_password,
                     ));
-                    let indexer =
-                        Indexer::new(&storage, block_service, Arc::clone(&block_provider));
+                    let indexer = Arc::new(Indexer::new(
+                        Arc::clone(&storage),
+                        Arc::clone(&families),
+                        block_service,
+                        Arc::clone(&block_provider),
+                    ));
                     let syncer = ChainSyncer::new(
                         Arc::clone(&block_provider),
                         Arc::new(EuBlockMonitor::new(1000)),
-                        &indexer,
+                        indexer,
                     );
-                    let db = Arc::clone(&db);
+                    let storage = Arc::clone(&storage);
                     tokio::task::spawn(async move {
                         match tokio::signal::ctrl_c().await {
                             Ok(()) => {
                                 info!("Received interrupt signal");
-                                db.flush().unwrap();
+                                storage.write().unwrap().db.flush().unwrap();
                                 info!("RocksDB successfully flushed and closed.");
                                 std::process::exit(0);
                             }
@@ -112,7 +118,6 @@ async fn main() -> Result<(), std::io::Error> {
                             }
                         }
                     });
-
                     syncer.sync(tx_batch_size).await;
                     Ok(())
                 }

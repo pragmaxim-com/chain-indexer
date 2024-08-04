@@ -54,32 +54,36 @@ pub trait TxService<'db> {
     fn get_txs_by_height(
         &self,
         block_height: &BlockHeight,
-        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB<MultiThreaded>>,
+        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
+        families: &Families<'db, Self::CF>,
     ) -> Result<Vec<Self::Tx>, rocksdb::Error>;
 
     fn persist_txs(
         &self,
         block: &Block<Self::Tx>,
-        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB<MultiThreaded>>,
+        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        families: &Families<'db, Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 
     fn persist_tx(
         &self,
         block_height: &BlockHeight,
         tx: &Self::Tx,
-        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB<MultiThreaded>>,
+        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        families: &Families<'db, Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 
     fn remove_tx(
         &self,
         block_height: &BlockHeight,
         tx: &Self::Tx,
-        db_tx: &rocksdb::Transaction<'db, OptimisticTransactionDB<MultiThreaded>>,
+        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        families: &Families<'db, Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 }
 
@@ -87,7 +91,6 @@ pub trait BlockMonitor<Tx> {
     fn monitor(&self, block_batch: &Vec<Block<Tx>>, tx_count: &TxCount);
 }
 
-pub struct Storage<'db, CF: CustomFamilies<'db>> {
+pub struct Storage {
     pub db: Arc<OptimisticTransactionDB<MultiThreaded>>,
-    pub families: &'db Families<'db, CF>,
 }
