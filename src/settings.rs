@@ -23,6 +23,7 @@ pub struct BlockchainSettings {
 pub struct IndexerSettings {
     pub db_indexes: Vec<DbIndexUtxoBirthPkWithUtxoPkCf>,
     pub tx_batch_size: usize,
+    pub disable_wal: bool,
 }
 
 impl AppConfig {

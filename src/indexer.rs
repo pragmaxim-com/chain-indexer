@@ -25,6 +25,7 @@ pub struct Indexer<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction 
     families: Arc<Families<'db, CF>>,
     service: Arc<BlockService<'db, OutTx, CF>>,
     block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
+    disable_wal: bool,
 }
 
 impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
@@ -35,12 +36,14 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
         families: Arc<Families<'db, CF>>,
         service: Arc<BlockService<'db, OutTx, CF>>,
         block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
+        disable_wal: bool,
     ) -> Self {
         Indexer {
             storage,
             families,
             service,
             block_provider,
+            disable_wal,
         }
     }
 
@@ -112,7 +115,7 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
         chain_link: bool,
     ) -> Result<(), String> {
         let mut write_options = WriteOptions::default();
-        write_options.disable_wal(true);
+        write_options.disable_wal(self.disable_wal);
 
         let storage = self.storage.write().unwrap();
 

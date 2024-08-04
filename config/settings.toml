@@ -6,3 +6,4 @@ api_host = "http://127.0.0.1:8332"
 [indexer]
 db_indexes = ["SCRIPT_HASH", "ADDRESS"] ## order matters, it affects data layout
 tx_batch_size = 1000
+disable_wal = false

@@ -32,6 +32,7 @@ async fn main() -> Result<(), std::io::Error> {
             let api_password = blockchain.api_password;
             let db_path: String = format!("{}/{}/{}", blockchain.db_path, "main", blockchain.name);
             let db_indexes = config.indexer.db_indexes;
+            let disable_wal = config.indexer.disable_wal;
 
             let tx_batch_size = config.indexer.tx_batch_size;
 
@@ -97,6 +98,7 @@ async fn main() -> Result<(), std::io::Error> {
                         Arc::clone(&families),
                         block_service,
                         Arc::clone(&block_provider),
+                        disable_wal,
                     ));
                     let syncer = ChainSyncer::new(
                         Arc::clone(&block_provider),

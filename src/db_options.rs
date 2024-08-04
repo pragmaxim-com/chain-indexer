@@ -18,7 +18,7 @@ pub fn get_db_options() -> Options {
     opts.set_min_write_buffer_number_to_merge(4);
     opts.set_target_file_size_base(256 * 1024 * 1024); // 256 MB
     opts.set_max_bytes_for_level_base(2048 * 1024 * 1024); // 2GB for compaction
-    opts.set_use_direct_io_for_flush_and_compaction(true);
+    opts.set_allow_mmap_writes(true); // cannot be used together with use_direct_io_for_flush_and_compaction
     opts.set_disable_auto_compactions(true);
 
     // opts.set_level_compaction_dynamic_level_bytes(true);
@@ -26,9 +26,8 @@ pub fn get_db_options() -> Options {
     // opts.set_allow_mmap_reads(true);
 
     // opts.set_compaction_style(rocksdb::DBCompactionStyle::Level);
-    // opts.set_allow_concurrent_memtable_write(false);
     // opts.set_memtable_factory(MemtableFactory::Vector);
-    // opts.set_allow_mmap_writes(true); // cannot be used together with use_direct_io_for_flush_and_compaction
+    // opts.set_use_direct_io_for_flush_and_compaction(true);
 
     opts
 }
