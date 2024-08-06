@@ -1,27 +1,30 @@
+use ergo_lib::chain::transaction::Transaction;
+use reqwest::Url;
+
 use crate::{
     api::{BlockProcessor, BlockProvider},
     eutxo::eutxo_model::EuTx,
     model::{Block, BlockHash, BlockHeight, TxCount},
 };
 
-use super::{btc_client::BtcClient, btc_processor::BtcProcessor};
+use super::{ergo_client::ErgoClient, ergo_processor::ErgoProcessor};
 
-pub struct BtcBlockProvider {
-    pub client: BtcClient,
-    pub processor: BtcProcessor,
+pub struct ErgoBlockProvider {
+    pub client: ErgoClient,
+    pub processor: ErgoProcessor,
 }
 
-impl BtcBlockProvider {
-    pub fn new(api_host: &str, api_username: &str, api_password: &str) -> Self {
-        BtcBlockProvider {
-            client: BtcClient::new(api_host, api_username, api_password),
-            processor: BtcProcessor {},
+impl ErgoBlockProvider {
+    pub fn new(node_url: Url, api_key: Option<&'static str>) -> Self {
+        ErgoBlockProvider {
+            client: ErgoClient { node_url, api_key },
+            processor: ErgoProcessor {},
         }
     }
 }
 
-impl BlockProvider for BtcBlockProvider {
-    type InTx = bitcoin::Transaction;
+impl BlockProvider for ErgoBlockProvider {
+    type InTx = Transaction;
     type OutTx = EuTx;
 
     fn process_batch(

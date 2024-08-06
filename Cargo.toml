@@ -36,6 +36,12 @@ signal-hook = "0.3.17"
 ouroboros = "0.18.4"
 derive_more = "0.99.18"
 proptest = "1.5.0"
+ergo-lib = "0.27.1"
+reqwest = { version = "0.12.5", default-features = false, features = [
+    "json",
+    "blocking",
+] }
+serde_json = "1.0.122"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }

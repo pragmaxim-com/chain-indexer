@@ -1,7 +1,7 @@
 use std::{fs, sync::Arc, time::Duration};
 
 use ci::{
-    api::{BlockProcessor, BlockProvider, BlockchainClient, Storage},
+    api::{BlockProcessor, BlockProvider, Storage},
     block_service::BlockService,
     eutxo::{
         btc::{

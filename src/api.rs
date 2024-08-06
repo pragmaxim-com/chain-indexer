@@ -9,15 +9,6 @@ use crate::{
     rocks_db_batch::{CustomFamilies, Families},
 };
 
-pub trait BlockchainClient {
-    type Tx: Send;
-
-    fn get_best_block(&self) -> Result<Block<Self::Tx>, String>;
-
-    fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::Tx>, String>;
-    fn get_block_by_hash(&self, height: BlockHash) -> Result<Block<Self::Tx>, String>;
-}
-
 pub trait BlockProcessor {
     type InTx: Send;
     type OutTx: Send;
