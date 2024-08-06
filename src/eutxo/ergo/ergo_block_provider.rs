@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use ergo_lib::chain::transaction::Transaction;
 use reqwest::Url;
 
@@ -23,6 +24,7 @@ impl ErgoBlockProvider {
     }
 }
 
+#[async_trait]
 impl BlockProvider for ErgoBlockProvider {
     type InTx = Transaction;
     type OutTx = EuTx;
@@ -35,16 +37,16 @@ impl BlockProvider for ErgoBlockProvider {
         self.processor.process_batch(block_batch, tx_count)
     }
 
-    fn get_best_block(&self) -> Result<Block<Self::InTx>, String> {
-        self.client.get_best_block()
+    async fn get_best_block(&self) -> Result<Block<Self::InTx>, String> {
+        self.client.get_best_block_async().await
     }
 
-    fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::InTx>, String> {
-        self.client.get_block_by_height(height)
+    async fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::InTx>, String> {
+        self.client.get_block_by_height_async(height).await
     }
 
     fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::OutTx>, String> {
-        let block = self.client.get_block_by_hash(hash)?;
+        let block = self.client.get_block_by_hash_sync(hash)?;
         let processed_block = self.processor.process(&block);
         Ok(processed_block)
     }

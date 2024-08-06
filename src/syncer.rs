@@ -42,7 +42,13 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Se
     }
 
     pub async fn sync(&self, min_batch_size: usize) {
-        let best_height = self.block_provider.get_best_block().unwrap().header.height;
+        let best_height = self
+            .block_provider
+            .get_best_block()
+            .await
+            .unwrap()
+            .header
+            .height;
         let last_height = self.indexer.get_last_height().0 + 1;
         // let check_forks: bool = best_height - last_height < 1000;
         info!("Initiating index from {} to {}", last_height, best_height);
@@ -51,8 +57,11 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Se
         tokio_stream::iter(heights)
             .map(|height| {
                 let block_provider = Arc::clone(&self.block_provider);
-                tokio::task::spawn_blocking(move || {
-                    block_provider.get_block_by_height(height.into()).unwrap()
+                tokio::task::spawn(async move {
+                    block_provider
+                        .get_block_by_height(height.into())
+                        .await
+                        .unwrap()
                 })
             })
             .buffered(num_cpus::get())

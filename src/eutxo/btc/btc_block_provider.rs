@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+
 use crate::{
     api::{BlockProcessor, BlockProvider},
     eutxo::eutxo_model::EuTx,
@@ -20,6 +22,7 @@ impl BtcBlockProvider {
     }
 }
 
+#[async_trait]
 impl BlockProvider for BtcBlockProvider {
     type InTx = bitcoin::Transaction;
     type OutTx = EuTx;
@@ -32,11 +35,11 @@ impl BlockProvider for BtcBlockProvider {
         self.processor.process_batch(block_batch, tx_count)
     }
 
-    fn get_best_block(&self) -> Result<Block<Self::InTx>, String> {
+    async fn get_best_block(&self) -> Result<Block<Self::InTx>, String> {
         self.client.get_best_block()
     }
 
-    fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::InTx>, String> {
+    async fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::InTx>, String> {
         self.client.get_block_by_height(height)
     }
 

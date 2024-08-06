@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use lru::LruCache;
-use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction};
-
 use crate::{
     codec_tx::TxPkBytes,
     model::{Block, BlockHash, BlockHeight, Transaction, TxCount, TxHash},
     rocks_db_batch::{CustomFamilies, Families},
 };
+use async_trait::async_trait;
+use lru::LruCache;
+use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction};
 
 pub trait BlockProcessor {
     type InTx: Send;
@@ -22,6 +22,7 @@ pub trait BlockProcessor {
     ) -> (Vec<Block<Self::OutTx>>, TxCount);
 }
 
+#[async_trait]
 pub trait BlockProvider {
     type InTx: Send;
     type OutTx: Send;
@@ -32,9 +33,9 @@ pub trait BlockProvider {
         tx_count: TxCount,
     ) -> (Vec<Block<Self::OutTx>>, TxCount);
 
-    fn get_best_block(&self) -> Result<Block<Self::InTx>, String>;
+    async fn get_best_block(&self) -> Result<Block<Self::InTx>, String>;
 
-    fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::InTx>, String>;
+    async fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::InTx>, String>;
 
     fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::OutTx>, String>;
 }
