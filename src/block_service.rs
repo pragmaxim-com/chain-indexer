@@ -181,7 +181,7 @@ impl<'db, Tx: Transaction, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
             return Ok(Some(value.header.clone()));
         } else {
             let header_bytes = db_tx.get_cf(&families.shared.block_pk_by_hash_cf, block_hash)?;
-            Ok(header_bytes.map(|bytes| codec_block::bytes_to_block_header(&block_hash.0, &bytes)))
+            Ok(header_bytes.map(|bytes| codec_block::bytes_to_block_header(&bytes)))
         }
     }
 

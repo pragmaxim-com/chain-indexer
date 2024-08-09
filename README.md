@@ -1,5 +1,8 @@
 ## DB schema
 
+Indexer uses block/tx/box indexes over hashes which allows for much better space efficiency and for ~ 10 000 txs/s speed for BTC and 8 000 txs/s 
+for chains with assets like Cardano/Ergo. Chain tip is eventually consistent due to using indexes over hashes, ie. forks get settled eventually.
+
 ```
 PK           = unique pointer to an object
 BirthPK      = unique pointer to an object of creation
@@ -15,6 +18,8 @@ UtxoBirthPk  = block_height|tx_index|utxo_index
 AssetPk      = block_height|tx_index|utxo_index|asset_index
 AssetBirthPk = block_height|tx_index|utxo_index|asset_index
 ```
+
+**Meta column family** keeps track 
 
 **UtxoIndexes** and **AssetIndex** are seconary indexes that keep entity (`asset-id/address/script_hash`) under small-size `UtxoBirthPk/AssetBirthPk`
 and references/relations to all further occurences to them.

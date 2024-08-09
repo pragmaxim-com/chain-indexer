@@ -79,19 +79,6 @@ impl ErgoClient {
             .await
     }
 
-    pub(crate) fn get_best_block_sync(&self) -> Result<Block<Transaction>, String> {
-        let url = self.node_url.join("info").unwrap();
-        let rb = self.build_blocking_client()?.get(url);
-        let node_info = self
-            .set_blocking_req_headers(rb)
-            .send()
-            .map_err(|e| e.to_string())?
-            .json::<NodeInfo>()
-            .map_err(|e| e.to_string())?;
-
-        self.get_block_by_height_sync(node_info.full_height.into())
-    }
-
     pub(crate) async fn get_block_by_height_async(
         &self,
         height: BlockHeight,
@@ -101,17 +88,6 @@ impl ErgoClient {
         #[allow(clippy::unwrap_used)]
         let url = self.node_url.join(&path).unwrap();
         self.get_block_by_url_async(url).await
-    }
-
-    pub(crate) fn get_block_by_height_sync(
-        &self,
-        height: BlockHeight,
-    ) -> Result<Block<Transaction>, String> {
-        let mut path = "blocks/at/".to_owned();
-        path.push_str(&height.0.to_string());
-        #[allow(clippy::unwrap_used)]
-        let url = self.node_url.join(&path).unwrap();
-        self.get_block_by_url_sync(url)
     }
 
     fn get_block_by_url_sync(&self, url: Url) -> Result<Block<Transaction>, String> {
@@ -170,16 +146,5 @@ impl ErgoClient {
         #[allow(clippy::unwrap_used)]
         let url = self.node_url.join(&path).unwrap();
         self.get_block_by_url_sync(url)
-    }
-    pub(crate) async fn get_block_by_hash_async(
-        &self,
-        hash: BlockHash,
-    ) -> Result<Block<Transaction>, String> {
-        let mut path = "blocks/".to_owned();
-        let block_hash: String = hex::encode(hash.0);
-        path.push_str(&block_hash);
-        #[allow(clippy::unwrap_used)]
-        let url = self.node_url.join(&path).unwrap();
-        self.get_block_by_url_async(url).await
     }
 }

@@ -1,11 +1,12 @@
-use std::sync::Arc;
+use std::{pin::Pin, sync::Arc};
 
 use crate::{
     codec_tx::TxPkBytes,
-    model::{Block, BlockHash, BlockHeight, Transaction, TxCount, TxHash},
+    model::{Block, BlockHeader, BlockHeight, Transaction, TxCount, TxHash},
     rocks_db_batch::{CustomFamilies, Families},
 };
 use async_trait::async_trait;
+use futures::Stream;
 use lru::LruCache;
 use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction};
 
@@ -24,21 +25,17 @@ pub trait BlockProcessor {
 
 #[async_trait]
 pub trait BlockProvider {
-    type InTx: Send;
     type OutTx: Send;
 
-    fn process_batch(
+    fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, String>;
+
+    async fn stream(
         &self,
-        block_batch: &Vec<Block<Self::InTx>>,
-        tx_count: TxCount,
-    ) -> (Vec<Block<Self::OutTx>>, TxCount);
-
-    async fn get_best_block(&self) -> Result<Block<Self::InTx>, String>;
-
-    async fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::InTx>, String>;
-
-    fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::OutTx>, String>;
+        last_header: Option<BlockHeader>,
+        min_batch_size: usize,
+    ) -> Pin<Box<dyn Stream<Item = (Vec<Block<Self::OutTx>>, TxCount)> + Send + 'life0>>;
 }
+
 pub trait TxService<'db> {
     type CF: CustomFamilies<'db>;
     type Tx: Transaction;

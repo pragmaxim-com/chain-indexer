@@ -32,7 +32,7 @@ impl TryFrom<bitcoin::Block> for Block<bitcoin::Transaction> {
 }
 
 impl BtcClient {
-    pub fn get_best_block(&self) -> Result<Block<bitcoin::Transaction>, String> {
+    pub fn get_best_block(&self) -> Result<BlockHeader, String> {
         self.rpc_client
             .get_best_block_hash()
             .map_err(|e| e.to_string())
@@ -42,7 +42,8 @@ impl BtcClient {
                     .get_block(&hash)
                     .map_err(|e| e.to_string())?;
 
-                block.try_into()
+                let b: Block<bitcoin::Transaction> = block.try_into()?;
+                Ok(b.header)
             })
     }
 

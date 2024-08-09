@@ -2,8 +2,8 @@ use ergo_lib::chain::transaction::Transaction;
 
 use crate::{
     api::BlockProcessor,
-    eutxo::eutxo_model::{EuTx, EuTxInput},
-    model::{Block, TxCount, TxIndex},
+    eutxo::eutxo_model::EuTx,
+    model::{Block, TxCount},
 };
 
 pub struct ErgoProcessor {}
