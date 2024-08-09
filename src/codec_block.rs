@@ -3,29 +3,33 @@ use byteorder::{BigEndian, ByteOrder};
 use crate::model::{BlockHash, BlockHeader, BlockHeight, BlockTimestamp};
 
 type BlockHeightBytes = [u8; 4];
-type BlockHeaderBytes = [u8; 40];
+type BlockHeaderBytes = [u8; 72];
 
 pub fn block_header_to_bytes(block_header: &BlockHeader) -> BlockHeaderBytes {
-    let mut bytes = [0u8; 40];
+    let mut bytes = [0u8; 72];
     BigEndian::write_u32(&mut bytes[0..4], block_header.height.0);
     BigEndian::write_u32(&mut bytes[4..8], block_header.timestamp.0);
     bytes[8..40].copy_from_slice(&block_header.hash.0);
+    bytes[40..72].copy_from_slice(&block_header.prev_hash.0);
     bytes
 }
 
-pub fn bytes_to_block_header(block_hash_bytes: &[u8; 32], header_bytes: &[u8]) -> BlockHeader {
-    assert_eq!(header_bytes.len(), 40, "header slice must be 40 bytes long");
+pub fn bytes_to_block_header(header_bytes: &[u8]) -> BlockHeader {
+    assert_eq!(header_bytes.len(), 72, "header slice must be 40 bytes long");
 
     let height: BlockHeight = BigEndian::read_u32(&header_bytes[0..4]).into();
     let timestamp: BlockTimestamp = BigEndian::read_u32(&header_bytes[4..8]).into();
 
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&header_bytes[8..40]);
+
     let mut prev_hash = [0u8; 32];
-    prev_hash.copy_from_slice(&header_bytes[8..40]);
+    prev_hash.copy_from_slice(&header_bytes[40..72]);
 
     BlockHeader {
         height,
         timestamp,
-        hash: (*block_hash_bytes).into(),
+        hash: hash.into(),
         prev_hash: prev_hash.into(),
     }
 }
@@ -101,7 +105,7 @@ mod tests {
         let bytes = block_header_to_bytes(&original_block_header);
 
         // Convert back to BlockHeader
-        let decoded_block_header = bytes_to_block_header(&original_block_header.hash.0, &bytes);
+        let decoded_block_header = bytes_to_block_header(&bytes);
 
         assert_eq!(decoded_block_header, original_block_header);
     }

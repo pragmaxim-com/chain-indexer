@@ -15,6 +15,7 @@ pub struct BlockchainSettings {
     pub name: String,
     pub db_path: String,
     pub api_host: String,
+    pub socket_path: String,
     pub api_username: String,
     pub api_password: String,
 }

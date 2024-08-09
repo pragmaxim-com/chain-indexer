@@ -1,3 +1,5 @@
+use futures::StreamExt;
+
 use crate::{
     api::{BlockMonitor, BlockProvider},
     indexer::Indexer,
@@ -5,78 +7,45 @@ use crate::{
     model::Transaction,
     rocks_db_batch::CustomFamilies,
 };
-use futures::stream::StreamExt;
-
-use min_batch::ext::MinBatchExt;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 
-pub struct ChainSyncer<
-    'db,
-    CF: CustomFamilies<'db>,
-    InTx: Send + 'static,
-    OutTx: Transaction + Send + 'static,
-> {
+pub struct ChainSyncer<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send + 'static> {
     pub is_shutdown: Arc<AtomicBool>,
-    pub block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
+    pub block_source: Arc<dyn BlockProvider<OutTx = OutTx>>,
     pub monitor: Arc<dyn BlockMonitor<OutTx>>,
-    pub indexer: Arc<Indexer<'db, CF, InTx, OutTx>>,
+    pub indexer: Arc<Indexer<'db, CF, OutTx>>,
 }
 
-impl<'db, CF: CustomFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Send + 'static>
-    ChainSyncer<'db, CF, InTx, OutTx>
+impl<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send + 'static>
+    ChainSyncer<'db, CF, OutTx>
 {
     pub fn new(
-        block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
+        block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
         monitor: Arc<dyn BlockMonitor<OutTx>>,
-        indexer: Arc<Indexer<'db, CF, InTx, OutTx>>,
+        indexer: Arc<Indexer<'db, CF, OutTx>>,
     ) -> Self {
         ChainSyncer {
             is_shutdown: Arc::new(AtomicBool::new(false)),
-            block_provider,
+            block_source: block_provider,
             monitor,
             indexer,
         }
     }
 
     pub async fn sync(&self, min_batch_size: usize) {
-        let best_height = self.block_provider.get_best_block().unwrap().header.height;
-        let last_height = self.indexer.get_last_height().0 + 1;
-        // let check_forks: bool = best_height - last_height < 1000;
-        info!("Initiating index from {} to {}", last_height, best_height);
-        let heights = last_height..=best_height.0;
-
-        tokio_stream::iter(heights)
-            .map(|height| {
-                let block_provider = Arc::clone(&self.block_provider);
-                tokio::task::spawn_blocking(move || {
-                    block_provider.get_block_by_height(height.into()).unwrap()
-                })
-            })
-            .buffered(num_cpus::get())
-            .map(|res| match res {
-                Ok(block) => block,
-                Err(e) => panic!("Error: {:?}", e),
-            })
-            .min_batch_with_weight(min_batch_size, |block| block.txs.len())
-            .map(|(blocks, tx_count)| {
-                let block_provider = Arc::clone(&self.block_provider);
-                tokio::task::spawn_blocking(move || block_provider.process_batch(&blocks, tx_count))
-            })
-            .buffered(num_cpus::get())
-            .map(|res| match res {
-                Ok((block_batch, tx_count)) => {
-                    let chain_link = block_batch
-                        .last()
-                        .is_some_and(|b| best_height.0 < b.header.height.0 + 1000);
-                    self.monitor.monitor(&block_batch, &tx_count);
-                    self.indexer
-                        .persist_blocks(block_batch, chain_link)
-                        .unwrap_or_else(|e| panic!("Unable to persist blocks due to {}", e))
-                }
-                Err(e) => panic!("Unable to process blocks: {:?}", e),
+        let is_chain_tip = false; // TODO check for ChainTip presence to start chainlinking
+        self.block_source
+            .stream(self.indexer.get_last_header(), min_batch_size)
+            .await
+            .map(|(block_batch, tx_count)| {
+                let chain_link = block_batch.last().is_some_and(|_| is_chain_tip);
+                self.monitor.monitor(&block_batch, &tx_count);
+                self.indexer
+                    .persist_blocks(block_batch, chain_link)
+                    .unwrap_or_else(|e| panic!("Unable to persist blocks due to {}", e))
             })
             .count()
             .await;
@@ -98,8 +67,8 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Se
     }
 }
 
-impl<'db, CF: CustomFamilies<'db>, InTx: Send + 'static, OutTx: Transaction + Send + 'static> Drop
-    for ChainSyncer<'db, CF, InTx, OutTx>
+impl<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send + 'static> Drop
+    for ChainSyncer<'db, CF, OutTx>
 {
     fn drop(&mut self) {
         info!("Dropping indexer");

@@ -1,14 +1,7 @@
-use crate::api::BlockchainClient;
 use crate::model::{Block, BlockHash, BlockHeader, BlockHeight};
 use bitcoin_hashes::Hash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use std::sync::Arc;
-
-#[derive(Debug)]
-pub struct BtcTx {
-    pub height: BlockHeight, // expensive to calculate
-    pub delegate: bitcoin::Block,
-}
 
 pub struct BtcClient {
     rpc_client: Arc<Client>,
@@ -38,10 +31,8 @@ impl TryFrom<bitcoin::Block> for Block<bitcoin::Transaction> {
     }
 }
 
-impl BlockchainClient for BtcClient {
-    type Tx = bitcoin::Transaction;
-
-    fn get_best_block(&self) -> Result<Block<bitcoin::Transaction>, String> {
+impl BtcClient {
+    pub fn get_best_block(&self) -> Result<BlockHeader, String> {
         self.rpc_client
             .get_best_block_hash()
             .map_err(|e| e.to_string())
@@ -51,11 +42,15 @@ impl BlockchainClient for BtcClient {
                     .get_block(&hash)
                     .map_err(|e| e.to_string())?;
 
-                block.try_into()
+                let b: Block<bitcoin::Transaction> = block.try_into()?;
+                Ok(b.header)
             })
     }
 
-    fn get_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::Tx>, String> {
+    pub fn get_block_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> Result<Block<bitcoin::Transaction>, String> {
         let bitcoin_hash = bitcoin::BlockHash::from_slice(&hash.0).unwrap();
         let block = self
             .rpc_client
@@ -65,7 +60,10 @@ impl BlockchainClient for BtcClient {
         block.try_into()
     }
 
-    fn get_block_by_height(&self, height: BlockHeight) -> Result<Block<Self::Tx>, String> {
+    pub fn get_block_by_height(
+        &self,
+        height: BlockHeight,
+    ) -> Result<Block<bitcoin::Transaction>, String> {
         self.rpc_client
             .get_block_hash(height.0 as u64)
             .map_err(|e| e.to_string())

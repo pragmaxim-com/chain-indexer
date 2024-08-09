@@ -8,9 +8,9 @@ use crate::api::Storage;
 use crate::block_service::BlockService;
 use crate::codec_block;
 use crate::info;
+use crate::model::Block;
 use crate::model::BlockHeader;
 use crate::model::Transaction;
-use crate::model::{Block, BlockHeight};
 use crate::rocks_db_batch::CustomFamilies;
 use crate::rocks_db_batch::Families;
 use std::rc::Rc;
@@ -18,24 +18,22 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::RwLock;
 
-pub const LAST_ADDRESS_HEIGHT_KEY: &[u8] = b"last_address_height";
+pub const LAST_HEADER_KEY: &[u8] = b"last_header";
 
-pub struct Indexer<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send> {
+pub struct Indexer<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send> {
     pub storage: Arc<RwLock<Storage>>,
     families: Arc<Families<'db, CF>>,
     service: Arc<BlockService<'db, OutTx, CF>>,
-    block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
+    block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
     disable_wal: bool,
 }
 
-impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
-    Indexer<'db, CF, InTx, OutTx>
-{
+impl<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send> Indexer<'db, CF, OutTx> {
     pub fn new(
         storage: Arc<RwLock<Storage>>,
         families: Arc<Families<'db, CF>>,
         service: Arc<BlockService<'db, OutTx, CF>>,
-        block_provider: Arc<dyn BlockProvider<InTx = InTx, OutTx = OutTx> + Send + Sync>,
+        block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
         disable_wal: bool,
     ) -> Self {
         Indexer {
@@ -47,28 +45,26 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
         }
     }
 
-    fn persist_last_height(
+    fn persist_last_block(
         &self,
-        height: BlockHeight,
+        header: &BlockHeader,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
     ) -> Result<(), rocksdb::Error> {
         db_tx.put_cf(
             &self.families.shared.meta_cf,
-            LAST_ADDRESS_HEIGHT_KEY,
-            codec_block::block_height_to_bytes(&height),
+            LAST_HEADER_KEY,
+            codec_block::block_header_to_bytes(header),
         )?;
         Ok(())
     }
 
-    pub fn get_last_height(&self) -> BlockHeight {
+    pub fn get_last_header(&self) -> Option<BlockHeader> {
         let storage = self.storage.read().unwrap();
         storage
             .db
-            .get_cf(&self.families.shared.meta_cf, LAST_ADDRESS_HEIGHT_KEY)
+            .get_cf(&self.families.shared.meta_cf, LAST_HEADER_KEY)
             .unwrap()
-            .map_or(0.into(), |height| {
-                codec_block::bytes_to_block_height(&height)
-            })
+            .map(|header_bytes| codec_block::bytes_to_block_header(&header_bytes))
     }
 
     fn chain_link(
@@ -99,7 +95,7 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
             );
             let downloaded_prev_block = Rc::new(
                 self.block_provider
-                    .get_processed_block_by_hash(block.header.prev_hash)?,
+                    .get_processed_block(block.header.clone())?,
             );
 
             winning_fork.insert(0, Rc::clone(&block));
@@ -125,7 +121,7 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
 
         let mut batch = db_tx.get_writebatch();
 
-        let last_block_height = blocks
+        let last_block_header = blocks
             .into_iter()
             .map(|block| {
                 if chain_link {
@@ -138,25 +134,25 @@ impl<'db, CF: CustomFamilies<'db>, InTx: Send, OutTx: Transaction + Send>
             .map(|linked_blocks| match linked_blocks.len() {
                 0 => panic!("Blocks vector is empty"),
                 1 => {
-                    let last_height = linked_blocks.last().unwrap().header.height;
+                    let last_header = linked_blocks.last().unwrap().header.clone();
                     self.service
                         .persist_blocks(linked_blocks, &db_tx, &mut batch, &self.families)
                         .unwrap();
-                    last_height
+                    last_header
                 }
                 _ => {
-                    let last_height = linked_blocks.last().unwrap().header.height;
+                    let last_header = linked_blocks.last().unwrap().header.clone();
                     self.service
                         .update_blocks(linked_blocks, &db_tx, &mut batch, &self.families)
                         .unwrap();
-                    last_height
+                    last_header
                 }
             })
             .last();
 
         // persist last height to db_tx and commit
-        if let Some(height) = last_block_height {
-            self.persist_last_height(height, &db_tx)
+        if let Some(header) = last_block_header {
+            self.persist_last_block(&header, &db_tx)
                 .map_err(|e| e.into_string())?;
 
             db_tx.commit().map_err(|e| {

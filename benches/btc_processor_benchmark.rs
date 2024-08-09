@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use ci::{
-    api::{BlockProcessor, BlockchainClient},
+    api::BlockProcessor,
     eutxo::btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
     info,
     model::Block,
