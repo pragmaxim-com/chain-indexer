@@ -19,7 +19,7 @@ AssetPk      = block_height|tx_index|utxo_index|asset_index
 AssetBirthPk = block_height|tx_index|utxo_index|asset_index
 ```
 
-**Meta column family** keeps track 
+**Meta column family** keeps track of last block header we indexed. Indexing is completely idempotent and blocks are persited atomicly (in a db transaction).
 
 **UtxoIndexes** and **AssetIndex** are seconary indexes that keep entity (`asset-id/address/script_hash`) under small-size `UtxoBirthPk/AssetBirthPk`
 and references/relations to all further occurences to them.
