@@ -1,6 +1,6 @@
 use crate::api::BlockProcessor;
 use crate::eutxo::eutxo_model::{EuTx, EuTxInput, EuUtxo};
-use crate::model::{AssetId, AssetValue, Block, TxCount, TxIndex};
+use crate::model::{AssetAction, AssetId, AssetValue, Block, TxCount, TxIndex};
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
 use bitcoin_hashes::Hash;
@@ -9,7 +9,7 @@ use bitcoin_hashes::Hash;
 pub const ADDRESS_INDEX: &str = "address";
 pub const SCRIPT_HASH_INDEX: &str = "script_hash";
 
-pub const EMPTY_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
+pub const EMPTY_VEC: Vec<(AssetId, AssetValue, AssetAction)> = Vec::new();
 
 pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {

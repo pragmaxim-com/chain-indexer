@@ -8,6 +8,7 @@ PK           = unique pointer to an object
 BirthPK      = unique pointer to an object of creation
 Hash         = Hash of an object
 Index        = Secondary Index
+Asset Action = Mint, Transfer, Burn
 ```
 ```
 HeightPk     = block_height
@@ -59,8 +60,11 @@ Secondary indexes like (`script_hash/address`) are stored as sequence of pointer
 UtxoValueAndUtxoBirthPks_by_UtxoPk:
     utxo_pk -> utxo_value|[utxo_index_cf:utxo_birth_pk,utxo_index_cf:utxo_birth_pk]
 
-UtxoPk_by_InputPk:
+Spent_UtxoPk_by_InputPk:
     input_pk -> utxo_pk
+
+Spent_InputPk_by_UtxoPk:
+    utxo_pk -> input_pk
 ```
 
 ## Utxo indexes
@@ -94,7 +98,7 @@ To keep data small, we keep assets as an array under utxo_pk.
 
 ```
 AssetValueAndBirthPk_by_UtxoPk:
-    utxo_pk -> [asset_value|asset_birth_pk]
+    asset_pk -> asset_value|asset_birth_pk|action
 ```
 
 ### Asset index

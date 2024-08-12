@@ -1,6 +1,7 @@
 use chrono::DateTime;
 use core::fmt;
 use derive_more::{AsRef, Display, From, Into};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockHeader {
@@ -81,6 +82,15 @@ impl TryFrom<Box<[u8]>> for TxHash {
 pub type AssetId = Vec<u8>;
 pub type AssetIndex = u8;
 pub type AssetValue = u64;
+pub type AssetMinted = bool;
+
+#[derive(Clone, Copy, Debug, IntoPrimitive, PartialEq, TryFromPrimitive)]
+#[repr(u8)]
+pub enum AssetAction {
+    Mint = 0,
+    Transfer = 1,
+    Burn = 2,
+}
 
 pub type DbIndexCfIndex = u8;
 pub type DbIndexUtxoBirthPkWithUtxoPkCf = String;

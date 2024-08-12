@@ -59,7 +59,6 @@ impl BlockProvider for CardanoBlockProvider {
         let node_client = Arc::clone(&self.client.node_client);
 
         tokio::spawn(async move {
-            let node_client = Arc::clone(&node_client);
             let (from, to) = node_client
                 .lock()
                 .await

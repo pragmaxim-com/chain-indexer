@@ -4,7 +4,7 @@ use byteorder::{BigEndian, ByteOrder};
 
 use crate::{
     codec_tx::TxPkBytes,
-    model::{AssetIndex, AssetValue, BlockHeight, DbIndexCfIndex, TxIndex},
+    model::{AssetAction, AssetIndex, AssetValue, BlockHeight, DbIndexCfIndex, TxIndex},
 };
 
 use super::eutxo_model::{UtxoIndex, UtxoValue};
@@ -24,26 +24,27 @@ struct EutxoPk {
     pub utxo_index: UtxoIndex,
 }
 
-pub fn get_asset_value_and_birth_pks(
-    asset_value_birth_pk_bytes: &[u8],
-) -> Vec<(AssetValue, AssetBirthPkBytes)> {
-    let asset_value_with_pk_size = 17;
-    let asset_count = asset_value_birth_pk_bytes.len() / asset_value_with_pk_size;
-    let mut result = Vec::with_capacity(asset_count);
+pub fn get_asset_value_birth_pk_action(
+    asset_value_birth_pk_action_bytes: &[u8],
+) -> (AssetValue, AssetBirthPkBytes, AssetAction) {
+    let asset_value =
+        BigEndian::read_u64(&asset_value_birth_pk_action_bytes[0..size_of::<AssetValue>()]);
 
-    for chunk in asset_value_birth_pk_bytes.chunks_exact(asset_value_with_pk_size) {
-        let asset_value = BigEndian::read_u64(&chunk[0..8]);
+    let mut asset_birth_pk_bytes = [0u8; 9];
+    asset_birth_pk_bytes.copy_from_slice(
+        &asset_value_birth_pk_action_bytes
+            [size_of::<AssetValue>()..size_of::<AssetValue>() + size_of::<AssetBirthPkBytes>()],
+    );
 
-        let mut asset_birth_pk_bytes = [0u8; 9];
-        asset_birth_pk_bytes.copy_from_slice(&chunk[8..17]);
+    let asset_action: AssetAction = AssetAction::try_from(
+        asset_value_birth_pk_action_bytes[size_of::<AssetValue>() + size_of::<AssetBirthPkBytes>()],
+    )
+    .unwrap();
 
-        result.push((asset_value, asset_birth_pk_bytes));
-    }
-
-    result
+    (asset_value, asset_birth_pk_bytes, asset_action)
 }
 
-pub fn utxo_value_to_bytes(utxo_value: &UtxoValue) -> [u8; std::mem::size_of::<UtxoValue>()] {
+pub fn utxo_value_to_bytes(utxo_value: &UtxoValue) -> [u8; size_of::<UtxoValue>()] {
     let mut bytes = [0u8; 8];
     BigEndian::write_u64(&mut bytes, utxo_value.0);
     bytes
@@ -233,18 +234,14 @@ mod tests {
             // First pair: AssetValue (8 bytes) + AssetBirthPkBytes (9 bytes)
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A, // 42 as u64
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, // AssetBirthPkBytes
-            // Second pair: AssetValue (8 bytes) + AssetBirthPkBytes (9 bytes)
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2B, // 43 as u64
-            0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, // AssetBirthPkBytes
+            0x01, // The encoded AssetAction::Transfer
         ];
 
-        let result = get_asset_value_and_birth_pks(&data);
+        let result = get_asset_value_birth_pk_action(&data);
 
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0].0, 42);
-        assert_eq!(result[0].1, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
-        assert_eq!(result[1].0, 43);
-        assert_eq!(result[1].1, [10, 11, 12, 13, 14, 15, 16, 17, 18]);
+        assert_eq!(result.0, 42);
+        assert_eq!(result.1, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        assert_eq!(result.2, AssetAction::Transfer);
     }
 
     #[test]
