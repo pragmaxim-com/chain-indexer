@@ -6,13 +6,27 @@ use crate::{
     model::{Block, TxCount},
 };
 
-pub struct ErgoProcessor {}
+use super::ergo_config::ErgoIndexes;
+
+pub type OutputAddress = Vec<u8>;
+pub type OutputErgoTreeHash = Vec<u8>;
+pub type OutputErgoTreeT8Hash = Vec<u8>;
+
+pub struct ErgoProcessor {
+    pub indexes: ErgoIndexes,
+}
+
+impl ErgoProcessor {
+    pub fn new(indexes: ErgoIndexes) -> Self {
+        ErgoProcessor { indexes }
+    }
+}
 
 impl BlockProcessor for ErgoProcessor {
     type InTx = Transaction;
     type OutTx = EuTx;
 
-    fn process(&self, btc_block: &Block<Self::InTx>) -> Block<Self::OutTx> {
+    fn process_block(&self, btc_block: &Block<Self::InTx>) -> Block<Self::OutTx> {
         btc_block.into()
     }
 

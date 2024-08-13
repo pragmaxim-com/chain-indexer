@@ -1,5 +1,6 @@
 pub mod btc;
 pub mod cardano;
+pub mod ergo;
 pub mod eutxo_block_monitor;
 pub mod eutxo_codec_utxo;
 pub mod eutxo_executor;

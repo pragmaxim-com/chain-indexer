@@ -6,7 +6,7 @@ use pallas::network::{
     miniprotocols::{localstate::queries_v16, Point, MAINNET_MAGIC},
 };
 
-use crate::settings::CardanoConfig;
+use super::cardano_config::CardanoConfig;
 
 pub type CBOR = Vec<u8>;
 

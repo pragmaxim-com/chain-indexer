@@ -16,14 +16,14 @@ async fn main() -> Result<(), std::io::Error> {
         Ok(app_config) => match cli_clonfig.blockchain {
             Blockchain::Bitcoin => {
                 let block_provider = Arc::new(BtcBlockProvider::new(&app_config.bitcoin));
-
-                eutxo_executor::run_eutxo_indexing(app_config, cli_clonfig, block_provider).await;
+                eutxo_executor::run_eutxo_indexing(app_config.indexer, cli_clonfig, block_provider)
+                    .await;
                 Ok(())
             }
             Blockchain::Cardano => {
                 let block_provider = Arc::new(CardanoBlockProvider::new(&app_config.cardano).await);
-
-                eutxo_executor::run_eutxo_indexing(app_config, cli_clonfig, block_provider).await;
+                eutxo_executor::run_eutxo_indexing(app_config.indexer, cli_clonfig, block_provider)
+                    .await;
                 Ok(())
             }
         },

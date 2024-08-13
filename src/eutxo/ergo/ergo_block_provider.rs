@@ -47,7 +47,7 @@ impl BlockProvider for ErgoBlockProvider {
 
     fn get_processed_block_by_hash(&self, hash: BlockHash) -> Result<Block<Self::OutTx>, String> {
         let block = self.client.get_block_by_hash_sync(hash)?;
-        let processed_block = self.processor.process(&block);
+        let processed_block = self.processor.process_block(&block);
         Ok(processed_block)
     }
 }

@@ -1,17 +1,27 @@
 use pallas::{codec::minicbor::Encode, codec::minicbor::Encoder, ledger::traverse::MultiEraBlock};
 
-use super::cardano_client::CBOR;
+use super::{cardano_client::CBOR, cardano_config::CardanoIndexes};
 use crate::{
     eutxo::eutxo_model::{EuTx, EuTxInput, EuUtxo},
     model::{AssetAction, AssetId, AssetValue, Block, BlockHash, BlockHeader, TxIndex},
+    settings::Indexes,
 };
 pub const EMPTY_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
 
+pub type OutputAddress = Option<Vec<u8>>;
+pub type OutputScriptHash = Option<Vec<u8>>;
+
 pub static GENESIS_START_TIME: u32 = 1506203091;
 
-pub struct CardanoProcessor {}
+pub struct CardanoProcessor {
+    pub indexes: CardanoIndexes,
+}
 
 impl CardanoProcessor {
+    pub fn new(indexes: CardanoIndexes) -> Self {
+        CardanoProcessor { indexes }
+    }
+
     pub fn process_block(&self, block: &CBOR) -> Result<Block<EuTx>, String> {
         let b = MultiEraBlock::decode(block).map_err(|e| e.to_string())?;
 
@@ -62,14 +72,9 @@ impl CardanoProcessor {
                                     h.encode(&mut encoder, &mut ctx).unwrap();
                                     buffer
                                 });
-                                let mut db_indexes = Vec::with_capacity(2); // Pre-allocate capacity for 2 elements
-                                if let Some(script_hash) = script_hash_opt {
-                                    db_indexes.push((0, script_hash));
-                                }
 
-                                if let Some(address) = address_opt {
-                                    db_indexes.push((1, address));
-                                }
+                                let db_indexes =
+                                    self.indexes.create_indexes((address_opt, script_hash_opt));
 
                                 let assets = out.non_ada_assets();
                                 let mut result = Vec::with_capacity(assets.len());

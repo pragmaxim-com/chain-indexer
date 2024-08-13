@@ -1,7 +1,6 @@
 ## DB schema
 
-Indexer uses block/tx/box indexes over hashes which allows for much better space efficiency and for ~ 10 000 txs/s speed for BTC and 8 000 txs/s 
-for chains with assets like Cardano/Ergo. Chain tip is eventually consistent due to using indexes over hashes, ie. forks get settled eventually.
+Indexer uses block/tx/box indexes over hashes which allows for much better space efficiency and for ~ 3 000 - 6 000 txs/s speed, depending on ammount of outputs/assets and WAL being on/off. Chain tip is eventually consistent due to using indexes over hashes, ie. forks get settled eventually.
 
 ```
 PK           = unique pointer to an object

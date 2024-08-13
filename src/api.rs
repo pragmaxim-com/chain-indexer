@@ -2,6 +2,7 @@ use std::{pin::Pin, sync::Arc};
 
 use crate::{
     codec_tx::TxPkBytes,
+    eutxo::eutxo_index_manager::DbIndexManager,
     model::{Block, BlockHeader, BlockHeight, Transaction, TxCount, TxHash},
     rocks_db_batch::{CustomFamilies, Families},
 };
@@ -14,7 +15,7 @@ pub trait BlockProcessor {
     type InTx: Send;
     type OutTx: Send;
 
-    fn process(&self, block: &Block<Self::InTx>) -> Block<Self::OutTx>;
+    fn process_block(&self, block: &Block<Self::InTx>) -> Block<Self::OutTx>;
 
     fn process_batch(
         &self,
@@ -26,6 +27,8 @@ pub trait BlockProcessor {
 #[async_trait]
 pub trait BlockProvider {
     type OutTx: Send;
+
+    fn get_index_manager(&self) -> DbIndexManager;
 
     fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, String>;
 

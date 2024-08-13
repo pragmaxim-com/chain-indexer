@@ -1,6 +1,7 @@
 use crate::api::Storage;
 use crate::cli::CliConfig;
 use crate::eutxo::eutxo_model::*;
+use crate::settings::IndexerSettings;
 
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -8,31 +9,29 @@ use std::sync::RwLock;
 use crate::block_service::BlockService;
 use crate::eutxo::eutxo_block_monitor::EuBlockMonitor;
 use crate::eutxo::eutxo_families::EutxoFamilies;
-use crate::eutxo::eutxo_index_manager::DbIndexManager;
 use crate::eutxo::eutxo_model::EuTx;
 use crate::eutxo::eutxo_tx_service::EuTxService;
 use crate::indexer::Indexer;
 use crate::info;
 use crate::model::*;
 use crate::rocks_db_batch::{Families, SharedFamilies};
-use crate::settings::AppConfig;
 use crate::syncer::ChainSyncer;
 use crate::{api::BlockProvider, eutxo::eutxo_storage};
 use rocksdb::BoundColumnFamily;
 
 pub async fn run_eutxo_indexing(
-    app_config: AppConfig,
+    indexer_settings: IndexerSettings,
     cli_config: CliConfig,
     block_provider: Arc<dyn BlockProvider<OutTx = EuTx>>,
 ) {
-    let indexer = app_config.indexer;
-    let db_path: String = format!("{}/{}/{}", indexer.db_path, "main", cli_config.blockchain);
-    let db_indexes = indexer.db_indexes;
-    let disable_wal = indexer.disable_wal;
+    let db_path: String = format!(
+        "{}/{}/{}",
+        indexer_settings.db_path, "main", cli_config.blockchain
+    );
+    let disable_wal = indexer_settings.disable_wal;
 
-    let tx_batch_size = indexer.tx_batch_size;
-
-    let db_index_manager = DbIndexManager::new(&db_indexes);
+    let tx_batch_size = indexer_settings.tx_batch_size;
+    let db_index_manager = block_provider.get_index_manager();
     let db = Arc::new(eutxo_storage::get_db(&db_index_manager, &db_path));
     let families = Arc::new(Families {
         shared: SharedFamilies {

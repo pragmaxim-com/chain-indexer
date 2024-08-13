@@ -2,32 +2,30 @@ use config::{Config, ConfigError, Environment, File};
 use dotenv::dotenv;
 use serde::Deserialize;
 
-use crate::model::DbIndexUtxoBirthPkWithUtxoPkCf;
+use crate::{
+    eutxo::{
+        btc::btc_config::BitcoinConfig, cardano::cardano_config::CardanoConfig,
+        ergo::ergo_config::ErgoConfig,
+    },
+    model::{DbIndexCfIndex, DbIndexUtxoBirthPkWithUtxoPkCf, DbIndexValue},
+};
+
+pub trait Indexes<I> {
+    fn get_indexes(&self) -> Vec<DbIndexUtxoBirthPkWithUtxoPkCf>;
+    fn create_indexes(&self, indexes: I) -> Vec<(DbIndexCfIndex, DbIndexValue)>;
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub indexer: IndexerSettings,
     pub bitcoin: BitcoinConfig,
     pub cardano: CardanoConfig,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct BitcoinConfig {
-    pub api_host: String,
-    pub api_username: String,
-    pub api_password: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct CardanoConfig {
-    pub api_host: String,
-    pub socket_path: String,
+    pub ergo: ErgoConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexerSettings {
     pub db_path: String,
-    pub db_indexes: Vec<DbIndexUtxoBirthPkWithUtxoPkCf>,
     pub tx_batch_size: usize,
     pub disable_wal: bool,
 }

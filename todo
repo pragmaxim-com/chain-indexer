@@ -1,14 +1,4 @@
+ergo - registers 
+cardano - datum
 
-nohup cardano-node run \
---config /opt/cardano-node/config.json \
---database-path /opt/cardano-node/db/ \
---socket-path /opt/cardano-node/db/node.socket \
---host-addr 0.0.0.0 \
---port 1337 \
---topology /opt/cardano-node/topology.json &
-
-
-Syncing : 
-    - Sources
-        - Btc - (hash, height, timestamp) from database
-        - Cardano - (hash, height, slot) from database
+assets - spent/unspent

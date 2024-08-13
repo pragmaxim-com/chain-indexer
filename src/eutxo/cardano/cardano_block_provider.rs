@@ -4,9 +4,9 @@ use tokio::runtime::Runtime;
 
 use crate::{
     api::BlockProvider,
-    eutxo::eutxo_model::EuTx,
+    eutxo::{eutxo_index_manager::DbIndexManager, eutxo_model::EuTx},
     model::{Block, BlockHeader, TxCount},
-    settings::CardanoConfig,
+    settings::Indexes,
 };
 use std::{pin::Pin, sync::Arc};
 
@@ -19,6 +19,7 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use super::{
     cardano_client::{CardanoClient, CBOR},
+    cardano_config::CardanoConfig,
     cardano_processor::{CardanoProcessor, GENESIS_START_TIME},
 };
 
@@ -31,7 +32,7 @@ impl CardanoBlockProvider {
     pub async fn new(cardano_config: &CardanoConfig) -> Self {
         CardanoBlockProvider {
             client: CardanoClient::new(cardano_config).await,
-            processor: Arc::new(CardanoProcessor {}),
+            processor: Arc::new(CardanoProcessor::new(cardano_config.db_indexes.clone())),
         }
     }
 }
@@ -39,6 +40,10 @@ impl CardanoBlockProvider {
 #[async_trait]
 impl BlockProvider for CardanoBlockProvider {
     type OutTx = EuTx;
+
+    fn get_index_manager(&self) -> DbIndexManager {
+        DbIndexManager::new(&self.processor.indexes.get_indexes())
+    }
 
     fn get_processed_block(&self, h: BlockHeader) -> Result<Block<Self::OutTx>, String> {
         let point = Point::new(

@@ -1,12 +1,21 @@
 [indexer]
 db_path = "/tmp/chain-indexer"
-db_indexes = ["SCRIPT_HASH", "ADDRESS"] ## order matters, it affects data layout
 tx_batch_size = 1000
 disable_wal = false
 
 [cardano]
+db_indexes.address = true
+db_indexes.script_hash = true
 api_host = "localhost:1337"
 socket_path = "/home/lisak/.cardano/db/node.socket"
 
 [bitcoin]
+db_indexes.address = true
+db_indexes.script_hash = true
+api_host = "http://127.0.0.1:8332"
+
+[ergo]
+db_indexes.address = true
+db_indexes.ergo_tree_hash = true
+db_indexes.ergo_tree_t8_hash = true
 api_host = "http://127.0.0.1:8332"

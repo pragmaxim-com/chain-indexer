@@ -1,9 +1,9 @@
 use crate::{
     api::{BlockProcessor, BlockProvider},
-    eutxo::eutxo_model::EuTx,
+    eutxo::{eutxo_index_manager::DbIndexManager, eutxo_model::EuTx},
     info,
     model::{Block, BlockHeader, TxCount},
-    settings::BitcoinConfig,
+    settings::Indexes,
 };
 use async_trait::async_trait;
 use futures::stream::StreamExt;
@@ -11,7 +11,7 @@ use futures::Stream;
 use min_batch::ext::MinBatchExt;
 use std::{pin::Pin, sync::Arc};
 
-use super::{btc_client::BtcClient, btc_processor::BtcProcessor};
+use super::{btc_client::BtcClient, btc_config::BitcoinConfig, btc_processor::BtcProcessor};
 
 pub struct BtcBlockProvider {
     pub client: Arc<BtcClient>,
@@ -22,7 +22,7 @@ impl BtcBlockProvider {
     pub fn new(bitcoin_config: &BitcoinConfig) -> Self {
         BtcBlockProvider {
             client: Arc::new(BtcClient::new(bitcoin_config)),
-            processor: Arc::new(BtcProcessor {}),
+            processor: Arc::new(BtcProcessor::new(bitcoin_config.db_indexes.clone())),
         }
     }
 
@@ -43,9 +43,13 @@ impl BtcBlockProvider {
 impl BlockProvider for BtcBlockProvider {
     type OutTx = EuTx;
 
+    fn get_index_manager(&self) -> DbIndexManager {
+        DbIndexManager::new(&self.processor.indexes.get_indexes())
+    }
+
     fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, String> {
         let block = self.client.get_block_by_hash(header.hash)?;
-        let processed_block = self.processor.process(&block);
+        let processed_block = self.processor.process_block(&block);
         Ok(processed_block)
     }
 
