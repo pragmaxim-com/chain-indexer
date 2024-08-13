@@ -6,6 +6,9 @@ use crate::{
     model::{AssetAction, AssetId, AssetValue, Block, BlockHash, BlockHeader, TxIndex},
 };
 pub const EMPTY_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
+
+pub static GENESIS_START_TIME: u32 = 1506203091;
+
 pub struct CardanoProcessor {}
 
 impl CardanoProcessor {
@@ -20,7 +23,7 @@ impl CardanoProcessor {
         let prev_hash: [u8; 32] = *prev_h;
         let header = BlockHeader {
             height: (b.header().number() as u32).into(),
-            timestamp: (b.header().slot() as u32).into(),
+            timestamp: (b.header().slot() as u32 + GENESIS_START_TIME).into(),
             hash: BlockHash(hash),
             prev_hash: BlockHash(prev_hash),
         };

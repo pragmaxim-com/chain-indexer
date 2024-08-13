@@ -1,4 +1,5 @@
 use crate::api::Storage;
+use crate::cli::CliConfig;
 use crate::eutxo::eutxo_model::*;
 
 use std::sync::Arc;
@@ -20,15 +21,16 @@ use crate::{api::BlockProvider, eutxo::eutxo_storage};
 use rocksdb::BoundColumnFamily;
 
 pub async fn run_eutxo_indexing(
-    config: AppConfig,
+    app_config: AppConfig,
+    cli_config: CliConfig,
     block_provider: Arc<dyn BlockProvider<OutTx = EuTx>>,
 ) {
-    let blockchain = config.blockchain;
-    let db_path: String = format!("{}/{}/{}", blockchain.db_path, "main", blockchain.name);
-    let db_indexes = config.indexer.db_indexes;
-    let disable_wal = config.indexer.disable_wal;
+    let indexer = app_config.indexer;
+    let db_path: String = format!("{}/{}/{}", indexer.db_path, "main", cli_config.blockchain);
+    let db_indexes = indexer.db_indexes;
+    let disable_wal = indexer.disable_wal;
 
-    let tx_batch_size = config.indexer.tx_batch_size;
+    let tx_batch_size = indexer.tx_batch_size;
 
     let db_index_manager = DbIndexManager::new(&db_indexes);
     let db = Arc::new(eutxo_storage::get_db(&db_index_manager, &db_path));

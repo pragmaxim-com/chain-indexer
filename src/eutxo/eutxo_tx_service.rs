@@ -75,7 +75,7 @@ impl<'db> EuTxService {
         families: &Families<'db, EutxoFamilies<'db>>,
     ) {
         for (input_index, tx_input) in tx.tx_inputs.iter().enumerate() {
-            let utxo_pk = tx_pk_by_tx_hash_lru_cache
+            let utxo_pk_opt = tx_pk_by_tx_hash_lru_cache
                 .get(&tx_input.tx_hash)
                 .map(|tx_pk_bytes| {
                     eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index)
@@ -87,13 +87,22 @@ impl<'db> EuTxService {
                         .map(|tx_pk_bytes| {
                             eutxo_codec_utxo::utxo_pk_bytes_from(&tx_pk_bytes, &tx_input.utxo_index)
                         })
-                })
-                .unwrap();
+                });
 
-            let input_pk =
-                eutxo_codec_utxo::utxo_pk_bytes(block_height, &tx.tx_index, &(input_index as u16));
-            batch.put_cf(&families.custom.utxo_pk_by_input_pk_cf, &input_pk, &utxo_pk);
-            batch.put_cf(&families.custom.input_pk_by_utxo_pk_cf, &utxo_pk, &input_pk)
+            match utxo_pk_opt {
+                Some(utxo_pk) => {
+                    let input_pk = eutxo_codec_utxo::utxo_pk_bytes(
+                        block_height,
+                        &tx.tx_index,
+                        &(input_index as u16),
+                    );
+                    batch.put_cf(&families.custom.utxo_pk_by_input_pk_cf, &input_pk, &utxo_pk);
+                    batch.put_cf(&families.custom.input_pk_by_utxo_pk_cf, &utxo_pk, &input_pk);
+                }
+                None => {
+                    // println!("Genesis {}", tx_input.tx_hash);
+                }
+            }
         }
     }
 

@@ -6,6 +6,7 @@ use crate::{
     api::BlockProvider,
     eutxo::eutxo_model::EuTx,
     model::{Block, BlockHeader, TxCount},
+    settings::CardanoConfig,
 };
 use std::{pin::Pin, sync::Arc};
 
@@ -18,7 +19,7 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use super::{
     cardano_client::{CardanoClient, CBOR},
-    cardano_processor::CardanoProcessor,
+    cardano_processor::{CardanoProcessor, GENESIS_START_TIME},
 };
 
 pub struct CardanoBlockProvider {
@@ -27,9 +28,9 @@ pub struct CardanoBlockProvider {
 }
 
 impl CardanoBlockProvider {
-    pub async fn new(api_host: &str, socket_path: &str) -> Self {
+    pub async fn new(cardano_config: &CardanoConfig) -> Self {
         CardanoBlockProvider {
-            client: CardanoClient::new(api_host, socket_path).await,
+            client: CardanoClient::new(cardano_config).await,
             processor: Arc::new(CardanoProcessor {}),
         }
     }
@@ -40,7 +41,10 @@ impl BlockProvider for CardanoBlockProvider {
     type OutTx = EuTx;
 
     fn get_processed_block(&self, h: BlockHeader) -> Result<Block<Self::OutTx>, String> {
-        let point = Point::new(h.timestamp.0 as u64, h.hash.0.to_vec());
+        let point = Point::new(
+            (h.timestamp.0 - GENESIS_START_TIME) as u64,
+            h.hash.0.to_vec(),
+        );
         let rt = Runtime::new().unwrap();
         let cbor = rt.block_on(self.client.get_block_by_point(point))?;
         self.processor.process_block(&cbor)

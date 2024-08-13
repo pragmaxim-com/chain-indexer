@@ -11,6 +11,8 @@ pub const SCRIPT_HASH_INDEX: &str = "script_hash";
 
 pub const EMPTY_VEC: Vec<(AssetId, AssetValue, AssetAction)> = Vec::new();
 
+pub static GENESIS_START_TIME: u32 = 1231006505;
+
 pub struct BtcProcessor;
 impl BlockProcessor for BtcProcessor {
     type InTx = bitcoin::Transaction;
