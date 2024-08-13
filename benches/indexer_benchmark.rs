@@ -26,7 +26,10 @@ fn criterion_benchmark(c: &mut Criterion) {
     let api_host = blockchain.api_host;
     let api_username = blockchain.api_username;
     let api_password = blockchain.api_password;
-    let db_path = format!("{}/{}/{}", blockchain.db_path, "benchmark", blockchain.name);
+    let db_path = format!(
+        "{}/{}/{}",
+        blockchain.db_path, "benchmark", blockchain.active
+    );
     let db_indexes = config.indexer.db_indexes;
 
     fs::remove_dir_all(&db_path).unwrap();

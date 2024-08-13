@@ -1,11 +1,12 @@
-[blockchain]
-name = "cardano"
-db_path = "/tmp/chain-indexer"
-socket_path = "/home/lisak/.cardano/db/node.socket"
-api_host = "localhost:1337"
-#api_host = "http://127.0.0.1:8332"
-
 [indexer]
+db_path = "/tmp/chain-indexer"
 db_indexes = ["SCRIPT_HASH", "ADDRESS"] ## order matters, it affects data layout
 tx_batch_size = 1000
 disable_wal = false
+
+[cardano]
+api_host = "localhost:1337"
+socket_path = "/home/lisak/.cardano/db/node.socket"
+
+[bitcoin]
+api_host = "http://127.0.0.1:8332"

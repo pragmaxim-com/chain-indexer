@@ -3,6 +3,7 @@ use crate::{
     eutxo::eutxo_model::EuTx,
     info,
     model::{Block, BlockHeader, TxCount},
+    settings::BitcoinConfig,
 };
 use async_trait::async_trait;
 use futures::stream::StreamExt;
@@ -18,9 +19,9 @@ pub struct BtcBlockProvider {
 }
 
 impl BtcBlockProvider {
-    pub fn new(api_host: &str, api_username: &str, api_password: &str) -> Self {
+    pub fn new(bitcoin_config: &BitcoinConfig) -> Self {
         BtcBlockProvider {
-            client: Arc::new(BtcClient::new(api_host, api_username, api_password)),
+            client: Arc::new(BtcClient::new(bitcoin_config)),
             processor: Arc::new(BtcProcessor {}),
         }
     }

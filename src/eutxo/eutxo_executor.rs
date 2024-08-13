@@ -1,4 +1,5 @@
 use crate::api::Storage;
+use crate::cli::CliConfig;
 use crate::eutxo::eutxo_model::*;
 
 use std::sync::Arc;
@@ -20,15 +21,16 @@ use crate::{api::BlockProvider, eutxo::eutxo_storage};
 use rocksdb::BoundColumnFamily;
 
 pub async fn run_eutxo_indexing(
-    config: AppConfig,
+    app_config: AppConfig,
+    cli_config: CliConfig,
     block_provider: Arc<dyn BlockProvider<OutTx = EuTx>>,
 ) {
-    let blockchain = config.blockchain;
-    let db_path: String = format!("{}/{}/{}", blockchain.db_path, "main", blockchain.name);
-    let db_indexes = config.indexer.db_indexes;
-    let disable_wal = config.indexer.disable_wal;
+    let indexer = app_config.indexer;
+    let db_path: String = format!("{}/{}/{}", indexer.db_path, "main", cli_config.blockchain);
+    let db_indexes = indexer.db_indexes;
+    let disable_wal = indexer.disable_wal;
 
-    let tx_batch_size = config.indexer.tx_batch_size;
+    let tx_batch_size = indexer.tx_batch_size;
 
     let db_index_manager = DbIndexManager::new(&db_indexes);
     let db = Arc::new(eutxo_storage::get_db(&db_index_manager, &db_path));
@@ -43,6 +45,7 @@ pub async fn run_eutxo_indexing(
         custom: EutxoFamilies {
             utxo_value_by_pk_cf: db.cf_handle(UTXO_VALUE_BY_PK_CF).unwrap(),
             utxo_pk_by_input_pk_cf: db.cf_handle(UTXO_PK_BY_INPUT_PK_CF).unwrap(),
+            input_pk_by_utxo_pk_cf: db.cf_handle(INPUT_PK_BY_UTXO_PK_CF).unwrap(),
             utxo_birth_pk_with_utxo_pk_cf: db_index_manager
                 .utxo_birth_pk_relations
                 .iter()
@@ -58,7 +61,7 @@ pub async fn run_eutxo_indexing(
                 .iter()
                 .map(|cf| db.cf_handle(cf).unwrap())
                 .collect::<Vec<Arc<BoundColumnFamily>>>(),
-            assets_by_utxo_pk_cf: db.cf_handle(ASSETS_BY_UTXO_PK_CF).unwrap(),
+            asset_by_asset_pk_cf: db.cf_handle(ASSET_BY_ASSET_PK_CF).unwrap(),
             asset_id_by_asset_birth_pk_cf: db.cf_handle(ASSET_ID_BY_ASSET_BIRTH_PK_CF).unwrap(),
             asset_birth_pk_by_asset_id_cf: db.cf_handle(ASSET_BIRTH_PK_BY_ASSET_ID_CF).unwrap(),
             asset_birth_pk_with_asset_pk_cf: db.cf_handle(ASSET_BIRTH_PK_WITH_ASSET_PK_CF).unwrap(),

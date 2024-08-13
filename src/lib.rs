@@ -1,5 +1,6 @@
 pub mod api;
 pub mod block_service;
+pub mod cli;
 pub mod codec_block;
 pub mod codec_tx;
 pub mod db_options;

@@ -1,4 +1,7 @@
-use crate::model::{Block, BlockHash, BlockHeader, BlockHeight};
+use crate::{
+    model::{Block, BlockHash, BlockHeader, BlockHeight},
+    settings::BitcoinConfig,
+};
 use bitcoin_hashes::Hash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use std::sync::Arc;
@@ -8,9 +11,12 @@ pub struct BtcClient {
 }
 
 impl BtcClient {
-    pub fn new(api_host: &str, api_username: &str, api_password: &str) -> Self {
-        let user_pass = Auth::UserPass(api_username.to_string(), api_password.to_string());
-        let client = Client::new(api_host, user_pass).unwrap();
+    pub fn new(bitcoin_config: &BitcoinConfig) -> Self {
+        let user_pass = Auth::UserPass(
+            bitcoin_config.api_username.to_string(),
+            bitcoin_config.api_password.to_string(),
+        );
+        let client = Client::new(bitcoin_config.api_host.as_str(), user_pass).unwrap();
         let rpc_client = Arc::new(client);
         BtcClient { rpc_client }
     }

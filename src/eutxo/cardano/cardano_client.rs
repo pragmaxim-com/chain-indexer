@@ -6,6 +6,8 @@ use pallas::network::{
     miniprotocols::{localstate::queries_v16, Point, MAINNET_MAGIC},
 };
 
+use crate::settings::CardanoConfig;
+
 pub type CBOR = Vec<u8>;
 
 pub struct CardanoClient {
@@ -14,12 +16,14 @@ pub struct CardanoClient {
 }
 
 impl CardanoClient {
-    pub async fn new(api_host: &str, socket_path: &str) -> Self {
+    pub async fn new(cardano_config: &CardanoConfig) -> Self {
         let peer_client = Arc::new(Mutex::new(
-            PeerClient::connect(api_host, MAINNET_MAGIC).await.unwrap(),
+            PeerClient::connect(cardano_config.api_host.clone(), MAINNET_MAGIC)
+                .await
+                .unwrap(),
         ));
         let node_client = Arc::new(Mutex::new(
-            NodeClient::connect(socket_path, MAINNET_MAGIC)
+            NodeClient::connect(cardano_config.socket_path.clone(), MAINNET_MAGIC)
                 .await
                 .unwrap(),
         ));
