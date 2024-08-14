@@ -35,12 +35,7 @@ impl BtcBlockProcessor {
                     })
                 })
                 .collect(),
-            tx_outputs: tx
-                .output
-                .iter()
-                .enumerate()
-                .map(|(out_index, out)| self.output_processor.process_output(out_index, out))
-                .collect(),
+            tx_outputs: self.output_processor.process_outputs(tx.output),
         }
     }
 }

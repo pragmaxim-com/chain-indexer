@@ -25,7 +25,7 @@ pub trait BlockProcessor {
 }
 
 pub trait OutputProcessor<FromBox, IntoBox> {
-    fn process_output(&self, out_index: usize, out: &FromBox) -> IntoBox;
+    fn process_outputs(&self, outs: Vec<FromBox>) -> Vec<IntoBox>;
 }
 
 #[async_trait]

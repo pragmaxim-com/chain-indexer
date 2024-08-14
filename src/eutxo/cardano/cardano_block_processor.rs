@@ -59,14 +59,7 @@ impl CardanoBlockProcessor {
                                 })
                             })
                             .collect(),
-                        tx_outputs: tx
-                            .outputs()
-                            .iter()
-                            .enumerate()
-                            .map(|(out_index, out)| {
-                                self.output_processor.process_output(out_index, out)
-                            })
-                            .collect(),
+                        tx_outputs: self.output_processor.process_outputs(tx.outputs().to_vec()),
                     }
                 })
                 .collect(),
