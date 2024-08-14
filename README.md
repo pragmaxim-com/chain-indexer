@@ -100,7 +100,7 @@ UtxoBirthPk_with_UtxoPk_relations:
 
 ### Assets
 
-To keep data small, we keep assets as an array under utxo_pk.
+Assets are for now just basic with single one-to-many secondary index 
 
 ```
 AssetValueAndBirthPk_by_UtxoPk:
