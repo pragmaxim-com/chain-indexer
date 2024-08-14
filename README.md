@@ -1,6 +1,11 @@
 ## DB schema
 
-Indexer uses block/tx/box indexes over hashes which allows for much better space efficiency and for ~ 3 000 - 6 000 txs/s speed, depending on ammount of outputs/assets and WAL being on/off. Chain tip is eventually consistent due to using indexes over hashes, ie. forks get settled eventually.
+Chain indexer is a universal blockchain indexing tool on top of RocksDB that generates one-to-many and one-to-one indexes to be able to answer all sorts of explorer queries.
+Indexer uses block/tx/box indexes over hashes which allows for much better space efficiency and for ~ 3 000 - 6 000 txs/s speed, depending on ammount of outputs/assets and WAL being on/off. Chain tip is "eventually consistent" due to using indexes over hashes, ie. forks get settled eventually.
+
+Currently Bitcoin, Cardano and Ergo are supported.
+
+### Data model
 
 ```
 PK           = unique pointer to an object
@@ -21,10 +26,10 @@ AssetBirthPk = block_height|tx_index|utxo_index|asset_index
 
 **Meta column family** keeps track of last block header we indexed. Indexing is completely idempotent and blocks are persited atomicly (in a db transaction).
 
-**UtxoIndexes** and **AssetIndex** are seconary indexes that keep entity (`asset-id/address/script_hash`) under small-size `UtxoBirthPk/AssetBirthPk`
+**UtxoIndexes** and **AssetIndex** are seconary indexes that keep entity (`asset/address/script_hash/etc...`) under small-size `UtxoBirthPk/AssetBirthPk`
 and references/relations to all further occurences to them.
 
-> Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one
+> Note, that there can be 0-x of either one-to-many or one-to-one UtxoIndexes, while AssetIndex is curently only 1 one-to-many for all assets together
 
 ### Block
 
@@ -66,10 +71,12 @@ Spent_InputPk_by_UtxoPk:
     utxo_pk -> input_pk
 ```
 
-## Utxo indexes
+### Utxo indexes (one-to-many)
 
 We keep secondary indexes (`script_hash/address`) under small-size `utxo_birth_pk` identifiers which is a unique pointer of their creation.
 Then we keep relations to all following boxes where given indexed entity occurred. Following table shows 2 example secondary indexes : `script_hash` & `address`.
+
+> Note that one-to-one indexes are the same, just without `relations`.
 
 ```
 UtxoIndex_by_UtxoBirthPk

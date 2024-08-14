@@ -52,6 +52,14 @@ pub type TxCount = usize;
 pub struct TxIndex(pub u16);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]
+pub struct OutputId(pub [u8; 32]);
+impl fmt::Display for OutputId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct TxHash(pub [u8; 32]);
 impl fmt::Display for TxHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -92,7 +100,6 @@ pub enum AssetAction {
     Burn = 2,
 }
 
-pub type DbIndexCfIndex = u8;
 pub type DbIndexUtxoBirthPkWithUtxoPkCf = String;
 pub type DbIndexByUtxoBirthPkCf = String;
 pub type DbUtxoBirthPkByIndexCf = String;

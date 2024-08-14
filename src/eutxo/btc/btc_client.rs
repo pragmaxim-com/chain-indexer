@@ -1,9 +1,10 @@
-use crate::model::{Block, BlockHash, BlockHeader, BlockHeight};
+use crate::{
+    model::{Block, BlockHash, BlockHeader, BlockHeight},
+    settings::BitcoinConfig,
+};
 use bitcoin_hashes::Hash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use std::sync::Arc;
-
-use super::btc_config::BitcoinConfig;
 
 pub struct BtcClient {
     rpc_client: Arc<Client>,

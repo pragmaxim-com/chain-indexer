@@ -5,6 +5,7 @@ use super::{
     },
     eutxo_families::EutxoFamilies,
     eutxo_model::{EuTxInput, EuUtxo},
+    eutxo_schema::DbIndexCfIndex,
 };
 use crate::{
     api::TxService,
@@ -12,8 +13,8 @@ use crate::{
     codec_tx::{self, TxPkBytes},
     eutxo::eutxo_model::EuTx,
     model::{
-        AssetAction, AssetId, AssetMinted, AssetValue, Block, BlockHeight, DbIndexCfIndex,
-        DbIndexValue, Transaction, TxHash, TxIndex,
+        AssetAction, AssetId, AssetMinted, AssetValue, Block, BlockHeight, DbIndexValue,
+        Transaction, TxHash, TxIndex,
     },
     rocks_db_batch::Families,
 };
@@ -58,7 +59,7 @@ impl<'db> EuTxService {
             let utxo_pk_bytes =
                 eutxo_codec_utxo::utxo_pk_bytes(block_height, &tx.tx_index, &utxo.utxo_index.0);
 
-            self.remove_utxo_indexes(&utxo_pk_bytes, &utxo.db_indexes, db_tx, families)?;
+            self.remove_utxo_indexes(&utxo_pk_bytes, &utxo.o2m_db_indexes, db_tx, families)?;
             self.remove_assets(&utxo_pk_bytes, &utxo.assets, db_tx, families)?;
         }
         Ok(())
@@ -174,7 +175,7 @@ impl<'db> EuTxService {
             .map(|(cf_index, utxo_birth_pk)| {
                 let index_value = db_tx
                     .get_cf(
-                        &families.custom.index_by_utxo_birth_pk_cf[*cf_index as usize],
+                        &families.custom.o2m_index_by_utxo_birth_pk_cf[*cf_index as usize],
                         utxo_birth_pk,
                     )?
                     .unwrap();
@@ -208,7 +209,7 @@ impl<'db> EuTxService {
 
                     Ok(EuUtxo {
                         utxo_index,
-                        db_indexes,
+                        o2m_db_indexes: db_indexes,
                         assets,
                         utxo_value,
                     })
@@ -306,23 +307,23 @@ impl<'db> EuTxService {
         let index_elem_length = size_of::<DbIndexCfIndex>() + size_of::<UtxoBirthPkBytes>();
 
         let mut utxo_value_with_indexes =
-            vec![0u8; size_of::<u64>() + (utxo.db_indexes.len() * index_elem_length)];
+            vec![0u8; size_of::<u64>() + (utxo.o2m_db_indexes.len() * index_elem_length)];
         BigEndian::write_u64(
             &mut utxo_value_with_indexes[0..size_of::<UtxoBirthPkBytes>()],
             utxo.utxo_value.0,
         );
         let mut index = size_of::<UtxoBirthPkBytes>();
 
-        for (cf_index, index_value) in utxo.db_indexes.iter() {
+        for (cf_index, index_value) in utxo.o2m_db_indexes.iter() {
             utxo_value_with_indexes[index] = *cf_index;
             index += size_of::<DbIndexCfIndex>();
 
             let (utxo_birth_pk_bytes, _) = self.persist_birth_pk_or_relation_with_pk(
                 index_value,
                 utxo_pk_bytes,
-                &families.custom.utxo_birth_pk_by_index_cf[*cf_index as usize],
-                &families.custom.utxo_birth_pk_with_utxo_pk_cf[*cf_index as usize],
-                &families.custom.index_by_utxo_birth_pk_cf[*cf_index as usize],
+                &families.custom.o2m_utxo_birth_pk_by_index_cf[*cf_index as usize],
+                &families.custom.o2m_utxo_birth_pk_relations_cf[*cf_index as usize],
+                &families.custom.o2m_index_by_utxo_birth_pk_cf[*cf_index as usize],
                 db_tx,
                 batch,
             )?;
@@ -351,9 +352,9 @@ impl<'db> EuTxService {
             self.remove_indexed_entry(
                 utxo_pk_bytes,
                 index_value,
-                &families.custom.utxo_birth_pk_by_index_cf[*cf_index as usize],
-                &families.custom.utxo_birth_pk_with_utxo_pk_cf[*cf_index as usize],
-                &families.custom.index_by_utxo_birth_pk_cf[*cf_index as usize],
+                &families.custom.o2m_utxo_birth_pk_by_index_cf[*cf_index as usize],
+                &families.custom.o2m_utxo_birth_pk_relations_cf[*cf_index as usize],
+                &families.custom.o2m_index_by_utxo_birth_pk_cf[*cf_index as usize],
                 db_tx,
                 eutxo_codec_utxo::get_utxo_pk_from_relation,
             )?;

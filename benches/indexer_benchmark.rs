@@ -5,10 +5,10 @@ use ci::{
     block_service::BlockService,
     eutxo::{
         btc::{
-            btc_block_provider::BtcBlockProvider, btc_client::BtcClient,
-            btc_processor::BtcProcessor,
+            btc_block_processor::BtcBlockProcessor, btc_block_provider::BtcBlockProvider,
+            btc_client::BtcClient,
         },
-        eutxo_index_manager::DbIndexManager,
+        eutxo_index_manager::DbSchema,
         eutxo_model::EuTx,
         eutxo_storage,
         eutxo_tx_service::EuTxService,
@@ -35,8 +35,8 @@ fn criterion_benchmark(c: &mut Criterion) {
     fs::remove_dir_all(&db_path).unwrap();
 
     let btc_client = BtcClient::new(&api_host, &api_username, &api_password);
-    let processor = BtcProcessor {};
-    let db_index_manager = DbIndexManager::new(&db_indexes);
+    let processor = BtcBlockProcessor {};
+    let db_index_manager = DbSchema::new(&db_indexes);
     let db = eutxo_storage::get_db(&db_index_manager, &db_path);
     let get_families = eutxo_storage::get_families(&db_index_manager, &db);
     let families = get_families;

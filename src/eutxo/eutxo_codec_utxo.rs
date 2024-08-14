@@ -4,10 +4,13 @@ use byteorder::{BigEndian, ByteOrder};
 
 use crate::{
     codec_tx::TxPkBytes,
-    model::{AssetAction, AssetIndex, AssetValue, BlockHeight, DbIndexCfIndex, TxIndex},
+    model::{AssetAction, AssetIndex, AssetValue, BlockHeight, TxIndex},
 };
 
-use super::eutxo_model::{UtxoIndex, UtxoValue};
+use super::{
+    eutxo_model::{UtxoIndex, UtxoValue},
+    eutxo_schema::DbIndexCfIndex,
+};
 
 pub type UtxoValueWithIndexes = Vec<u8>;
 pub type UtxoPkBytes = [u8; 8];
