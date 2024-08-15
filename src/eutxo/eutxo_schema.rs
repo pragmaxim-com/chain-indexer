@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
 
 use crate::model::{
     CompactionEnabled, DbIndexByUtxoBirthPkCf, DbIndexUtxoBirthPkWithUtxoPkCf,
@@ -111,6 +111,12 @@ pub struct DbSchema {
 }
 
 impl DbSchema {
+    pub fn load_config(path: &str) -> DbSchemaHolder {
+        let yaml_str = fs::read_to_string(path).expect("Failed to read YAML file");
+        let raw_config: RawSchema = serde_yaml::from_str(&yaml_str).expect("Failed to parse YAML");
+        raw_config.into()
+    }
+
     pub fn new(db_index_table: DbOutputIndexLayout) -> Self {
         DbSchema {
             db_index_table: db_index_table.clone(),
@@ -169,17 +175,10 @@ impl DbSchema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-
-    fn load_config(path: &str) -> DbSchemaHolder {
-        let yaml_str = fs::read_to_string(path).expect("Failed to read YAML file");
-        let raw_config: RawSchema = serde_yaml::from_str(&yaml_str).expect("Failed to parse YAML");
-        raw_config.into()
-    }
 
     #[test]
     fn test_cardano_indexes() {
-        let config = load_config("config/schema.yaml");
+        let config = DbSchema::load_config("config/schema.yaml");
         assert!(config
             .cardano
             .db_index_table
@@ -198,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_ergo_indexes() {
-        let config = load_config("config/schema.yaml");
+        let config = DbSchema::load_config("config/schema.yaml");
         assert!(config
             .ergo
             .db_index_table

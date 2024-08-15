@@ -83,7 +83,7 @@ impl<'db> EuTxService {
         families: &Families<'db, EutxoFamilies<'db>>,
     ) {
         for (input_index, input) in tx.tx_inputs.iter().enumerate() {
-            let utxo_pk_opt: Option<&[u8; 8]> = match input {
+            let utxo_pk_opt: Option<[u8; 8]> = match input {
                 EuTxInput::TxHashInput(tx_input) => tx_pk_by_tx_hash_lru_cache
                     .get(&tx_input.tx_hash)
                     .map(|tx_pk_bytes| {
@@ -99,22 +99,23 @@ impl<'db> EuTxService {
                                     &tx_input.utxo_index,
                                 )
                             })
-                    })
-                    .as_ref(),
+                    }),
                 EuTxInput::OutputIndexInput(index_number, output_index) => {
-                    utxo_pk_by_index_lru_cache.get(&output_index).or_else(|| {
-                        let pk: Option<&[u8; 8]> = db_tx
-                            .get_cf(
-                                &families.custom.o2o_utxo_birth_pk_by_index_cf[index_number],
-                                output_index.0,
-                            )
-                            .unwrap()
-                            .unwrap()
-                            .try_into()
-                            .ok()
-                            .as_ref();
-                        pk
-                    })
+                    utxo_pk_by_index_lru_cache
+                        .get(&output_index)
+                        .map(|&arr| arr)
+                        .or_else(|| {
+                            let pk: Option<[u8; 8]> = db_tx
+                                .get_cf(
+                                    &families.custom.o2o_utxo_birth_pk_by_index_cf[index_number],
+                                    &output_index.0,
+                                )
+                                .unwrap()
+                                .unwrap()
+                                .try_into()
+                                .ok();
+                            pk
+                        })
                 }
             };
             match utxo_pk_opt {
@@ -171,7 +172,7 @@ impl<'db> EuTxService {
                             db_tx
                                 .get_cf(
                                     &families.custom.o2o_utxo_birth_pk_by_index_cf[index_number],
-                                    output_index.0,
+                                    &output_index.0,
                                 )
                                 .unwrap()
                         })
@@ -402,7 +403,7 @@ impl<'db> EuTxService {
 
             db_tx.put_cf(
                 &families.custom.o2o_utxo_birth_pk_by_index_cf[cf_index],
-                index_value.0,
+                &index_value.0,
                 utxo_pk_bytes,
             )?;
         }
@@ -438,7 +439,7 @@ impl<'db> EuTxService {
         for (cf_index, index_value) in o2o_indexes {
             db_tx.delete_cf(
                 &families.custom.o2o_utxo_birth_pk_by_index_cf[cf_index],
-                index_value.0,
+                &index_value.0,
             )?;
         }
 

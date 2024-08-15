@@ -27,6 +27,7 @@ pub struct BitcoinConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ErgoConfig {
     pub api_host: String,
+    pub api_key: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

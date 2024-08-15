@@ -12,3 +12,4 @@ api_host = "http://127.0.0.1:8332"
 
 [ergo]
 api_host = "http://127.0.0.1:8332"
+api_key = "****"

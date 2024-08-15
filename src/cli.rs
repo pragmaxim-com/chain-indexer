@@ -13,6 +13,7 @@ pub struct CliConfig {
 pub enum Blockchain {
     Bitcoin,
     Cardano,
+    Ergo,
 }
 
 impl fmt::Display for Blockchain {
@@ -20,6 +21,7 @@ impl fmt::Display for Blockchain {
         let s = match self {
             Blockchain::Bitcoin => "citcoin",
             Blockchain::Cardano => "cardano",
+            Blockchain::Ergo => "ergo",
         };
         write!(f, "{}", s)
     }
@@ -32,6 +34,7 @@ impl FromStr for Blockchain {
         match input.to_lowercase().as_str() {
             "bitcoin" => Ok(Blockchain::Bitcoin),
             "cardano" => Ok(Blockchain::Cardano),
+            "ergo" => Ok(Blockchain::Ergo),
             _ => Err(format!("Unknown blockchain: {}", input)),
         }
     }

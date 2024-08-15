@@ -21,23 +21,13 @@ pub struct NodeInfo {
 
 pub struct ErgoClient {
     pub(crate) node_url: Url,
-    pub(crate) api_key: Option<&'static str>,
+    pub(crate) api_key: String,
 }
 
 impl ErgoClient {
-    pub fn get_node_api_header(&self) -> HeaderValue {
-        match self.api_key {
-            Some(api_key) => match HeaderValue::from_str(api_key) {
-                Ok(k) => k,
-                _ => HeaderValue::from_static("None"),
-            },
-            None => HeaderValue::from_static("None"),
-        }
-    }
-
     fn set_async_req_headers(&self, rb: RequestBuilder) -> RequestBuilder {
         rb.header("accept", "application/json")
-            .header("api_key", self.get_node_api_header())
+            .header("api_key", HeaderValue::from_str(&self.api_key).unwrap())
             .header(CONTENT_TYPE, "application/json")
     }
 
@@ -51,7 +41,7 @@ impl ErgoClient {
 
     fn set_blocking_req_headers(&self, rb: blocking::RequestBuilder) -> blocking::RequestBuilder {
         rb.header("accept", "application/json")
-            .header("api_key", self.get_node_api_header())
+            .header("api_key", HeaderValue::from_str(&self.api_key).unwrap())
             .header(CONTENT_TYPE, "application/json")
     }
 
