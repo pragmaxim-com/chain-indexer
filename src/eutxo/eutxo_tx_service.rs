@@ -5,7 +5,7 @@ use super::{
     },
     eutxo_families::EutxoFamilies,
     eutxo_model::{EuTxInput, EuUtxo},
-    eutxo_schema::DbIndexCfIndex,
+    eutxo_schema::DbIndexCfIndexNumber,
 };
 use crate::{
     api::TxService,
@@ -14,7 +14,7 @@ use crate::{
     eutxo::eutxo_model::EuTx,
     model::{
         AssetAction, AssetId, AssetMinted, AssetValue, Block, BlockHeight, DbIndexValue,
-        Transaction, TxHash, TxIndex,
+        OutputIndex, Transaction, TxHash, TxIndex,
     },
     rocks_db_batch::Families,
 };
@@ -73,23 +73,44 @@ impl<'db> EuTxService {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_lru_cache: &mut LruCache<OutputIndex, UtxoPkBytes>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) {
-        for (input_index, tx_input) in tx.tx_inputs.iter().enumerate() {
-            let utxo_pk_opt = tx_pk_by_tx_hash_lru_cache
-                .get(&tx_input.tx_hash)
-                .map(|tx_pk_bytes| {
-                    eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index)
-                })
-                .or_else(|| {
-                    db_tx
-                        .get_cf(&families.shared.tx_pk_by_hash_cf, tx_input.tx_hash)
-                        .unwrap()
-                        .map(|tx_pk_bytes| {
-                            eutxo_codec_utxo::utxo_pk_bytes_from(&tx_pk_bytes, &tx_input.utxo_index)
-                        })
-                });
-
+        for (input_index, input) in tx.tx_inputs.iter().enumerate() {
+            let utxo_pk_opt: Option<&[u8; 8]> = match input {
+                EuTxInput::TxHashInput(tx_input) => tx_pk_by_tx_hash_lru_cache
+                    .get(&tx_input.tx_hash)
+                    .map(|tx_pk_bytes| {
+                        eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index)
+                    })
+                    .or_else(|| {
+                        db_tx
+                            .get_cf(&families.shared.tx_pk_by_hash_cf, tx_input.tx_hash)
+                            .unwrap()
+                            .map(|tx_pk_bytes| {
+                                eutxo_codec_utxo::utxo_pk_bytes_from(
+                                    &tx_pk_bytes,
+                                    &tx_input.utxo_index,
+                                )
+                            })
+                    })
+                    .as_ref(),
+                EuTxInput::OutputIndexInput(output_index) => {
+                    utxo_pk_by_index_lru_cache.get(&output_index).or_else(|| {
+                        let pk: Option<&[u8; 8]> = db_tx
+                            .get_cf(
+                                &families.custom.o2o_utxo_birth_pk_by_index_cf[&255],
+                                output_index.0,
+                            )
+                            .unwrap()
+                            .unwrap()
+                            .try_into()
+                            .ok()
+                            .as_ref();
+                        pk
+                    })
+                }
+            };
             match utxo_pk_opt {
                 Some(utxo_pk) => {
                     let input_pk = eutxo_codec_utxo::utxo_pk_bytes(
@@ -97,11 +118,11 @@ impl<'db> EuTxService {
                         &tx.tx_index,
                         &(input_index as u16),
                     );
-                    batch.put_cf(&families.custom.utxo_pk_by_input_pk_cf, &input_pk, &utxo_pk);
-                    batch.put_cf(&families.custom.input_pk_by_utxo_pk_cf, &utxo_pk, &input_pk);
+                    batch.put_cf(&families.custom.utxo_pk_by_input_pk_cf, &input_pk, utxo_pk);
+                    batch.put_cf(&families.custom.input_pk_by_utxo_pk_cf, utxo_pk, &input_pk);
                 }
                 None => {
-                    // println!("Genesis {}", tx_input.tx_hash);
+                    // println!("Genesis {}", output_index);
                 }
             }
         }
@@ -113,23 +134,42 @@ impl<'db> EuTxService {
         tx: &EuTx,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_lru_cache: &mut LruCache<OutputIndex, UtxoPkBytes>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
-        for (input_index, tx_input) in tx.tx_inputs.iter().enumerate() {
-            let utxo_pk = tx_pk_by_tx_hash_lru_cache
-                .get(&tx_input.tx_hash)
-                .map(|tx_pk_bytes| {
-                    eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index)
-                })
-                .or_else(|| {
-                    db_tx
-                        .get_cf(&families.shared.tx_pk_by_hash_cf, tx_input.tx_hash)
-                        .unwrap()
-                        .map(|tx_pk_bytes| {
-                            eutxo_codec_utxo::utxo_pk_bytes_from(&tx_pk_bytes, &tx_input.utxo_index)
-                        })
-                })
-                .unwrap();
+        for (input_index, input) in tx.tx_inputs.iter().enumerate() {
+            let utxo_pk = match input {
+                EuTxInput::TxHashInput(tx_input) => tx_pk_by_tx_hash_lru_cache
+                    .get(&tx_input.tx_hash)
+                    .map(|tx_pk_bytes| {
+                        eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index)
+                    })
+                    .or_else(|| {
+                        db_tx
+                            .get_cf(&families.shared.tx_pk_by_hash_cf, tx_input.tx_hash)
+                            .unwrap()
+                            .map(|tx_pk_bytes| {
+                                eutxo_codec_utxo::utxo_pk_bytes_from(
+                                    &tx_pk_bytes,
+                                    &tx_input.utxo_index,
+                                )
+                            })
+                    })
+                    .unwrap()
+                    .to_vec(),
+                EuTxInput::OutputIndexInput(output_index) => utxo_pk_by_index_lru_cache
+                    .get(&output_index)
+                    .map(|o| o.to_vec())
+                    .or_else(|| {
+                        db_tx
+                            .get_cf(
+                                &families.custom.o2o_utxo_birth_pk_by_index_cf[&255],
+                                output_index.0,
+                            )
+                            .unwrap()
+                    })
+                    .unwrap(),
+            };
             let input_pk =
                 eutxo_codec_utxo::utxo_pk_bytes(block_height, &tx.tx_index, &(input_index as u16));
             db_tx.delete_cf(&families.custom.utxo_pk_by_input_pk_cf, input_pk)?;
@@ -164,25 +204,25 @@ impl<'db> EuTxService {
             .collect()
     }
 
-    fn get_utxo_indexes(
+    fn get_o2m_utxo_indexes(
         &self,
-        index_utxo_birth_pk_by_cf_index: &Vec<(DbIndexCfIndex, UtxoBirthPkBytes)>,
+        index_utxo_birth_pk_by_cf_index: &Vec<(DbIndexCfIndexNumber, UtxoBirthPkBytes)>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<'db, EutxoFamilies<'db>>,
-    ) -> Result<Vec<(DbIndexCfIndex, DbIndexValue)>, rocksdb::Error> {
+    ) -> Result<Vec<(DbIndexCfIndexNumber, DbIndexValue)>, rocksdb::Error> {
         index_utxo_birth_pk_by_cf_index
             .iter()
             .map(|(cf_index, utxo_birth_pk)| {
                 let index_value = db_tx
                     .get_cf(
-                        &families.custom.o2m_index_by_utxo_birth_pk_cf[*cf_index as usize],
+                        &families.custom.o2m_index_by_utxo_birth_pk_cf[cf_index],
                         utxo_birth_pk,
                     )?
                     .unwrap();
 
                 Ok((*cf_index, index_value))
             })
-            .collect::<Result<Vec<(DbIndexCfIndex, DbIndexValue)>, rocksdb::Error>>()
+            .collect::<Result<Vec<(DbIndexCfIndexNumber, DbIndexValue)>, rocksdb::Error>>()
     }
 
     fn get_outputs(
@@ -201,15 +241,19 @@ impl<'db> EuTxService {
                     let (utxo_value, index_utxo_birth_pk_by_cf_index) =
                         eutxo_codec_utxo::bytes_to_utxo(&utxo_value_bytes);
 
-                    let db_indexes: Vec<(DbIndexCfIndex, DbIndexValue)> =
-                        self.get_utxo_indexes(&index_utxo_birth_pk_by_cf_index, db_tx, families)?;
+                    let o2o_db_indexes: Vec<(DbIndexCfIndexNumber, DbIndexValue)> = self
+                        .get_o2o_utxo_indexes(&index_utxo_birth_pk_by_cf_index, db_tx, families)?;
+
+                    let o2m_db_indexes: Vec<(DbIndexCfIndexNumber, DbIndexValue)> = self
+                        .get_o2m_utxo_indexes(&index_utxo_birth_pk_by_cf_index, db_tx, families)?;
 
                     let assets: Vec<(AssetId, AssetValue, AssetAction)> =
                         self.get_assets(&utxo_pk, db_tx, families)?;
 
                     Ok(EuUtxo {
                         utxo_index,
-                        o2m_db_indexes: db_indexes,
+                        o2m_db_indexes,
+                        o2o_db_indexes,
                         assets,
                         utxo_value,
                     })
@@ -304,10 +348,17 @@ impl<'db> EuTxService {
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
         // start building the utxo_value_with_indexes
-        let index_elem_length = size_of::<DbIndexCfIndex>() + size_of::<UtxoBirthPkBytes>();
+        let o2m_index_elem_length =
+            size_of::<DbIndexCfIndexNumber>() + size_of::<UtxoBirthPkBytes>();
+        let o2o_index_elem_length = size_of::<DbIndexCfIndexNumber>() + size_of::<OutputIndex>();
 
         let mut utxo_value_with_indexes =
-            vec![0u8; size_of::<u64>() + (utxo.o2m_db_indexes.len() * index_elem_length)];
+            vec![
+                0u8;
+                size_of::<u64>()
+                    + (utxo.o2m_db_indexes.len() * o2m_index_elem_length)
+                    + (utxo.o2o_db_indexes.len() * o2o_index_elem_length)
+            ];
         BigEndian::write_u64(
             &mut utxo_value_with_indexes[0..size_of::<UtxoBirthPkBytes>()],
             utxo.utxo_value.0,
@@ -316,20 +367,34 @@ impl<'db> EuTxService {
 
         for (cf_index, index_value) in utxo.o2m_db_indexes.iter() {
             utxo_value_with_indexes[index] = *cf_index;
-            index += size_of::<DbIndexCfIndex>();
+            index += size_of::<DbIndexCfIndexNumber>();
 
             let (utxo_birth_pk_bytes, _) = self.persist_birth_pk_or_relation_with_pk(
                 index_value,
                 utxo_pk_bytes,
-                &families.custom.o2m_utxo_birth_pk_by_index_cf[*cf_index as usize],
-                &families.custom.o2m_utxo_birth_pk_relations_cf[*cf_index as usize],
-                &families.custom.o2m_index_by_utxo_birth_pk_cf[*cf_index as usize],
+                &families.custom.o2m_utxo_birth_pk_by_index_cf[cf_index],
+                &families.custom.o2m_utxo_birth_pk_relations_cf[cf_index],
+                &families.custom.o2m_index_by_utxo_birth_pk_cf[cf_index],
                 db_tx,
                 batch,
             )?;
             utxo_value_with_indexes[index..index + size_of::<UtxoBirthPkBytes>()]
                 .copy_from_slice(&utxo_birth_pk_bytes);
             index += size_of::<UtxoBirthPkBytes>();
+        }
+
+        for (cf_index, index_value) in utxo.o2o_db_indexes.iter() {
+            utxo_value_with_indexes[index] = *cf_index;
+            index += size_of::<DbIndexCfIndexNumber>();
+            utxo_value_with_indexes[index..index + size_of::<OutputIndex>()]
+                .copy_from_slice(index_value);
+            index += size_of::<OutputIndex>();
+
+            db_tx.put_cf(
+                &families.custom.o2o_utxo_birth_pk_by_index_cf[cf_index],
+                index_value,
+                utxo_pk_bytes,
+            )?;
         }
 
         self.persist_utxo_value_with_indexes(
@@ -344,7 +409,7 @@ impl<'db> EuTxService {
     fn remove_utxo_indexes(
         &self,
         utxo_pk_bytes: &UtxoPkBytes,
-        db_indexes: &Vec<(DbIndexCfIndex, DbIndexValue)>,
+        db_indexes: &Vec<(DbIndexCfIndexNumber, DbIndexValue)>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
@@ -352,9 +417,9 @@ impl<'db> EuTxService {
             self.remove_indexed_entry(
                 utxo_pk_bytes,
                 index_value,
-                &families.custom.o2m_utxo_birth_pk_by_index_cf[*cf_index as usize],
-                &families.custom.o2m_utxo_birth_pk_relations_cf[*cf_index as usize],
-                &families.custom.o2m_index_by_utxo_birth_pk_cf[*cf_index as usize],
+                &families.custom.o2m_utxo_birth_pk_by_index_cf[cf_index],
+                &families.custom.o2m_utxo_birth_pk_relations_cf[cf_index],
+                &families.custom.o2m_index_by_utxo_birth_pk_cf[cf_index],
                 db_tx,
                 eutxo_codec_utxo::get_utxo_pk_from_relation,
             )?;
@@ -539,6 +604,7 @@ impl<'db> TxService<'db> for EuTxService {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_lru_cache: &mut LruCache<OutputIndex, UtxoPkBytes>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
         for tx in block.txs.iter() {
@@ -548,6 +614,7 @@ impl<'db> TxService<'db> for EuTxService {
                 db_tx,
                 batch,
                 tx_pk_by_tx_hash_lru_cache,
+                utxo_pk_by_index_lru_cache,
                 families,
             )?;
         }
@@ -561,6 +628,7 @@ impl<'db> TxService<'db> for EuTxService {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_lru_cache: &mut LruCache<OutputIndex, UtxoPkBytes>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
         let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
@@ -578,6 +646,7 @@ impl<'db> TxService<'db> for EuTxService {
                 db_tx,
                 batch,
                 tx_pk_by_tx_hash_lru_cache,
+                utxo_pk_by_index_lru_cache,
                 families,
             );
         }
@@ -590,6 +659,7 @@ impl<'db> TxService<'db> for EuTxService {
         tx: &EuTx,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_lru_cache: &mut LruCache<OutputIndex, UtxoPkBytes>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
         let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
@@ -600,6 +670,7 @@ impl<'db> TxService<'db> for EuTxService {
                 tx,
                 db_tx,
                 tx_pk_by_tx_hash_lru_cache,
+                utxo_pk_by_index_lru_cache,
                 families,
             )?;
         }

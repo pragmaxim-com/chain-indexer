@@ -1,10 +1,10 @@
 use crate::model::{
-    AssetAction, AssetId, AssetValue, CompactionEnabled, DbIndexValue, OutputId, Transaction,
+    AssetAction, AssetId, AssetValue, CompactionEnabled, DbIndexValue, OutputIndex, Transaction,
     TxHash, TxIndex,
 };
 use derive_more::{AsRef, Display, From, Into};
 
-use super::eutxo_schema::DbIndexCfIndex;
+use super::eutxo_schema::DbIndexCfIndexNumber;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct InputIndex(u16);
@@ -18,8 +18,8 @@ pub struct UtxoIndex(pub u16);
 #[derive(Debug, Clone)]
 pub struct EuUtxo {
     pub utxo_index: UtxoIndex,
-    pub o2m_db_indexes: Vec<(DbIndexCfIndex, DbIndexValue)>,
-    pub o2o_db_indexes: Vec<(DbIndexCfIndex, DbIndexValue)>,
+    pub o2m_db_indexes: Vec<(DbIndexCfIndexNumber, DbIndexValue)>,
+    pub o2o_db_indexes: Vec<(DbIndexCfIndexNumber, DbIndexValue)>,
     pub assets: Vec<(AssetId, AssetValue, AssetAction)>,
     pub utxo_value: UtxoValue,
 }
@@ -27,7 +27,7 @@ pub struct EuUtxo {
 #[derive(Debug, Clone)]
 pub enum EuTxInput {
     TxHashInput(TxHashWithIndex),
-    BoxIdInput(OutputId),
+    OutputIndexInput(OutputIndex),
 }
 
 #[derive(Debug, Clone)]

@@ -1,38 +1,30 @@
 bitcoin:
   one_to_many_index:
     ADDRESS:
-      index: 0
       enabled: true
 
     SCRIPT_HASH:
-      index: 1
       enabled: false
 
 cardano:
   one_to_many_index:
     ADDRESS:
-      index: 0
       enabled: true
 
     SCRIPT_HASH:
-      index: 1
       enabled: false
 
 ergo:
+  one_to_one_index:
+    BOX_ID:
+      enabled: true
+
   one_to_many_index:
     ADDRESS:
-      index: 0
       enabled: true
 
     ERGO_TREE_HASH:
-      index: 1
       enabled: true
 
     ERGO_TREE_T8_HASH:
-      index: 2
-      enabled: true
-
-  one_to_one_index:
-    BOX_ID:
-      index: 0
       enabled: true

@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     eutxo_model::{UtxoIndex, UtxoValue},
-    eutxo_schema::DbIndexCfIndex,
+    eutxo_schema::DbIndexCfIndexNumber,
 };
 
 pub type UtxoValueWithIndexes = Vec<u8>;
@@ -94,7 +94,7 @@ pub fn get_asset_pk_from_relation(relation_bytes: &[u8]) -> AssetPkBytes {
     pk_bytes
 }
 
-pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndex, UtxoPkBytes)>) {
+pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndexNumber, UtxoPkBytes)>) {
     let utxo_value = UtxoValue(BigEndian::read_u64(&bytes[0..8]));
     let num_pairs = (bytes.len() - 8) / 9;
     let mut utxo_birth_pk_by_cf_index = Vec::with_capacity(num_pairs);
@@ -117,7 +117,7 @@ pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndex, UtxoPkByt
 
 pub fn utxo_to_bytes(
     utxo_value: &UtxoValue,
-    utxo_birth_pk_by_cf_index: Vec<(DbIndexCfIndex, UtxoPkBytes)>,
+    utxo_birth_pk_by_cf_index: Vec<(DbIndexCfIndexNumber, UtxoPkBytes)>,
 ) -> Vec<u8> {
     let mut utxo_value_with_indexes = vec![0u8; 8 + utxo_birth_pk_by_cf_index.len() * 9];
     BigEndian::write_u64(&mut utxo_value_with_indexes[0..8], utxo_value.0);

@@ -3,6 +3,7 @@ use crate::cli::CliConfig;
 use crate::eutxo::eutxo_model::*;
 use crate::settings::IndexerSettings;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -18,6 +19,8 @@ use crate::rocks_db_batch::{Families, SharedFamilies};
 use crate::syncer::ChainSyncer;
 use crate::{api::BlockProvider, eutxo::eutxo_storage};
 use rocksdb::BoundColumnFamily;
+
+use super::eutxo_schema::DbIndexCfIndexNumber;
 
 pub async fn run_eutxo_indexing(
     indexer_settings: IndexerSettings,
@@ -49,33 +52,34 @@ pub async fn run_eutxo_indexing(
                 .one_to_many_index_cfs
                 .utxo_birth_pk_relations
                 .iter()
-                .map(|(cf, _)| db.cf_handle(cf).unwrap())
-                .collect::<Vec<Arc<BoundColumnFamily>>>(),
+                .map(|(index_number, index_name, _)| {
+                    (*index_number, db.cf_handle(index_name).unwrap())
+                })
+                .collect::<HashMap<DbIndexCfIndexNumber, Arc<BoundColumnFamily>>>(),
             o2m_utxo_birth_pk_by_index_cf: db_index_manager
                 .one_to_many_index_cfs
                 .utxo_birth_pk_by_index
                 .iter()
-                .map(|(cf, _)| db.cf_handle(cf).unwrap())
-                .collect::<Vec<Arc<BoundColumnFamily>>>(),
+                .map(|(index_number, index_name, _)| {
+                    (*index_number, db.cf_handle(index_name).unwrap())
+                })
+                .collect::<HashMap<DbIndexCfIndexNumber, Arc<BoundColumnFamily>>>(),
             o2m_index_by_utxo_birth_pk_cf: db_index_manager
                 .one_to_many_index_cfs
                 .index_by_utxo_birth_pk
                 .iter()
-                .map(|(cf, _)| db.cf_handle(cf).unwrap())
-                .collect::<Vec<Arc<BoundColumnFamily>>>(),
+                .map(|(index_number, index_name, _)| {
+                    (*index_number, db.cf_handle(index_name).unwrap())
+                })
+                .collect::<HashMap<DbIndexCfIndexNumber, Arc<BoundColumnFamily>>>(),
             o2o_utxo_birth_pk_by_index_cf: db_index_manager
                 .one_to_one_index_cfs
                 .utxo_birth_pk_by_index
                 .iter()
-                .map(|(cf, _)| db.cf_handle(cf).unwrap())
-                .collect::<Vec<Arc<BoundColumnFamily>>>(),
-            o2o_index_by_utxo_birth_pk_cf: db_index_manager
-                .one_to_one_index_cfs
-                .index_by_utxo_birth_pk
-                .iter()
-                .map(|(cf, _)| db.cf_handle(cf).unwrap())
-                .collect::<Vec<Arc<BoundColumnFamily>>>(),
-
+                .map(|(index_number, index_name, _)| {
+                    (*index_number, db.cf_handle(index_name).unwrap())
+                })
+                .collect::<HashMap<DbIndexCfIndexNumber, Arc<BoundColumnFamily>>>(),
             asset_by_asset_pk_cf: db.cf_handle(ASSET_BY_ASSET_PK_CF).unwrap(),
             asset_id_by_asset_birth_pk_cf: db.cf_handle(ASSET_ID_BY_ASSET_BIRTH_PK_CF).unwrap(),
             asset_birth_pk_by_asset_id_cf: db.cf_handle(ASSET_BIRTH_PK_BY_ASSET_ID_CF).unwrap(),

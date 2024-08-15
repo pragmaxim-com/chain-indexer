@@ -60,9 +60,11 @@ TxPk_by_txHash:
 Secondary indexes like (`script_hash/address`) are stored as sequence of pointers to a utxo where it was first born, prefixed with a column family pointer.
 `UtxoPk_by_InputPk` is used to tell whether box is spent or not.
 
+> Note that this encoding will be likely replaced in future with some alternative binary encoding, `utxo_value` will be replaced by anything box related we want to search by.
+
 ```
 UtxoValueAndUtxoBirthPks_by_UtxoPk:
-    utxo_pk -> utxo_value|[utxo_index_cf:utxo_birth_pk,utxo_index_cf:utxo_birth_pk]
+    utxo_pk -> utxo_value|[utxo_o2m_index_cf:utxo_birth_pk,utxo_o2m_index_cf:utxo_birth_pk:utxo_o2o_index_cf:utxo_index]
 
 Spent_UtxoPk_by_InputPk:
     input_pk -> utxo_pk
@@ -71,9 +73,17 @@ Spent_InputPk_by_UtxoPk:
     utxo_pk -> input_pk
 ```
 
+### Utxo indexes (one-to-one)
+
+As an example, Ergo's output box has a unique identifier `box_id` which we want to search by. But it could be anything from a box. Each blockchain might have it's own
+box binary encoder/decoder.
+
+UtxoIndex_by_UtxoPk
+    box_id -> utxo_pk
+
 ### Utxo indexes (one-to-many)
 
-We keep secondary indexes (`script_hash/address`) under small-size `utxo_birth_pk` identifiers which is a unique pointer of their creation.
+We keep secondary indexes like `script_hash/address/etc...` under small-size `utxo_birth_pk` identifiers which is a unique pointer of their creation.
 Then we keep relations to all following boxes where given indexed entity occurred. Following table shows 2 example secondary indexes : `script_hash` & `address`.
 
 > Note that one-to-one indexes are the same, just without `relations`.

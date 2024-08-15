@@ -52,8 +52,8 @@ pub type TxCount = usize;
 pub struct TxIndex(pub u16);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]
-pub struct OutputId(pub [u8; 32]);
-impl fmt::Display for OutputId {
+pub struct OutputIndex(pub [u8; 32]);
+impl fmt::Display for OutputIndex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(self.0))
     }

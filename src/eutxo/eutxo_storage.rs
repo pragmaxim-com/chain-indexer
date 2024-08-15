@@ -36,7 +36,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
         }
 
         // One To Many
-        for (index_utxo_birth_pk_with_utxo_pk, compaction_enabled) in db_schema
+        for (index_number, index_utxo_birth_pk_with_utxo_pk, compaction_enabled) in db_schema
             .one_to_many_index_cfs
             .utxo_birth_pk_relations
             .into_iter()
@@ -51,7 +51,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
             )
             .unwrap();
         }
-        for (index_by_utxo_birth_pk, compaction_enabled) in db_schema
+        for (index_number, index_by_utxo_birth_pk, compaction_enabled) in db_schema
             .one_to_many_index_cfs
             .index_by_utxo_birth_pk
             .into_iter()
@@ -63,7 +63,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
             db.create_cf(index_by_utxo_birth_pk, get_opts(compaction_enabled))
                 .unwrap();
         }
-        for (utxo_birth_pk_by_index, compaction_enabled) in db_schema
+        for (index_number, utxo_birth_pk_by_index, compaction_enabled) in db_schema
             .one_to_many_index_cfs
             .utxo_birth_pk_by_index
             .into_iter()
@@ -77,7 +77,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
         }
 
         // One To One
-        for (utxo_birth_pk_by_index, compaction_enabled) in db_schema
+        for (index_number, utxo_birth_pk_by_index, compaction_enabled) in db_schema
             .one_to_one_index_cfs
             .utxo_birth_pk_by_index
             .into_iter()
@@ -87,18 +87,6 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
                 utxo_birth_pk_by_index, compaction_enabled
             );
             db.create_cf(utxo_birth_pk_by_index, get_opts(compaction_enabled))
-                .unwrap();
-        }
-        for (index_by_utxo_birth_pk, compaction_enabled) in db_schema
-            .one_to_one_index_cfs
-            .index_by_utxo_birth_pk
-            .into_iter()
-        {
-            info!(
-                "Creating one-to-one index column family {}, compaction {}",
-                index_by_utxo_birth_pk, compaction_enabled
-            );
-            db.create_cf(index_by_utxo_birth_pk, get_opts(compaction_enabled))
                 .unwrap();
         }
     }

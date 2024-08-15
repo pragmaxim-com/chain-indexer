@@ -3,7 +3,7 @@ use ergo_lib::{chain::transaction::Transaction, wallet::signing::ErgoTransaction
 use crate::{
     api::{BlockProcessor, OutputProcessor},
     eutxo::eutxo_model::{EuTx, EuTxInput},
-    model::{Block, OutputId, TxCount, TxIndex},
+    model::{Block, OutputIndex, TxCount, TxIndex},
 };
 
 use super::ergo_output_processor::ErgoOutputProcessor;
@@ -62,7 +62,7 @@ impl BlockProcessor for ErgoBlockProcessor {
                                 let box_id: [u8; 32] = box_id_slice
                                     .try_into()
                                     .expect("slice with incorrect length");
-                                EuTxInput::BoxIdInput(OutputId(box_id))
+                                EuTxInput::OutputIndexInput(OutputIndex(box_id))
                             })
                             .collect(),
                         tx_outputs: self.output_processor.process_outputs(tx.outputs().to_vec()), //TODO perf check
