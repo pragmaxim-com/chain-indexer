@@ -78,8 +78,10 @@ Spent_InputPk_by_UtxoPk:
 As an example, Ergo's output box has a unique identifier `box_id` which we want to search by. But it could be anything from a box. Each blockchain might have it's own
 box binary encoder/decoder.
 
+```
 UtxoIndex_by_UtxoPk
     box_id -> utxo_pk
+```
 
 ### Utxo indexes (one-to-many)
 

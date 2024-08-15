@@ -204,6 +204,27 @@ impl<'db> EuTxService {
             .collect()
     }
 
+    fn get_o2o_utxo_indexes(
+        &self,
+        index_utxo_birth_pk_by_cf_index: &Vec<(DbIndexCfIndexNumber, UtxoBirthPkBytes)>,
+        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
+        families: &Families<'db, EutxoFamilies<'db>>,
+    ) -> Result<Vec<(DbIndexCfIndexNumber, DbIndexValue)>, rocksdb::Error> {
+        index_utxo_birth_pk_by_cf_index
+            .iter()
+            .map(|(cf_index, utxo_birth_pk)| {
+                let index_value = db_tx
+                    .get_cf(
+                        &families.custom.o2m_index_by_utxo_birth_pk_cf[cf_index],
+                        utxo_birth_pk,
+                    )?
+                    .unwrap();
+
+                Ok((*cf_index, index_value))
+            })
+            .collect::<Result<Vec<(DbIndexCfIndexNumber, DbIndexValue)>, rocksdb::Error>>()
+    }
+
     fn get_o2m_utxo_indexes(
         &self,
         index_utxo_birth_pk_by_cf_index: &Vec<(DbIndexCfIndexNumber, UtxoBirthPkBytes)>,
