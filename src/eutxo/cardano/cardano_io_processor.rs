@@ -1,26 +1,41 @@
 use crate::{
-    api::OutputProcessor,
-    eutxo::{eutxo_model::EuUtxo, eutxo_schema::DbSchema},
-    model::AssetAction,
+    api::IoProcessor,
+    eutxo::{
+        eutxo_model::{EuTxInput, EuUtxo, TxHashWithIndex},
+        eutxo_schema::DbSchema,
+    },
+    model::{AssetAction, O2mIndexValue},
 };
-use pallas::{codec::minicbor::Encode, codec::minicbor::Encoder, ledger::traverse::MultiEraOutput};
+use pallas::{
+    codec::minicbor::{Encode, Encoder},
+    ledger::traverse::{MultiEraInput, MultiEraOutput},
+};
 
-const DB_INDEX_ADDRESS: String = "ADDRESS".to_string();
-const DB_INDEX_SCRIPT_HASH: String = "SCRIPT_HASH".to_string();
-
-pub struct CardanoOutputProcessor {
+pub struct CardanoIoProcessor {
     pub db_schema: DbSchema,
 }
 
-impl CardanoOutputProcessor {
+impl CardanoIoProcessor {
     pub fn new(db_schema: DbSchema) -> Self {
-        CardanoOutputProcessor { db_schema }
+        CardanoIoProcessor { db_schema }
     }
 }
 
-impl OutputProcessor<MultiEraOutput<'_>, EuUtxo> for CardanoOutputProcessor {
-    fn process_outputs(&self, outs: Vec<MultiEraOutput<'_>>) -> Vec<EuUtxo> {
-        let result_outs = Vec::with_capacity(outs.len());
+impl IoProcessor<MultiEraInput<'_>, EuTxInput, MultiEraOutput<'_>, EuUtxo> for CardanoIoProcessor {
+    fn process_inputs(&self, ins: &Vec<MultiEraInput<'_>>) -> Vec<EuTxInput> {
+        ins.iter()
+            .map(|input| {
+                let tx_hash: [u8; 32] = **input.hash();
+                EuTxInput::TxHashInput(TxHashWithIndex {
+                    tx_hash: tx_hash.into(),
+                    utxo_index: (input.index() as u16).into(),
+                })
+            })
+            .collect()
+    }
+
+    fn process_outputs(&self, outs: &Vec<MultiEraOutput<'_>>) -> Vec<EuUtxo> {
+        let mut result_outs = Vec::with_capacity(outs.len());
         for (out_index, out) in outs.iter().enumerate() {
             let address_opt = out.address().ok().map(|a| a.to_vec());
             let script_hash_opt = out.script_ref().map(|h| {
@@ -31,27 +46,18 @@ impl OutputProcessor<MultiEraOutput<'_>, EuUtxo> for CardanoOutputProcessor {
                 buffer
             });
 
-            let mut o2m_db_indexes = Vec::with_capacity(2);
+            let mut o2m_db_indexes: Vec<(u8, O2mIndexValue)> = Vec::with_capacity(2);
 
-            if let Some(index_number) = self
-                .db_schema
-                .db_index_table
-                .one_to_many
-                .get(&DB_INDEX_SCRIPT_HASH)
+            if let Some(index_number) = self.db_schema.db_index_table.one_to_many.get("SCRIPT_HASH")
             {
                 if let Some(script_hash) = script_hash_opt {
-                    o2m_db_indexes.push((*index_number, script_hash));
+                    o2m_db_indexes.push((*index_number, script_hash.into()));
                 }
             }
 
-            if let Some(index_number) = self
-                .db_schema
-                .db_index_table
-                .one_to_many
-                .get(&DB_INDEX_ADDRESS)
-            {
+            if let Some(index_number) = self.db_schema.db_index_table.one_to_many.get("ADDRESS") {
                 if let Some(address) = address_opt {
-                    o2m_db_indexes.push((*index_number, address));
+                    o2m_db_indexes.push((*index_number, address.into()));
                 }
             }
 

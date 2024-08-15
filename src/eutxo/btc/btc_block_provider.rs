@@ -12,8 +12,7 @@ use min_batch::ext::MinBatchExt;
 use std::{pin::Pin, sync::Arc};
 
 use super::{
-    btc_block_processor::BtcBlockProcessor, btc_client::BtcClient,
-    btc_output_processor::BtcOutputProcessor,
+    btc_block_processor::BtcBlockProcessor, btc_client::BtcClient, btc_io_processor::BtcIoProcessor,
 };
 
 pub struct BtcBlockProvider {
@@ -25,7 +24,7 @@ impl BtcBlockProvider {
     pub fn new(bitcoin_config: &BitcoinConfig, db_schema: DbSchema) -> Self {
         BtcBlockProvider {
             client: Arc::new(BtcClient::new(bitcoin_config)),
-            processor: Arc::new(BtcBlockProcessor::new(BtcOutputProcessor::new(db_schema))),
+            processor: Arc::new(BtcBlockProcessor::new(BtcIoProcessor::new(db_schema))),
         }
     }
 
@@ -47,7 +46,7 @@ impl BlockProvider for BtcBlockProvider {
     type OutTx = EuTx;
 
     fn get_schema(&self) -> DbSchema {
-        self.processor.output_processor.db_schema
+        self.processor.io_processor.db_schema.clone()
     }
 
     fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, String> {

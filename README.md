@@ -64,7 +64,7 @@ Secondary indexes like (`script_hash/address`) are stored as sequence of pointer
 
 ```
 UtxoValueAndUtxoBirthPks_by_UtxoPk:
-    utxo_pk -> utxo_value|[utxo_o2m_index_cf:utxo_birth_pk,utxo_o2m_index_cf:utxo_birth_pk:utxo_o2o_index_cf:utxo_index]
+    utxo_pk -> utxo_value|[utxo_o2m_index_number:utxo_birth_pk,utxo_o2m_index_number:utxo_birth_pk]|[utxo_o2o_index_number:size:utxo_index_value]
 
 Spent_UtxoPk_by_InputPk:
     input_pk -> utxo_pk

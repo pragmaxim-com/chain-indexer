@@ -4,7 +4,7 @@ use crate::{
     codec_tx::TxPkBytes,
     eutxo::eutxo_codec_utxo::UtxoPkBytes,
     info,
-    model::{Block, BlockHash, BlockHeader, BlockHeight, OutputIndex, Transaction, TxHash},
+    model::{Block, BlockHash, BlockHeader, BlockHeight, O2oIndexValue, Transaction, TxHash},
     rocks_db_batch::{CustomFamilies, Families},
 };
 use lru::LruCache;
@@ -16,7 +16,7 @@ pub struct BlockService<'db, Tx: Transaction, CF: CustomFamilies<'db>> {
     pub(crate) tx_service: Arc<dyn TxService<'db, CF = CF, Tx = Tx>>,
     pub(crate) block_by_hash_lru_cache: RefCell<LruCache<BlockHash, Rc<Block<Tx>>>>,
     pub(crate) tx_pk_by_tx_hash_lru_cache: RefCell<LruCache<TxHash, TxPkBytes>>,
-    pub(crate) utxo_pk_by_index_lru_cache: RefCell<LruCache<OutputIndex, UtxoPkBytes>>,
+    pub(crate) utxo_pk_by_index_lru_cache: RefCell<LruCache<O2oIndexValue, UtxoPkBytes>>,
 }
 
 impl<'db, Tx: Transaction, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
@@ -64,7 +64,7 @@ impl<'db, Tx: Transaction, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         block: Rc<Block<Tx>>,
         block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
-        utxo_pk_by_index_lru_cache: &mut LruCache<OutputIndex, UtxoPkBytes>,
+        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         families: &Families<'db, CF>,

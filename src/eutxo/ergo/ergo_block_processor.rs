@@ -1,24 +1,24 @@
 use ergo_lib::{chain::transaction::Transaction, wallet::signing::ErgoTransaction};
 
 use crate::{
-    api::{BlockProcessor, OutputProcessor},
-    eutxo::eutxo_model::{EuTx, EuTxInput},
-    model::{Block, OutputIndex, TxCount, TxIndex},
+    api::{BlockProcessor, IoProcessor},
+    eutxo::eutxo_model::EuTx,
+    model::{Block, TxCount, TxIndex},
 };
 
-use super::ergo_output_processor::ErgoOutputProcessor;
+use super::ergo_io_processor::ErgoIoProcessor;
 
 pub type OutputAddress = Vec<u8>;
 pub type OutputErgoTreeHash = Vec<u8>;
 pub type OutputErgoTreeT8Hash = Vec<u8>;
 
 pub struct ErgoBlockProcessor {
-    pub output_processor: ErgoOutputProcessor,
+    pub io_processor: ErgoIoProcessor,
 }
 
 impl ErgoBlockProcessor {
-    pub fn new(output_processor: ErgoOutputProcessor) -> Self {
-        ErgoBlockProcessor { output_processor }
+    pub fn new(io_processor: ErgoIoProcessor) -> Self {
+        ErgoBlockProcessor { io_processor }
     }
 }
 
@@ -54,18 +54,8 @@ impl BlockProcessor for ErgoBlockProcessor {
                     EuTx {
                         tx_hash: tx_hash.into(),
                         tx_index: TxIndex(tx_index as u16),
-                        tx_inputs: tx
-                            .inputs_ids()
-                            .iter()
-                            .map(|input| {
-                                let box_id_slice: &[u8] = input.as_ref();
-                                let box_id: [u8; 32] = box_id_slice
-                                    .try_into()
-                                    .expect("slice with incorrect length");
-                                EuTxInput::OutputIndexInput(OutputIndex(box_id))
-                            })
-                            .collect(),
-                        tx_outputs: self.output_processor.process_outputs(tx.outputs().to_vec()), //TODO perf check
+                        tx_inputs: self.io_processor.process_inputs(&tx.inputs_ids().to_vec()),
+                        tx_outputs: self.io_processor.process_outputs(&tx.outputs().to_vec()), //TODO perf check
                     }
                 })
                 .collect(),

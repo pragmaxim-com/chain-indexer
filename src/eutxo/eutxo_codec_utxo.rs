@@ -4,12 +4,12 @@ use byteorder::{BigEndian, ByteOrder};
 
 use crate::{
     codec_tx::TxPkBytes,
-    model::{AssetAction, AssetIndex, AssetValue, BlockHeight, TxIndex},
+    model::{AssetAction, AssetIndex, AssetValue, BlockHeight, O2oIndexValue, TxIndex},
 };
 
 use super::{
     eutxo_model::{UtxoIndex, UtxoValue},
-    eutxo_schema::DbIndexCfIndexNumber,
+    eutxo_schema::DbIndexNumber,
 };
 
 pub type UtxoValueWithIndexes = Vec<u8>;
@@ -94,30 +94,46 @@ pub fn get_asset_pk_from_relation(relation_bytes: &[u8]) -> AssetPkBytes {
     pk_bytes
 }
 
-pub fn bytes_to_utxo(bytes: &[u8]) -> (UtxoValue, Vec<(DbIndexCfIndexNumber, UtxoPkBytes)>) {
+pub fn bytes_to_utxo(
+    bytes: &[u8],
+) -> (
+    UtxoValue,
+    Vec<(DbIndexNumber, UtxoPkBytes)>,
+    Vec<(DbIndexNumber, O2oIndexValue)>,
+) {
     let utxo_value = UtxoValue(BigEndian::read_u64(&bytes[0..8]));
-    let num_pairs = (bytes.len() - 8) / 9;
-    let mut utxo_birth_pk_by_cf_index = Vec::with_capacity(num_pairs);
+    let mut o2m_indexes = vec![];
+    let mut o2o_indexes: Vec<(u8, O2oIndexValue)> = vec![];
     let mut index = 8;
     while index < bytes.len() {
         if index + 9 <= bytes.len() {
-            let cf_index_id = bytes[index];
+            let index_number = bytes[index];
             index += 1;
-            let utxo_birth_pk = &bytes[index..index + 8];
-            index += 8;
-            let utxo_birth_pk_bytes: UtxoPkBytes = <UtxoPkBytes>::try_from(utxo_birth_pk)
-                .expect("UtxoBirthPk should have exactly 8 bytes");
-            utxo_birth_pk_by_cf_index.push((cf_index_id, utxo_birth_pk_bytes));
+            if index_number < 128 {
+                let utxo_birth_pk = &bytes[index..index + 8];
+                index += 8;
+                let utxo_birth_pk_bytes: UtxoPkBytes = <UtxoPkBytes>::try_from(utxo_birth_pk)
+                    .expect("UtxoBirthPk should have exactly 8 bytes");
+                o2m_indexes.push((index_number, utxo_birth_pk_bytes));
+            } else {
+                let index_value_size_bytes = &bytes[index..index + 2];
+                let index_value_size =
+                    u16::from_be_bytes([index_value_size_bytes[0], index_value_size_bytes[1]]);
+                index += 2;
+                let index_value = &bytes[index..index + index_value_size as usize];
+                index += index_value_size as usize;
+                o2o_indexes.push((index_number, index_value.to_vec().into()));
+            }
         } else {
             break;
         }
     }
-    (utxo_value, utxo_birth_pk_by_cf_index)
+    (utxo_value, o2m_indexes, o2o_indexes)
 }
 
 pub fn utxo_to_bytes(
     utxo_value: &UtxoValue,
-    utxo_birth_pk_by_cf_index: Vec<(DbIndexCfIndexNumber, UtxoPkBytes)>,
+    utxo_birth_pk_by_cf_index: Vec<(DbIndexNumber, UtxoPkBytes)>,
 ) -> Vec<u8> {
     let mut utxo_value_with_indexes = vec![0u8; 8 + utxo_birth_pk_by_cf_index.len() * 9];
     BigEndian::write_u64(&mut utxo_value_with_indexes[0..8], utxo_value.0);
@@ -224,7 +240,7 @@ mod tests {
         fn test_roundtrip(utxo_value in any::<u64>(), pairs in prop::collection::vec((any::<u8>(), any::<[u8; 8]>()), 0..100)) {
             let utxo_value = UtxoValue(utxo_value);
             let bytes = utxo_to_bytes(&utxo_value, pairs.clone());
-            let (decoded_utxo_value, decoded_pairs) = bytes_to_utxo(&bytes);
+            let (decoded_utxo_value, decoded_pairs, _) = bytes_to_utxo(&bytes);
             assert_eq!(utxo_value.0, decoded_utxo_value.0);
             assert_eq!(pairs, decoded_pairs);
         }

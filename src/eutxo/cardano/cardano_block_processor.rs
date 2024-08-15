@@ -1,9 +1,9 @@
 use pallas::ledger::traverse::MultiEraBlock;
 
-use super::{cardano_client::CBOR, cardano_output_processor::CardanoOutputProcessor};
+use super::{cardano_client::CBOR, cardano_io_processor::CardanoIoProcessor};
 use crate::{
-    api::OutputProcessor,
-    eutxo::eutxo_model::{EuTx, EuTxInput, TxHashWithIndex},
+    api::IoProcessor,
+    eutxo::eutxo_model::EuTx,
     model::{AssetId, AssetValue, Block, BlockHash, BlockHeader, TxIndex},
 };
 pub const EMPTY_ASSETS_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
@@ -14,12 +14,12 @@ pub type OutputScriptHash = Option<Vec<u8>>;
 pub static GENESIS_START_TIME: u32 = 1506203091;
 
 pub struct CardanoBlockProcessor {
-    pub output_processor: CardanoOutputProcessor,
+    pub io_processor: CardanoIoProcessor,
 }
 
 impl CardanoBlockProcessor {
-    pub fn new(output_processor: CardanoOutputProcessor) -> Self {
-        CardanoBlockProcessor { output_processor }
+    pub fn new(io_processor: CardanoIoProcessor) -> Self {
+        CardanoBlockProcessor { io_processor }
     }
 
     pub fn process_block(&self, block: &CBOR) -> Result<Block<EuTx>, String> {
@@ -48,18 +48,8 @@ impl CardanoBlockProcessor {
                     EuTx {
                         tx_hash: tx_hash.into(),
                         tx_index: TxIndex(tx_index as u16),
-                        tx_inputs: tx
-                            .inputs()
-                            .iter()
-                            .map(|input| {
-                                let tx_hash: [u8; 32] = **input.hash();
-                                EuTxInput::TxHashInput(TxHashWithIndex {
-                                    tx_hash: tx_hash.into(),
-                                    utxo_index: (input.index() as u16).into(),
-                                })
-                            })
-                            .collect(),
-                        tx_outputs: self.output_processor.process_outputs(tx.outputs().to_vec()),
+                        tx_inputs: self.io_processor.process_inputs(&tx.inputs()),
+                        tx_outputs: self.io_processor.process_outputs(&tx.outputs().to_vec()),
                     }
                 })
                 .collect(),

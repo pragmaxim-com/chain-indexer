@@ -7,7 +7,7 @@ use crate::model::{
     DbUtxoBirthPkByIndexCf,
 };
 
-pub type DbIndexCfIndexNumber = u8;
+pub type DbIndexNumber = u8;
 pub type DbIndexName = String;
 pub type DbIndexEnabled = bool;
 
@@ -35,9 +35,9 @@ impl From<RawOutputIndexes> for DbOutputIndexLayout {
             .one_to_many_index
             .into_iter()
             .enumerate()
-            .filter_map(|(index, (db_index_name, db_index_info))| {
+            .filter_map(|(index_number, (db_index_name, db_index_info))| {
                 if db_index_info.enabled {
-                    Some((db_index_name, index as u8))
+                    Some((db_index_name, index_number as u8))
                 } else {
                     None
                 }
@@ -48,9 +48,9 @@ impl From<RawOutputIndexes> for DbOutputIndexLayout {
             .one_to_one_index
             .into_iter()
             .zip((0..=255).rev())
-            .filter_map(|((db_index_name, db_index_info), index)| {
+            .filter_map(|((db_index_name, db_index_info), index_number)| {
                 if db_index_info.enabled {
-                    Some((db_index_name, index as u8))
+                    Some((db_index_name, index_number as u8))
                 } else {
                     None
                 }
@@ -74,38 +74,26 @@ impl From<RawSchema> for DbSchemaHolder {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DbOutputIndexLayout {
-    pub one_to_many: HashMap<DbIndexName, DbIndexCfIndexNumber>,
-    pub one_to_one: HashMap<DbIndexName, DbIndexCfIndexNumber>,
+    pub one_to_many: HashMap<DbIndexName, DbIndexNumber>,
+    pub one_to_one: HashMap<DbIndexName, DbIndexNumber>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct O2mOutputIndexCfs {
     pub utxo_birth_pk_relations: Vec<(
-        DbIndexCfIndexNumber,
+        DbIndexNumber,
         DbIndexUtxoBirthPkWithUtxoPkCf,
         CompactionEnabled,
     )>,
-    pub utxo_birth_pk_by_index: Vec<(
-        DbIndexCfIndexNumber,
-        DbUtxoBirthPkByIndexCf,
-        CompactionEnabled,
-    )>,
-    pub index_by_utxo_birth_pk: Vec<(
-        DbIndexCfIndexNumber,
-        DbIndexByUtxoBirthPkCf,
-        CompactionEnabled,
-    )>,
+    pub utxo_birth_pk_by_index: Vec<(DbIndexNumber, DbUtxoBirthPkByIndexCf, CompactionEnabled)>,
+    pub index_by_utxo_birth_pk: Vec<(DbIndexNumber, DbIndexByUtxoBirthPkCf, CompactionEnabled)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct O2oOutputIndexCfs {
-    pub utxo_birth_pk_by_index: Vec<(
-        DbIndexCfIndexNumber,
-        DbUtxoBirthPkByIndexCf,
-        CompactionEnabled,
-    )>,
+    pub utxo_birth_pk_by_index: Vec<(DbIndexNumber, DbUtxoBirthPkByIndexCf, CompactionEnabled)>,
 }
 
 #[derive(Debug)]
@@ -115,7 +103,7 @@ pub struct DbSchemaHolder {
     pub ergo: DbSchema,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DbSchema {
     pub db_index_table: DbOutputIndexLayout,
     pub one_to_many_index_cfs: O2mOutputIndexCfs,
@@ -125,33 +113,37 @@ pub struct DbSchema {
 impl DbSchema {
     pub fn new(db_index_table: DbOutputIndexLayout) -> Self {
         DbSchema {
-            db_index_table,
+            db_index_table: db_index_table.clone(),
             one_to_many_index_cfs: O2mOutputIndexCfs {
                 utxo_birth_pk_relations: db_index_table
                     .one_to_many
-                    .into_iter()
+                    .iter()
                     .map(|(index_name, index_number)| {
-                        (index_number, format!("O2M_{}_RELATIONS", index_name), false)
+                        (
+                            *index_number,
+                            format!("O2M_{}_RELATIONS", *index_name),
+                            false,
+                        )
                     })
                     .collect(),
                 utxo_birth_pk_by_index: db_index_table
                     .one_to_many
-                    .into_iter()
+                    .iter()
                     .map(|(index_name, index_number)| {
                         (
-                            index_number,
-                            format!("O2M_UTXO_BIRTH_PK_BY_{}", index_name),
+                            *index_number,
+                            format!("O2M_UTXO_BIRTH_PK_BY_{}", *index_name),
                             true,
                         )
                     })
                     .collect(),
                 index_by_utxo_birth_pk: db_index_table
                     .one_to_many
-                    .into_iter()
+                    .iter()
                     .map(|(index_name, index_number)| {
                         (
-                            index_number,
-                            format!("O2M_{}_BY_UTXO_BIRTH_PK", index_name),
+                            *index_number,
+                            format!("O2M_{}_BY_UTXO_BIRTH_PK", *index_name),
                             false,
                         )
                     })
@@ -160,11 +152,11 @@ impl DbSchema {
             one_to_one_index_cfs: O2oOutputIndexCfs {
                 utxo_birth_pk_by_index: db_index_table
                     .one_to_one
-                    .into_iter()
+                    .iter()
                     .map(|(index_name, index_number)| {
                         (
-                            index_number,
-                            format!("O2O_UTXO_BIRTH_PK_BY_{}", index_name),
+                            *index_number,
+                            format!("O2O_UTXO_BIRTH_PK_BY_{}", *index_name),
                             true,
                         )
                     })

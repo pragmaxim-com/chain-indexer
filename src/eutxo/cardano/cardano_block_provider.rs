@@ -20,7 +20,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use super::{
     cardano_block_processor::{CardanoBlockProcessor, GENESIS_START_TIME},
     cardano_client::{CardanoClient, CBOR},
-    cardano_output_processor::CardanoOutputProcessor,
+    cardano_io_processor::CardanoIoProcessor,
 };
 
 pub struct CardanoBlockProvider {
@@ -32,7 +32,7 @@ impl CardanoBlockProvider {
     pub async fn new(cardano_config: &CardanoConfig, db_schema: DbSchema) -> Self {
         CardanoBlockProvider {
             client: CardanoClient::new(cardano_config).await,
-            processor: Arc::new(CardanoBlockProcessor::new(CardanoOutputProcessor::new(
+            processor: Arc::new(CardanoBlockProcessor::new(CardanoIoProcessor::new(
                 db_schema,
             ))),
         }
@@ -44,7 +44,7 @@ impl BlockProvider for CardanoBlockProvider {
     type OutTx = EuTx;
 
     fn get_schema(&self) -> DbSchema {
-        self.processor.output_processor.db_schema
+        self.processor.io_processor.db_schema.clone()
     }
 
     fn get_processed_block(&self, h: BlockHeader) -> Result<Block<Self::OutTx>, String> {

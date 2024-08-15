@@ -1,9 +1,9 @@
-use crate::api::{BlockProcessor, OutputProcessor};
-use crate::eutxo::eutxo_model::{EuTx, EuTxInput, TxHashWithIndex};
+use crate::api::{BlockProcessor, IoProcessor};
+use crate::eutxo::eutxo_model::EuTx;
 use crate::model::{AssetAction, AssetId, AssetValue, Block, TxCount, TxIndex};
 use bitcoin_hashes::Hash;
 
-use super::btc_output_processor::BtcOutputProcessor;
+use super::btc_io_processor::BtcIoProcessor;
 
 pub const EMPTY_VEC: Vec<(AssetId, AssetValue, AssetAction)> = Vec::new();
 
@@ -13,29 +13,20 @@ pub type OutputAddress = Option<Vec<u8>>;
 pub type OutputScriptHash = Vec<u8>;
 
 pub struct BtcBlockProcessor {
-    pub output_processor: BtcOutputProcessor,
+    pub io_processor: BtcIoProcessor,
 }
 
 impl BtcBlockProcessor {
-    pub fn new(output_processor: BtcOutputProcessor) -> Self {
-        BtcBlockProcessor { output_processor }
+    pub fn new(io_processor: BtcIoProcessor) -> Self {
+        BtcBlockProcessor { io_processor }
     }
 
     fn process_tx(&self, tx_index: &TxIndex, tx: &bitcoin::Transaction) -> EuTx {
         EuTx {
             tx_hash: tx.compute_txid().to_byte_array().into(),
             tx_index: tx_index.clone(),
-            tx_inputs: tx
-                .input
-                .iter()
-                .map(|input| {
-                    EuTxInput::TxHashInput(TxHashWithIndex {
-                        tx_hash: input.previous_output.txid.to_byte_array().into(),
-                        utxo_index: (input.previous_output.vout as u16).into(),
-                    })
-                })
-                .collect(),
-            tx_outputs: self.output_processor.process_outputs(tx.output),
+            tx_inputs: self.io_processor.process_inputs(&tx.input),
+            tx_outputs: self.io_processor.process_outputs(&tx.output),
         }
     }
 }

@@ -1,29 +1,36 @@
-use crate::api::OutputProcessor;
-use crate::eutxo::eutxo_model::EuUtxo;
+use crate::api::IoProcessor;
+use crate::eutxo::eutxo_model::{EuTxInput, EuUtxo, TxHashWithIndex};
 use crate::eutxo::eutxo_schema::DbSchema;
-use crate::model::{AssetAction, AssetId, AssetValue};
+use crate::model::{AssetAction, AssetId, AssetValue, O2mIndexValue};
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
 use bitcoin_hashes::Hash;
 
 pub const EMPTY_ASSETS_VEC: Vec<(AssetId, AssetValue, AssetAction)> = Vec::new();
 
-const DB_INDEX_ADDRESS: String = "ADDRESS".to_string();
-const DB_INDEX_SCRIPT_HASH: String = "SCRIPT_HASH".to_string();
-
-pub struct BtcOutputProcessor {
+pub struct BtcIoProcessor {
     pub db_schema: DbSchema,
 }
 
-impl BtcOutputProcessor {
+impl BtcIoProcessor {
     pub fn new(db_schema: DbSchema) -> Self {
-        BtcOutputProcessor { db_schema }
+        BtcIoProcessor { db_schema }
     }
 }
 
-impl OutputProcessor<bitcoin::TxOut, EuUtxo> for BtcOutputProcessor {
-    fn process_outputs(&self, outs: Vec<bitcoin::TxOut>) -> Vec<EuUtxo> {
-        let result_outs = Vec::with_capacity(outs.len());
+impl IoProcessor<bitcoin::TxIn, EuTxInput, bitcoin::TxOut, EuUtxo> for BtcIoProcessor {
+    fn process_inputs(&self, ins: &Vec<bitcoin::TxIn>) -> Vec<EuTxInput> {
+        ins.iter()
+            .map(|input| {
+                EuTxInput::TxHashInput(TxHashWithIndex {
+                    tx_hash: input.previous_output.txid.to_byte_array().into(),
+                    utxo_index: (input.previous_output.vout as u16).into(),
+                })
+            })
+            .collect()
+    }
+    fn process_outputs(&self, outs: &Vec<bitcoin::TxOut>) -> Vec<EuUtxo> {
+        let mut result_outs = Vec::with_capacity(outs.len());
         for (out_index, out) in outs.iter().enumerate() {
             let address_opt = if let Ok(address) =
                 Address::from_script(out.script_pubkey.as_script(), Network::Bitcoin)
@@ -40,29 +47,21 @@ impl OutputProcessor<bitcoin::TxOut, EuUtxo> for BtcOutputProcessor {
             } else {
                 None
             };
-            let script_hash = sha256::Hash::hash(out.script_pubkey.as_bytes())
+            let script_hash: O2mIndexValue = sha256::Hash::hash(out.script_pubkey.as_bytes())
                 .as_byte_array()
-                .to_vec();
+                .to_vec()
+                .into();
 
-            let mut o2m_db_indexes = Vec::with_capacity(2);
+            let mut o2m_db_indexes: Vec<(u8, O2mIndexValue)> = Vec::with_capacity(2);
 
-            if let Some(index_number) = self
-                .db_schema
-                .db_index_table
-                .one_to_many
-                .get(&DB_INDEX_SCRIPT_HASH)
+            if let Some(index_number) = self.db_schema.db_index_table.one_to_many.get("SCRIPT_HASH")
             {
                 o2m_db_indexes.push((*index_number, script_hash));
             }
 
-            if let Some(index_number) = self
-                .db_schema
-                .db_index_table
-                .one_to_many
-                .get(&DB_INDEX_ADDRESS)
-            {
+            if let Some(index_number) = self.db_schema.db_index_table.one_to_many.get("ADDRESS") {
                 if let Some(address) = address_opt {
-                    o2m_db_indexes.push((*index_number, address));
+                    o2m_db_indexes.push((*index_number, address.into()));
                 }
             }
 
