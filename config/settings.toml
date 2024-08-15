@@ -11,5 +11,4 @@ socket_path = "/home/lisak/.cardano/db/node.socket"
 api_host = "http://127.0.0.1:8332"
 
 [ergo]
-api_host = "http://127.0.0.1:8332"
-api_key = "****"
+api_host = "http://127.0.0.1:9053"
