@@ -51,6 +51,14 @@ pub type TxCount = usize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct TxIndex(pub u16);
 
+#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
+pub struct O2oIndexValue(pub Vec<u8>);
+impl fmt::Display for O2oIndexValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.0))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct TxHash(pub [u8; 32]);
 impl fmt::Display for TxHash {
@@ -92,12 +100,18 @@ pub enum AssetAction {
     Burn = 2,
 }
 
-pub type DbIndexCfIndex = u8;
 pub type DbIndexUtxoBirthPkWithUtxoPkCf = String;
 pub type DbIndexByUtxoBirthPkCf = String;
 pub type DbUtxoBirthPkByIndexCf = String;
 pub type DbIndexUtxoBirthPk = u32;
-pub type DbIndexValue = Vec<u8>;
+
+#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
+pub struct O2mIndexValue(pub Vec<u8>);
+impl fmt::Display for O2mIndexValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.0))
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Block<T> {

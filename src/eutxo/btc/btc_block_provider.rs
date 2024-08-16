@@ -1,6 +1,6 @@
 use crate::{
     api::{BlockProcessor, BlockProvider},
-    eutxo::eutxo_model::EuTx,
+    eutxo::{eutxo_model::EuTx, eutxo_schema::DbSchema},
     info,
     model::{Block, BlockHeader, TxCount},
     settings::BitcoinConfig,
@@ -11,18 +11,20 @@ use futures::Stream;
 use min_batch::ext::MinBatchExt;
 use std::{pin::Pin, sync::Arc};
 
-use super::{btc_client::BtcClient, btc_processor::BtcProcessor};
+use super::{
+    btc_block_processor::BtcBlockProcessor, btc_client::BtcClient, btc_io_processor::BtcIoProcessor,
+};
 
 pub struct BtcBlockProvider {
     pub client: Arc<BtcClient>,
-    pub processor: Arc<BtcProcessor>,
+    pub processor: Arc<BtcBlockProcessor>,
 }
 
 impl BtcBlockProvider {
-    pub fn new(bitcoin_config: &BitcoinConfig) -> Self {
+    pub fn new(bitcoin_config: &BitcoinConfig, db_schema: DbSchema) -> Self {
         BtcBlockProvider {
             client: Arc::new(BtcClient::new(bitcoin_config)),
-            processor: Arc::new(BtcProcessor {}),
+            processor: Arc::new(BtcBlockProcessor::new(BtcIoProcessor::new(db_schema))),
         }
     }
 
@@ -43,9 +45,13 @@ impl BtcBlockProvider {
 impl BlockProvider for BtcBlockProvider {
     type OutTx = EuTx;
 
+    fn get_schema(&self) -> DbSchema {
+        self.processor.io_processor.db_schema.clone()
+    }
+
     fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, String> {
         let block = self.client.get_block_by_hash(header.hash)?;
-        let processed_block = self.processor.process(&block);
+        let processed_block = self.processor.process_block(&block);
         Ok(processed_block)
     }
 

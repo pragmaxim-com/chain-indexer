@@ -1,7 +1,11 @@
 ## DB schema
 
-Indexer uses block/tx/box indexes over hashes which allows for much better space efficiency and for ~ 10 000 txs/s speed for BTC and 8 000 txs/s 
-for chains with assets like Cardano/Ergo. Chain tip is eventually consistent due to using indexes over hashes, ie. forks get settled eventually.
+Chain indexer is a universal blockchain indexing tool on top of RocksDB that generates one-to-many and one-to-one indexes to be able to answer all sorts of explorer queries.
+Indexer uses block/tx/box indexes over hashes which allows for much better space efficiency and for ~ 3 000 - 6 000 txs/s speed, depending on ammount of outputs/assets and WAL being on/off. Chain tip is "eventually consistent" due to using indexes over hashes, ie. forks get settled eventually.
+
+Currently Bitcoin, Cardano and Ergo are supported.
+
+### Data model
 
 ```
 PK           = unique pointer to an object
@@ -22,10 +26,10 @@ AssetBirthPk = block_height|tx_index|utxo_index|asset_index
 
 **Meta column family** keeps track of last block header we indexed. Indexing is completely idempotent and blocks are persited atomicly (in a db transaction).
 
-**UtxoIndexes** and **AssetIndex** are seconary indexes that keep entity (`asset-id/address/script_hash`) under small-size `UtxoBirthPk/AssetBirthPk`
+**UtxoIndexes** and **AssetIndex** are seconary indexes that keep entity (`asset/address/script_hash/etc...`) under small-size `UtxoBirthPk/AssetBirthPk`
 and references/relations to all further occurences to them.
 
-> Note, that UtxoIndexes are custom and can be 0-x of them, while AssetIndex is only one
+> Note, that there can be 0-x of either one-to-many or one-to-one UtxoIndexes, while AssetIndex is curently only 1 one-to-many for all assets together
 
 ### Block
 
@@ -56,9 +60,11 @@ TxPk_by_txHash:
 Secondary indexes like (`script_hash/address`) are stored as sequence of pointers to a utxo where it was first born, prefixed with a column family pointer.
 `UtxoPk_by_InputPk` is used to tell whether box is spent or not.
 
+> Note that this encoding will be likely replaced in future with some alternative binary encoding, `utxo_value` will be replaced by anything box related we want to search by.
+
 ```
 UtxoValueAndUtxoBirthPks_by_UtxoPk:
-    utxo_pk -> utxo_value|[utxo_index_cf:utxo_birth_pk,utxo_index_cf:utxo_birth_pk]
+    utxo_pk -> utxo_value|[utxo_o2m_index_number:utxo_birth_pk,utxo_o2m_index_number:utxo_birth_pk]|[utxo_o2o_index_number:size:utxo_index_value]
 
 Spent_UtxoPk_by_InputPk:
     input_pk -> utxo_pk
@@ -67,10 +73,22 @@ Spent_InputPk_by_UtxoPk:
     utxo_pk -> input_pk
 ```
 
-## Utxo indexes
+### Utxo indexes (one-to-one)
 
-We keep secondary indexes (`script_hash/address`) under small-size `utxo_birth_pk` identifiers which is a unique pointer of their creation.
+As an example, Ergo's output box has a unique identifier `box_id` which we want to search by. But it could be anything from a box. Each blockchain might have it's own
+box binary encoder/decoder.
+
+```
+UtxoIndex_by_UtxoPk
+    box_id -> utxo_pk
+```
+
+### Utxo indexes (one-to-many)
+
+We keep secondary indexes like `script_hash/address/etc...` under small-size `utxo_birth_pk` identifiers which is a unique pointer of their creation.
 Then we keep relations to all following boxes where given indexed entity occurred. Following table shows 2 example secondary indexes : `script_hash` & `address`.
+
+> Note that one-to-one indexes are the same, just without `relations`.
 
 ```
 UtxoIndex_by_UtxoBirthPk
@@ -94,7 +112,7 @@ UtxoBirthPk_with_UtxoPk_relations:
 
 ### Assets
 
-To keep data small, we keep assets as an array under utxo_pk.
+Assets are for now just basic with single one-to-many secondary index 
 
 ```
 AssetValueAndBirthPk_by_UtxoPk:

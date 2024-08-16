@@ -1,38 +1,40 @@
 use crate::api::Storage;
 use crate::cli::CliConfig;
 use crate::eutxo::eutxo_model::*;
+use crate::settings::IndexerSettings;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock;
 
 use crate::block_service::BlockService;
 use crate::eutxo::eutxo_block_monitor::EuBlockMonitor;
 use crate::eutxo::eutxo_families::EutxoFamilies;
-use crate::eutxo::eutxo_index_manager::DbIndexManager;
 use crate::eutxo::eutxo_model::EuTx;
 use crate::eutxo::eutxo_tx_service::EuTxService;
 use crate::indexer::Indexer;
 use crate::info;
 use crate::model::*;
 use crate::rocks_db_batch::{Families, SharedFamilies};
-use crate::settings::AppConfig;
 use crate::syncer::ChainSyncer;
 use crate::{api::BlockProvider, eutxo::eutxo_storage};
 use rocksdb::BoundColumnFamily;
 
+use super::eutxo_schema::DbIndexNumber;
+
 pub async fn run_eutxo_indexing(
-    app_config: AppConfig,
+    indexer_settings: IndexerSettings,
     cli_config: CliConfig,
     block_provider: Arc<dyn BlockProvider<OutTx = EuTx>>,
 ) {
-    let indexer = app_config.indexer;
-    let db_path: String = format!("{}/{}/{}", indexer.db_path, "main", cli_config.blockchain);
-    let db_indexes = indexer.db_indexes;
-    let disable_wal = indexer.disable_wal;
+    let db_path: String = format!(
+        "{}/{}/{}",
+        indexer_settings.db_path, "main", cli_config.blockchain
+    );
+    let disable_wal = indexer_settings.disable_wal;
 
-    let tx_batch_size = indexer.tx_batch_size;
-
-    let db_index_manager = DbIndexManager::new(&db_indexes);
+    let tx_batch_size = indexer_settings.tx_batch_size;
+    let db_index_manager = block_provider.get_schema();
     let db = Arc::new(eutxo_storage::get_db(&db_index_manager, &db_path));
     let families = Arc::new(Families {
         shared: SharedFamilies {
@@ -46,21 +48,38 @@ pub async fn run_eutxo_indexing(
             utxo_value_by_pk_cf: db.cf_handle(UTXO_VALUE_BY_PK_CF).unwrap(),
             utxo_pk_by_input_pk_cf: db.cf_handle(UTXO_PK_BY_INPUT_PK_CF).unwrap(),
             input_pk_by_utxo_pk_cf: db.cf_handle(INPUT_PK_BY_UTXO_PK_CF).unwrap(),
-            utxo_birth_pk_with_utxo_pk_cf: db_index_manager
+            o2m_utxo_birth_pk_relations_cf: db_index_manager
+                .one_to_many_index_cfs
                 .utxo_birth_pk_relations
                 .iter()
-                .map(|cf| db.cf_handle(cf).unwrap())
-                .collect::<Vec<Arc<BoundColumnFamily>>>(),
-            utxo_birth_pk_by_index_cf: db_index_manager
+                .map(|(index_number, index_name, _)| {
+                    (*index_number, db.cf_handle(index_name).unwrap())
+                })
+                .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
+            o2m_utxo_birth_pk_by_index_cf: db_index_manager
+                .one_to_many_index_cfs
                 .utxo_birth_pk_by_index
                 .iter()
-                .map(|cf| db.cf_handle(cf).unwrap())
-                .collect::<Vec<Arc<BoundColumnFamily>>>(),
-            index_by_utxo_birth_pk_cf: db_index_manager
+                .map(|(index_number, index_name, _)| {
+                    (*index_number, db.cf_handle(index_name).unwrap())
+                })
+                .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
+            o2m_index_by_utxo_birth_pk_cf: db_index_manager
+                .one_to_many_index_cfs
                 .index_by_utxo_birth_pk
                 .iter()
-                .map(|cf| db.cf_handle(cf).unwrap())
-                .collect::<Vec<Arc<BoundColumnFamily>>>(),
+                .map(|(index_number, index_name, _)| {
+                    (*index_number, db.cf_handle(index_name).unwrap())
+                })
+                .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
+            o2o_utxo_birth_pk_by_index_cf: db_index_manager
+                .one_to_one_index_cfs
+                .utxo_birth_pk_by_index
+                .iter()
+                .map(|(index_number, index_name, _)| {
+                    (*index_number, db.cf_handle(index_name).unwrap())
+                })
+                .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
             asset_by_asset_pk_cf: db.cf_handle(ASSET_BY_ASSET_PK_CF).unwrap(),
             asset_id_by_asset_birth_pk_cf: db.cf_handle(ASSET_ID_BY_ASSET_BIRTH_PK_CF).unwrap(),
             asset_birth_pk_by_asset_id_cf: db.cf_handle(ASSET_BIRTH_PK_BY_ASSET_ID_CF).unwrap(),

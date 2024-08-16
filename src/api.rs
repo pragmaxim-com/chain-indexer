@@ -2,7 +2,8 @@ use std::{pin::Pin, sync::Arc};
 
 use crate::{
     codec_tx::TxPkBytes,
-    model::{Block, BlockHeader, BlockHeight, Transaction, TxCount, TxHash},
+    eutxo::{eutxo_codec_utxo::UtxoPkBytes, eutxo_schema::DbSchema},
+    model::{Block, BlockHeader, BlockHeight, O2oIndexValue, Transaction, TxCount, TxHash},
     rocks_db_batch::{CustomFamilies, Families},
 };
 use async_trait::async_trait;
@@ -11,21 +12,28 @@ use lru::LruCache;
 use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction};
 
 pub trait BlockProcessor {
-    type InTx: Send;
-    type OutTx: Send;
+    type FromTx: Send;
+    type IntoTx: Send;
 
-    fn process(&self, block: &Block<Self::InTx>) -> Block<Self::OutTx>;
+    fn process_block(&self, block: &Block<Self::FromTx>) -> Block<Self::IntoTx>;
 
     fn process_batch(
         &self,
-        block_batch: &Vec<Block<Self::InTx>>,
+        block_batch: &Vec<Block<Self::FromTx>>,
         tx_count: TxCount,
-    ) -> (Vec<Block<Self::OutTx>>, TxCount);
+    ) -> (Vec<Block<Self::IntoTx>>, TxCount);
+}
+
+pub trait IoProcessor<FromInput, IntoInput, FromOutput, IntoOutput> {
+    fn process_inputs(&self, ins: &Vec<FromInput>) -> Vec<IntoInput>;
+    fn process_outputs(&self, outs: &Vec<FromOutput>) -> Vec<IntoOutput>;
 }
 
 #[async_trait]
 pub trait BlockProvider {
     type OutTx: Send;
+
+    fn get_schema(&self) -> DbSchema;
 
     fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, String>;
 
@@ -53,6 +61,7 @@ pub trait TxService<'db> {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         families: &Families<'db, Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 
@@ -63,6 +72,7 @@ pub trait TxService<'db> {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         families: &Families<'db, Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 
@@ -72,6 +82,7 @@ pub trait TxService<'db> {
         tx: &Self::Tx,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         families: &Families<'db, Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 }

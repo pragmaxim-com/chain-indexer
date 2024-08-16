@@ -4,7 +4,7 @@ use tokio::runtime::Runtime;
 
 use crate::{
     api::BlockProvider,
-    eutxo::eutxo_model::EuTx,
+    eutxo::{eutxo_model::EuTx, eutxo_schema::DbSchema},
     model::{Block, BlockHeader, TxCount},
     settings::CardanoConfig,
 };
@@ -18,20 +18,23 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
 use super::{
+    cardano_block_processor::{CardanoBlockProcessor, GENESIS_START_TIME},
     cardano_client::{CardanoClient, CBOR},
-    cardano_processor::{CardanoProcessor, GENESIS_START_TIME},
+    cardano_io_processor::CardanoIoProcessor,
 };
 
 pub struct CardanoBlockProvider {
     pub client: CardanoClient,
-    pub processor: Arc<CardanoProcessor>,
+    pub processor: Arc<CardanoBlockProcessor>,
 }
 
 impl CardanoBlockProvider {
-    pub async fn new(cardano_config: &CardanoConfig) -> Self {
+    pub async fn new(cardano_config: &CardanoConfig, db_schema: DbSchema) -> Self {
         CardanoBlockProvider {
             client: CardanoClient::new(cardano_config).await,
-            processor: Arc::new(CardanoProcessor {}),
+            processor: Arc::new(CardanoBlockProcessor::new(CardanoIoProcessor::new(
+                db_schema,
+            ))),
         }
     }
 }
@@ -39,6 +42,10 @@ impl CardanoBlockProvider {
 #[async_trait]
 impl BlockProvider for CardanoBlockProvider {
     type OutTx = EuTx;
+
+    fn get_schema(&self) -> DbSchema {
+        self.processor.io_processor.db_schema.clone()
+    }
 
     fn get_processed_block(&self, h: BlockHeader) -> Result<Block<Self::OutTx>, String> {
         let point = Point::new(

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use ci::{
     api::BlockProcessor,
-    eutxo::btc::{btc_client::BtcClient, btc_processor::BtcProcessor},
+    eutxo::btc::{btc_block_processor::BtcBlockProcessor, btc_client::BtcClient},
     info,
     model::Block,
     settings,
@@ -17,7 +17,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let api_password = blockchain.api_password;
 
     let btc_client = BtcClient::new(&api_host, &api_username, &api_password);
-    let processor = BtcProcessor {};
+    let processor = BtcBlockProcessor {};
     info!("Initiating download");
     let batch_size = 50000;
     let start_height = 1 as u32;

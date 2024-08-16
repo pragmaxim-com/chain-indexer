@@ -2,13 +2,19 @@ use config::{Config, ConfigError, Environment, File};
 use dotenv::dotenv;
 use serde::Deserialize;
 
-use crate::model::DbIndexUtxoBirthPkWithUtxoPkCf;
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub indexer: IndexerSettings,
     pub bitcoin: BitcoinConfig,
     pub cardano: CardanoConfig,
+    pub ergo: ErgoConfig,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct IndexerSettings {
+    pub db_path: String,
+    pub tx_batch_size: usize,
+    pub disable_wal: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -19,17 +25,15 @@ pub struct BitcoinConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct CardanoConfig {
+pub struct ErgoConfig {
     pub api_host: String,
-    pub socket_path: String,
+    pub api_key: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct IndexerSettings {
-    pub db_path: String,
-    pub db_indexes: Vec<DbIndexUtxoBirthPkWithUtxoPkCf>,
-    pub tx_batch_size: usize,
-    pub disable_wal: bool,
+pub struct CardanoConfig {
+    pub api_host: String,
+    pub socket_path: String,
 }
 
 impl AppConfig {
@@ -41,6 +45,12 @@ impl AppConfig {
                     .add_source(File::with_name("local-settings").required(false))
                     .add_source(
                         Environment::with_prefix("BITCOIN")
+                            .try_parsing(true)
+                            .keep_prefix(true)
+                            .separator("__"),
+                    )
+                    .add_source(
+                        Environment::with_prefix("ERGO")
                             .try_parsing(true)
                             .keep_prefix(true)
                             .separator("__"),

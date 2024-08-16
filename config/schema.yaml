@@ -1,0 +1,23 @@
+bitcoin:
+  one_to_many_index:
+    ADDRESS:
+      enabled: true
+    SCRIPT_HASH:
+      enabled: false
+cardano:
+  one_to_many_index:
+    ADDRESS:
+      enabled: true
+    SCRIPT_HASH:
+      enabled: false
+ergo:
+  one_to_one_index:
+    BOX_ID:
+      enabled: true
+  one_to_many_index:
+    ADDRESS:
+      enabled: true
+    ERGO_TREE_HASH:
+      enabled: true
+    ERGO_TREE_T8_HASH:
+      enabled: true

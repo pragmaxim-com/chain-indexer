@@ -2,8 +2,9 @@ use crate::{
     api::TxService,
     codec_block,
     codec_tx::TxPkBytes,
+    eutxo::eutxo_codec_utxo::UtxoPkBytes,
     info,
-    model::{Block, BlockHash, BlockHeader, BlockHeight, Transaction, TxHash},
+    model::{Block, BlockHash, BlockHeader, BlockHeight, O2oIndexValue, Transaction, TxHash},
     rocks_db_batch::{CustomFamilies, Families},
 };
 use lru::LruCache;
@@ -15,6 +16,7 @@ pub struct BlockService<'db, Tx: Transaction, CF: CustomFamilies<'db>> {
     pub(crate) tx_service: Arc<dyn TxService<'db, CF = CF, Tx = Tx>>,
     pub(crate) block_by_hash_lru_cache: RefCell<LruCache<BlockHash, Rc<Block<Tx>>>>,
     pub(crate) tx_pk_by_tx_hash_lru_cache: RefCell<LruCache<TxHash, TxPkBytes>>,
+    pub(crate) utxo_pk_by_index_lru_cache: RefCell<LruCache<O2oIndexValue, UtxoPkBytes>>,
 }
 
 impl<'db, Tx: Transaction, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
@@ -23,7 +25,10 @@ impl<'db, Tx: Transaction, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
             tx_service: service,
             block_by_hash_lru_cache: RefCell::new(LruCache::new(NonZeroUsize::new(1_000).unwrap())),
             tx_pk_by_tx_hash_lru_cache: RefCell::new(LruCache::new(
-                NonZeroUsize::new(10_000_000).unwrap(),
+                NonZeroUsize::new(5_000_000).unwrap(),
+            )),
+            utxo_pk_by_index_lru_cache: RefCell::new(LruCache::new(
+                NonZeroUsize::new(5_000_000).unwrap(),
             )),
         }
     }
@@ -37,12 +42,14 @@ impl<'db, Tx: Transaction, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
     ) -> Result<(), rocksdb::Error> {
         let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
         let mut block_height_by_hash_lru_cache = self.block_by_hash_lru_cache.borrow_mut();
+        let mut utxo_pk_by_index_lru_cache = self.utxo_pk_by_index_lru_cache.borrow_mut();
 
         for block in blocks {
             self.persist_block(
                 block,
                 &mut block_height_by_hash_lru_cache,
                 &mut tx_pk_by_tx_hash_lru_cache,
+                &mut utxo_pk_by_index_lru_cache,
                 db_tx,
                 batch,
                 families,
@@ -57,12 +64,19 @@ impl<'db, Tx: Transaction, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         block: Rc<Block<Tx>>,
         block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         families: &Families<'db, CF>,
     ) -> Result<(), rocksdb::Error> {
-        self.tx_service
-            .persist_txs(&block, db_tx, batch, tx_pk_by_tx_hash_lru_cache, families)?;
+        self.tx_service.persist_txs(
+            &block,
+            db_tx,
+            batch,
+            tx_pk_by_tx_hash_lru_cache,
+            utxo_pk_by_index_lru_cache,
+            families,
+        )?;
         self.persist_header(&block.header, db_tx, batch, families)?;
         block_height_by_hash_lru_cache.put(block.header.hash, Rc::clone(&block));
         Ok(())
@@ -76,6 +90,7 @@ impl<'db, Tx: Transaction, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
     ) -> Result<(), String> {
         let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
         let mut block_height_by_hash_lru_cache = self.block_by_hash_lru_cache.borrow_mut();
+        let mut utxo_pk_by_index_lru_cache = self.utxo_pk_by_index_lru_cache.borrow_mut();
 
         for tx in block.txs.iter() {
             self.tx_service
@@ -84,6 +99,7 @@ impl<'db, Tx: Transaction, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
                     tx,
                     db_tx,
                     &mut tx_pk_by_tx_hash_lru_cache,
+                    &mut utxo_pk_by_index_lru_cache,
                     families,
                 )
                 .map_err(|e| e.into_string())?;
