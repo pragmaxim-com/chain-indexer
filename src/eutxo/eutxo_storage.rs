@@ -29,7 +29,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
 
         for (cf, compation_enabled) in all_cfs.into_iter() {
             info!(
-                "Creating column family {}, compaction {}",
+                "{} column family created with compaction {}",
                 cf, compation_enabled
             );
             db.create_cf(cf, get_opts(compation_enabled)).unwrap();
@@ -42,7 +42,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
             .iter()
         {
             info!(
-                "Creating one-to-many index column family {}, compaction {}",
+                "{} one-to-many index column family created with compaction {}",
                 index_utxo_birth_pk_with_utxo_pk, compaction_enabled
             );
             db.create_cf(
@@ -57,7 +57,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
             .iter()
         {
             info!(
-                "Creating one-to-many index column family {}, compaction {}",
+                "{} one-to-many index column family created with compaction {}",
                 index_by_utxo_birth_pk, compaction_enabled
             );
             db.create_cf(index_by_utxo_birth_pk, get_opts(*compaction_enabled))
@@ -69,7 +69,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
             .iter()
         {
             info!(
-                "Creating one-to-many index column family {}, compaction {}",
+                "{} one-to-many index column family created with compaction {}",
                 utxo_birth_pk_by_index, compaction_enabled
             );
             db.create_cf(utxo_birth_pk_by_index, get_opts(*compaction_enabled))
@@ -81,7 +81,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
             db_schema.one_to_one_index_cfs.utxo_birth_pk_by_index.iter()
         {
             info!(
-                "Creating one-to-one index column family {}, compaction {}",
+                "{} one-to-one index column family created with compaction {}",
                 utxo_birth_pk_by_index, compaction_enabled
             );
             db.create_cf(utxo_birth_pk_by_index, get_opts(*compaction_enabled))

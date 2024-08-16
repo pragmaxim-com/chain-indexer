@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use serde::Deserialize;
 
 use std::{collections::HashMap, fs};
@@ -8,6 +9,7 @@ use crate::model::{
 };
 
 pub type DbIndexNumber = u8;
+pub type DbIndexValueSize = u16;
 pub type DbIndexName = String;
 pub type DbIndexEnabled = bool;
 
@@ -18,8 +20,8 @@ struct DbOutputIndexInfo {
 
 #[derive(Debug, Deserialize)]
 struct RawOutputIndexes {
-    one_to_many_index: Vec<(DbIndexName, DbOutputIndexInfo)>,
-    one_to_one_index: Vec<(DbIndexName, DbOutputIndexInfo)>,
+    one_to_many_index: IndexMap<DbIndexName, DbOutputIndexInfo>,
+    one_to_one_index: Option<IndexMap<DbIndexName, DbOutputIndexInfo>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,16 +48,20 @@ impl From<RawOutputIndexes> for DbOutputIndexLayout {
 
         let one_to_one_index = raw
             .one_to_one_index
-            .into_iter()
-            .zip((0..=255).rev())
-            .filter_map(|((db_index_name, db_index_info), index_number)| {
-                if db_index_info.enabled {
-                    Some((db_index_name, index_number as u8))
-                } else {
-                    None
-                }
+            .map(|index_map| {
+                index_map
+                    .into_iter()
+                    .zip((0..=255).rev())
+                    .filter_map(|((db_index_name, db_index_info), index_number)| {
+                        if db_index_info.enabled {
+                            Some((db_index_name, index_number as u8))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<HashMap<DbIndexName, DbIndexNumber>>()
             })
-            .collect();
+            .unwrap_or(HashMap::new());
 
         DbOutputIndexLayout {
             one_to_many: one_to_many_index,

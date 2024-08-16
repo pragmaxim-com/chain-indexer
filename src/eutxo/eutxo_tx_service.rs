@@ -4,8 +4,8 @@ use super::{
         UtxoValueWithIndexes,
     },
     eutxo_families::EutxoFamilies,
-    eutxo_model::{EuTxInput, EuUtxo, TxHashWithIndex},
-    eutxo_schema::DbIndexNumber,
+    eutxo_model::{EuTxInput, EuUtxo, TxHashWithIndex, UtxoValue},
+    eutxo_schema::{DbIndexNumber, DbIndexValueSize},
 };
 use crate::{
     api::TxService,
@@ -111,9 +111,7 @@ impl<'db> EuTxService {
                                     &output_index.0,
                                 )
                                 .unwrap()
-                                .unwrap()
-                                .try_into()
-                                .ok();
+                                .map(|bytes| bytes.try_into().unwrap());
                             pk
                         })
                 }
@@ -354,22 +352,24 @@ impl<'db> EuTxService {
         batch: &mut WriteBatchWithTransaction<true>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
-        // start building the utxo_value_with_indexes
-        let o2m_index_elem_length = size_of::<DbIndexNumber>() + size_of::<UtxoBirthPkBytes>();
-        let o2o_index_elem_length = size_of::<DbIndexNumber>() + size_of::<O2oIndexValue>();
+        // TODO !! The following code is extremely inefficient, new encoding needed for UTXO !!!
+
+        let o2m_index_elem_length = utxo.o2m_db_indexes.len()
+            * (size_of::<DbIndexNumber>() + size_of::<UtxoBirthPkBytes>());
+        let o2o_index_elem_length: usize = utxo
+            .o2o_db_indexes
+            .iter()
+            .map(|(_, v)| size_of::<DbIndexNumber>() + size_of::<DbIndexValueSize>() + v.0.len())
+            .sum();
 
         let mut utxo_value_with_indexes =
-            vec![
-                0u8;
-                size_of::<u64>()
-                    + (utxo.o2m_db_indexes.len() * o2m_index_elem_length)
-                    + (utxo.o2o_db_indexes.len() * o2o_index_elem_length)
-            ];
+            vec![0u8; size_of::<UtxoValue>() + o2o_index_elem_length + o2m_index_elem_length];
+
         BigEndian::write_u64(
-            &mut utxo_value_with_indexes[0..size_of::<UtxoBirthPkBytes>()],
+            &mut utxo_value_with_indexes[0..size_of::<UtxoValue>()],
             utxo.utxo_value.0,
         );
-        let mut index = size_of::<UtxoBirthPkBytes>();
+        let mut index = size_of::<UtxoValue>();
 
         for (index_number, index_value) in utxo.o2m_db_indexes.iter() {
             utxo_value_with_indexes[index] = *index_number;
@@ -384,6 +384,7 @@ impl<'db> EuTxService {
                 db_tx,
                 batch,
             )?;
+
             utxo_value_with_indexes[index..index + size_of::<UtxoBirthPkBytes>()]
                 .copy_from_slice(&utxo_birth_pk_bytes);
             index += size_of::<UtxoBirthPkBytes>();
@@ -394,8 +395,12 @@ impl<'db> EuTxService {
             utxo_value_with_indexes[index] = *cf_index;
             index += size_of::<DbIndexNumber>();
             // index value size
-            utxo_value_with_indexes.extend_from_slice(&(index_value.0.len() as u16).to_be_bytes());
-            index += size_of::<u16>();
+
+            BigEndian::write_u16(
+                &mut utxo_value_with_indexes[index..index + size_of::<DbIndexValueSize>()],
+                index_value.0.len() as DbIndexValueSize,
+            );
+            index += size_of::<DbIndexValueSize>();
             // index value
             utxo_value_with_indexes[index..index + index_value.0.len()]
                 .copy_from_slice(&index_value.0);

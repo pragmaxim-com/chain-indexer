@@ -62,7 +62,7 @@ impl BlockProvider for ErgoBlockProvider {
         min_batch_size: usize,
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, TxCount)> + Send + 'life0>> {
         let best_header = self.get_best_block_header().await.unwrap();
-        let last_height = last_header.map_or(0, |h| h.height.0);
+        let last_height = last_header.map_or(1, |h| h.height.0);
         info!("Initiating index from {} to {}", last_height, best_header);
         let heights = last_height..=best_header.height.0;
 

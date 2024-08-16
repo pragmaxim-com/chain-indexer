@@ -47,6 +47,7 @@ pallas = "0.29.0"
 num_enum = "0.7.3"
 clap = { version = "4.5.15", features = ["derive"] }
 lazy_static = "1.5.0"
+indexmap = { version = "2.4.0", features = ["serde"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
