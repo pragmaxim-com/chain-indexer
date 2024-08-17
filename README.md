@@ -12,7 +12,7 @@ PK           = unique pointer to an object
 BirthPK      = unique pointer to an object of creation
 Hash         = Hash of an object
 Index        = Secondary Index
-Asset Action = Mint, Transfer, Burn
+Asset Action = Mint / Transfer
 ```
 ```
 HeightPk     = block_height
@@ -112,11 +112,18 @@ UtxoBirthPk_with_UtxoPk_relations:
 
 ### Assets
 
-Assets are for now just basic with single one-to-many secondary index 
+Assets are for now just basic with single one-to-many secondary index with spent/unspent info
 
 ```
 AssetValueAndBirthPk_by_UtxoPk:
-    asset_pk -> asset_value|asset_birth_pk|action
+    utxo_pk -> [asset_value|action|asset_birth_pk]
+
+Spent_UtxoAssetPk_by_InputAssetPk:
+    input_asset_pk -> utxo_asset_pk
+
+Spent_InputAssetPk_by_UtxoAssetPk:
+    utxo_asset_pk -> input_asset_pk
+
 ```
 
 ### Asset index
