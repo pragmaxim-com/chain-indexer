@@ -2,6 +2,3 @@ ergo - registers
 cardano - datum
 
 assets - spent/unspent
-
-
-!! Families and DbSchema should be united !!

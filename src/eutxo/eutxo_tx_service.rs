@@ -1,6 +1,6 @@
 use super::{
     eutxo_codec_utxo::{
-        self, AssetBirthPkBytes, AssetPkBytes, AssetValueWithIndex, UtxoBirthPkBytes, UtxoPkBytes,
+        self, AssetBirthPkBytes, AssetValueWithIndex, UtxoBirthPkBytes, UtxoPkBytes,
         UtxoValueWithIndexes,
     },
     eutxo_families::EutxoFamilies,
@@ -191,24 +191,21 @@ impl<'db> EuTxService {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<Vec<(AssetId, AssetValue, AssetAction)>, rocksdb::Error> {
-        db_tx
-            .prefix_iterator_cf(&families.custom.asset_by_asset_pk_cf, birth_pk_bytes)
-            .map(|result| {
-                result.and_then(|(_, asset_value_birth_pk_action_bytes)| {
-                    let (asset_value, asset_birth_pk, asset_action) =
-                        eutxo_codec_utxo::get_asset_value_birth_pk_action(
-                            &asset_value_birth_pk_action_bytes,
-                        );
+        if let Some(asset_value_birth_pk_bytes) =
+            db_tx.get_cf(&families.custom.assets_by_utxo_pk_cf, birth_pk_bytes)?
+        {
+            eutxo_codec_utxo::get_asset_value_ation_birth_pks(&asset_value_birth_pk_bytes)
+                .iter()
+                .map(|(asset_value, asset_action, birth_pk)| {
                     let asset_id = db_tx
-                        .get_cf(
-                            &families.custom.asset_id_by_asset_birth_pk_cf,
-                            asset_birth_pk,
-                        )?
+                        .get_cf(&families.custom.asset_id_by_asset_birth_pk_cf, birth_pk)?
                         .unwrap();
-                    Ok((asset_id, asset_value, asset_action))
+                    Ok((asset_id, *asset_value, *asset_action))
                 })
-            })
-            .collect()
+                .collect::<Result<Vec<(AssetId, AssetValue, AssetAction)>, rocksdb::Error>>()
+        } else {
+            Ok(vec![])
+        }
     }
 
     fn get_o2m_utxo_indexes(
@@ -303,19 +300,27 @@ impl<'db> EuTxService {
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
         if utxo.assets.len() > 0 {
+            // start building the asset_value_action_indexes
+            let asset_elem_size =
+                size_of::<AssetValue>() + size_of::<AssetAction>() + size_of::<AssetBirthPkBytes>();
+            let mut asset_value_birth_pk = vec![0u8; utxo.assets.len() * asset_elem_size];
+            let mut idx = 0;
+
             for (asset_index, (asset_id, asset_value, asset_action)) in
                 utxo.assets.iter().enumerate()
             {
                 let asset_pk_bytes =
                     eutxo_codec_utxo::asset_pk_bytes(utxo_pk_bytes, &(asset_index as u8));
 
-                let mut asset_value_birth_pk =
-                    vec![0u8; size_of::<AssetValue>() + size_of::<AssetBirthPkBytes>()];
                 // append indexes to utxo_value_with_indexes
                 BigEndian::write_u64(
-                    &mut asset_value_birth_pk[0..size_of::<AssetValue>()],
+                    &mut asset_value_birth_pk[idx..idx + size_of::<AssetValue>()],
                     *asset_value,
                 );
+                idx += size_of::<AssetValue>();
+
+                asset_value_birth_pk.push((*asset_action).into());
+                idx += size_of::<AssetAction>();
 
                 let (asset_birth_pk_bytes, _) = self.persist_birth_pk_or_relation_with_pk(
                     asset_id,
@@ -327,19 +332,16 @@ impl<'db> EuTxService {
                     batch,
                 )?;
 
-                asset_value_birth_pk[size_of::<AssetValue>()
-                    ..size_of::<AssetValue>() + size_of::<AssetBirthPkBytes>()]
+                asset_value_birth_pk[idx..idx + size_of::<AssetBirthPkBytes>()]
                     .copy_from_slice(&asset_birth_pk_bytes);
-
-                asset_value_birth_pk.push((*asset_action).into());
-
-                self.persist_asset_value_with_index(
-                    &asset_pk_bytes,
-                    &asset_value_birth_pk,
-                    batch,
-                    families,
-                );
+                idx += size_of::<AssetBirthPkBytes>();
             }
+            self.persist_asset_value_with_index(
+                utxo_pk_bytes,
+                &asset_value_birth_pk,
+                batch,
+                families,
+            );
         }
         Ok(())
     }
@@ -518,8 +520,8 @@ impl<'db> EuTxService {
                 db_tx,
                 eutxo_codec_utxo::get_asset_pk_from_relation,
             )?;
-            self.remove_asset_value_with_indexes(&asset_pk_bytes, db_tx, families)?;
         }
+        self.remove_asset_value_with_indexes(&utxo_pk_bytes, db_tx, families)?;
         Ok(())
     }
 
@@ -548,23 +550,23 @@ impl<'db> EuTxService {
 
     fn remove_asset_value_with_indexes(
         &self,
-        asset_pk_bytes: &AssetPkBytes,
+        utxo_pk_bytes: &UtxoPkBytes,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
-        db_tx.delete_cf(&families.custom.asset_by_asset_pk_cf, asset_pk_bytes)
+        db_tx.delete_cf(&families.custom.assets_by_utxo_pk_cf, utxo_pk_bytes)
     }
 
     fn persist_asset_value_with_index(
         &self,
-        asset_pk_bytes: &AssetPkBytes,
+        utxo_pk_bytes: &UtxoPkBytes,
         asset_value_with_index: &AssetValueWithIndex,
         batch: &mut WriteBatchWithTransaction<true>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) {
         batch.put_cf(
-            &families.custom.asset_by_asset_pk_cf,
-            asset_pk_bytes,
+            &families.custom.assets_by_utxo_pk_cf,
+            utxo_pk_bytes,
             asset_value_with_index,
         );
     }

@@ -27,6 +27,27 @@ struct EutxoPk {
     pub utxo_index: UtxoIndex,
 }
 
+pub fn get_asset_value_ation_birth_pks(
+    asset_value_birth_pk_bytes: &[u8],
+) -> Vec<(AssetValue, AssetAction, AssetBirthPkBytes)> {
+    let asset_value_action_pk_size = 18;
+    let asset_count = asset_value_birth_pk_bytes.len() / asset_value_action_pk_size;
+    let mut result = Vec::with_capacity(asset_count);
+
+    for chunk in asset_value_birth_pk_bytes.chunks_exact(asset_value_action_pk_size) {
+        let asset_value = BigEndian::read_u64(&chunk[0..8]);
+
+        let asset_action: AssetAction = AssetAction::try_from(chunk[8]).unwrap();
+
+        let mut asset_birth_pk_bytes = [0u8; 9];
+        asset_birth_pk_bytes.copy_from_slice(&chunk[9..18]);
+
+        result.push((asset_value, asset_action, asset_birth_pk_bytes));
+    }
+
+    result
+}
+
 pub fn get_asset_value_birth_pk_action(
     asset_value_birth_pk_action_bytes: &[u8],
 ) -> (AssetValue, AssetBirthPkBytes, AssetAction) {
