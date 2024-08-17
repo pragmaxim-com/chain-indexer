@@ -100,11 +100,6 @@ pub enum AssetAction {
     Burn = 2,
 }
 
-pub type DbIndexUtxoBirthPkWithUtxoPkCf = String;
-pub type DbIndexByUtxoBirthPkCf = String;
-pub type DbUtxoBirthPkByIndexCf = String;
-pub type DbIndexUtxoBirthPk = u32;
-
 #[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct O2mIndexValue(pub Vec<u8>);
 impl fmt::Display for O2mIndexValue {

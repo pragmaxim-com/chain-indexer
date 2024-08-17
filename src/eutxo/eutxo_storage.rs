@@ -37,7 +37,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
 
         // One To Many
         for (_, index_utxo_birth_pk_with_utxo_pk, compaction_enabled) in db_schema
-            .one_to_many_index_cfs
+            .o2m_index_name_by_number
             .utxo_birth_pk_relations
             .iter()
         {
@@ -52,7 +52,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
             .unwrap();
         }
         for (_, index_by_utxo_birth_pk, compaction_enabled) in db_schema
-            .one_to_many_index_cfs
+            .o2m_index_name_by_number
             .index_by_utxo_birth_pk
             .iter()
         {
@@ -64,7 +64,7 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
                 .unwrap();
         }
         for (_, utxo_birth_pk_by_index, compaction_enabled) in db_schema
-            .one_to_many_index_cfs
+            .o2m_index_name_by_number
             .utxo_birth_pk_by_index
             .iter()
         {
@@ -77,8 +77,10 @@ pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<Mu
         }
 
         // One To One
-        for (_, utxo_birth_pk_by_index, compaction_enabled) in
-            db_schema.one_to_one_index_cfs.utxo_birth_pk_by_index.iter()
+        for (_, utxo_birth_pk_by_index, compaction_enabled) in db_schema
+            .o2o_index_name_by_number
+            .utxo_birth_pk_by_index
+            .iter()
         {
             info!(
                 "{} one-to-one index column family created with compaction {}",

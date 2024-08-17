@@ -48,14 +48,13 @@ impl IoProcessor<MultiEraInput<'_>, EuTxInput, MultiEraOutput<'_>, EuUtxo> for C
 
             let mut o2m_db_indexes: Vec<(u8, O2mIndexValue)> = Vec::with_capacity(2);
 
-            if let Some(index_number) = self.db_schema.db_index_table.one_to_many.get("SCRIPT_HASH")
-            {
+            if let Some(index_number) = self.db_schema.o2m_index_number_by_name.get("SCRIPT_HASH") {
                 if let Some(script_hash) = script_hash_opt {
                     o2m_db_indexes.push((*index_number, script_hash.into()));
                 }
             }
 
-            if let Some(index_number) = self.db_schema.db_index_table.one_to_many.get("ADDRESS") {
+            if let Some(index_number) = self.db_schema.o2m_index_number_by_name.get("ADDRESS") {
                 if let Some(address) = address_opt {
                     o2m_db_indexes.push((*index_number, address.into()));
                 }

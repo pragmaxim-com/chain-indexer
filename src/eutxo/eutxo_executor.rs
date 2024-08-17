@@ -34,8 +34,8 @@ pub async fn run_eutxo_indexing(
     let disable_wal = indexer_settings.disable_wal;
 
     let tx_batch_size = indexer_settings.tx_batch_size;
-    let db_index_manager = block_provider.get_schema();
-    let db = Arc::new(eutxo_storage::get_db(&db_index_manager, &db_path));
+    let db_shema = block_provider.get_schema();
+    let db = Arc::new(eutxo_storage::get_db(&db_shema, &db_path));
     let families = Arc::new(Families {
         shared: SharedFamilies {
             meta_cf: db.cf_handle(META_CF).unwrap(),
@@ -48,32 +48,32 @@ pub async fn run_eutxo_indexing(
             utxo_value_by_pk_cf: db.cf_handle(UTXO_VALUE_BY_PK_CF).unwrap(),
             utxo_pk_by_input_pk_cf: db.cf_handle(UTXO_PK_BY_INPUT_PK_CF).unwrap(),
             input_pk_by_utxo_pk_cf: db.cf_handle(INPUT_PK_BY_UTXO_PK_CF).unwrap(),
-            o2m_utxo_birth_pk_relations_cf: db_index_manager
-                .one_to_many_index_cfs
+            o2m_utxo_birth_pk_relations_cf: db_shema
+                .o2m_index_name_by_number
                 .utxo_birth_pk_relations
                 .iter()
                 .map(|(index_number, index_name, _)| {
                     (*index_number, db.cf_handle(index_name).unwrap())
                 })
                 .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
-            o2m_utxo_birth_pk_by_index_cf: db_index_manager
-                .one_to_many_index_cfs
+            o2m_utxo_birth_pk_by_index_cf: db_shema
+                .o2m_index_name_by_number
                 .utxo_birth_pk_by_index
                 .iter()
                 .map(|(index_number, index_name, _)| {
                     (*index_number, db.cf_handle(index_name).unwrap())
                 })
                 .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
-            o2m_index_by_utxo_birth_pk_cf: db_index_manager
-                .one_to_many_index_cfs
+            o2m_index_by_utxo_birth_pk_cf: db_shema
+                .o2m_index_name_by_number
                 .index_by_utxo_birth_pk
                 .iter()
                 .map(|(index_number, index_name, _)| {
                     (*index_number, db.cf_handle(index_name).unwrap())
                 })
                 .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
-            o2o_utxo_birth_pk_by_index_cf: db_index_manager
-                .one_to_one_index_cfs
+            o2o_utxo_birth_pk_by_index_cf: db_shema
+                .o2o_index_name_by_number
                 .utxo_birth_pk_by_index
                 .iter()
                 .map(|(index_number, index_name, _)| {

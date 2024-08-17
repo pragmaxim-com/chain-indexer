@@ -33,7 +33,7 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
     fn process_inputs(&self, ins: &Vec<BoxId>) -> Vec<EuTxInput> {
         ins.iter()
             .map(|input| {
-                if let Some(index_number) = self.db_schema.db_index_table.one_to_one.get("BOX_ID") {
+                if let Some(index_number) = self.db_schema.o2o_index_number_by_name.get("BOX_ID") {
                     let box_id_slice: &[u8] = input.as_ref();
                     EuTxInput::OutputIndexInput(
                         (*index_number).into(),
@@ -59,7 +59,7 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
                 .ok();
 
             let mut o2o_db_indexes: Vec<(u8, O2oIndexValue)> = Vec::with_capacity(2);
-            if let Some(index_number) = self.db_schema.db_index_table.one_to_one.get("BOX_ID") {
+            if let Some(index_number) = self.db_schema.o2o_index_number_by_name.get("BOX_ID") {
                 o2o_db_indexes.push((*index_number, box_id_bytes.into()));
             } else {
                 panic!("Ergo BOX_ID index is missing in schema.yaml")
@@ -68,8 +68,7 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
             let mut o2m_db_indexes: Vec<(u8, O2mIndexValue)> = Vec::with_capacity(2);
             if let Some(index_number) = self
                 .db_schema
-                .db_index_table
-                .one_to_many
+                .o2m_index_number_by_name
                 .get("ERGO_TREE_HASH")
             {
                 if let Some(ergo_tree) = ergo_tree_opt {
@@ -79,8 +78,7 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
 
             if let Some(index_number) = self
                 .db_schema
-                .db_index_table
-                .one_to_many
+                .o2m_index_number_by_name
                 .get("ERGO_TREE_T8_HASH")
             {
                 if let Some(ergo_tree_t8) = ergo_tree_t8_opt {
@@ -88,7 +86,7 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
                 }
             }
 
-            if let Some(index_number) = self.db_schema.db_index_table.one_to_many.get("ADDRESS") {
+            if let Some(index_number) = self.db_schema.o2m_index_number_by_name.get("ADDRESS") {
                 if let Some(address) = address_opt {
                     o2m_db_indexes.push((*index_number, address.into()));
                 }
