@@ -1,6 +1,6 @@
 use super::{
     eutxo_codec_utxo::{
-        self, AssetBirthPkBytes, AssetValueWithIndex, UtxoBirthPkBytes, UtxoPkBytes,
+        self, AssetBirthPkBytes, AssetValueActionBirthPk, UtxoBirthPkBytes, UtxoPkBytes,
         UtxoValueWithIndexes,
     },
     eutxo_families::EutxoFamilies,
@@ -303,7 +303,7 @@ impl<'db> EuTxService {
             // start building the asset_value_action_indexes
             let asset_elem_size =
                 size_of::<AssetValue>() + size_of::<AssetAction>() + size_of::<AssetBirthPkBytes>();
-            let mut asset_value_birth_pk = vec![0u8; utxo.assets.len() * asset_elem_size];
+            let mut asset_value_action_birth_pk = vec![0u8; utxo.assets.len() * asset_elem_size];
             let mut idx = 0;
 
             for (asset_index, (asset_id, asset_value, asset_action)) in
@@ -314,12 +314,12 @@ impl<'db> EuTxService {
 
                 // append indexes to utxo_value_with_indexes
                 BigEndian::write_u64(
-                    &mut asset_value_birth_pk[idx..idx + size_of::<AssetValue>()],
+                    &mut asset_value_action_birth_pk[idx..idx + size_of::<AssetValue>()],
                     *asset_value,
                 );
                 idx += size_of::<AssetValue>();
 
-                asset_value_birth_pk.push((*asset_action).into());
+                asset_value_action_birth_pk.push((*asset_action).into());
                 idx += size_of::<AssetAction>();
 
                 let (asset_birth_pk_bytes, _) = self.persist_birth_pk_or_relation_with_pk(
@@ -332,13 +332,13 @@ impl<'db> EuTxService {
                     batch,
                 )?;
 
-                asset_value_birth_pk[idx..idx + size_of::<AssetBirthPkBytes>()]
+                asset_value_action_birth_pk[idx..idx + size_of::<AssetBirthPkBytes>()]
                     .copy_from_slice(&asset_birth_pk_bytes);
                 idx += size_of::<AssetBirthPkBytes>();
             }
             self.persist_asset_value_with_index(
                 utxo_pk_bytes,
-                &asset_value_birth_pk,
+                &asset_value_action_birth_pk,
                 batch,
                 families,
             );
@@ -560,7 +560,7 @@ impl<'db> EuTxService {
     fn persist_asset_value_with_index(
         &self,
         utxo_pk_bytes: &UtxoPkBytes,
-        asset_value_with_index: &AssetValueWithIndex,
+        asset_value_with_index: &AssetValueActionBirthPk,
         batch: &mut WriteBatchWithTransaction<true>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) {

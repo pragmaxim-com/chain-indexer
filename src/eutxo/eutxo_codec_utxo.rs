@@ -18,7 +18,7 @@ pub type UtxoBirthPkBytes = UtxoPkBytes;
 
 pub type AssetPkBytes = [u8; 9];
 pub type AssetBirthPkBytes = AssetPkBytes;
-pub type AssetValueWithIndex = Vec<u8>;
+pub type AssetValueActionBirthPk = Vec<u8>;
 
 #[derive(Debug, PartialEq, Clone)]
 struct EutxoPk {
