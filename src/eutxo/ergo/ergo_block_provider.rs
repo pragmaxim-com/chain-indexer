@@ -71,7 +71,7 @@ impl BlockProvider for ErgoBlockProvider {
                     async move { client.get_block_by_height_async(height.into()).await },
                 )
             })
-            .buffered(num_cpus::get())
+            .buffered(num_cpus::get() / 2)
             .map(|res| match res {
                 Ok(Ok(block)) => block,
                 Ok(Err(e)) => panic!("Error: {:?}", e),
@@ -82,7 +82,7 @@ impl BlockProvider for ErgoBlockProvider {
                 let processor = Arc::clone(&self.processor);
                 tokio::task::spawn_blocking(move || processor.process_batch(&blocks, tx_count))
             })
-            .buffered(num_cpus::get())
+            .buffered(num_cpus::get() / 2)
             .map(|res| match res {
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),
