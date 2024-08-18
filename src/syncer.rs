@@ -4,7 +4,6 @@ use crate::{
     api::{BlockMonitor, BlockProvider},
     indexer::Indexer,
     info,
-    model::Transaction,
     rocks_db_batch::CustomFamilies,
 };
 use std::sync::{
@@ -12,16 +11,14 @@ use std::sync::{
     Arc,
 };
 
-pub struct ChainSyncer<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send + 'static> {
+pub struct ChainSyncer<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> {
     pub is_shutdown: Arc<AtomicBool>,
     pub block_source: Arc<dyn BlockProvider<OutTx = OutTx>>,
     pub monitor: Arc<dyn BlockMonitor<OutTx>>,
     pub indexer: Arc<Indexer<'db, CF, OutTx>>,
 }
 
-impl<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send + 'static>
-    ChainSyncer<'db, CF, OutTx>
-{
+impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> ChainSyncer<'db, CF, OutTx> {
     pub fn new(
         block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
         monitor: Arc<dyn BlockMonitor<OutTx>>,
@@ -67,9 +64,7 @@ impl<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send + 'static>
     }
 }
 
-impl<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send + 'static> Drop
-    for ChainSyncer<'db, CF, OutTx>
-{
+impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> Drop for ChainSyncer<'db, CF, OutTx> {
     fn drop(&mut self) {
         info!("Dropping indexer");
         self.flush_and_shutdown();

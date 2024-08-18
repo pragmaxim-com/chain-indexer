@@ -14,7 +14,7 @@ use crate::{
     eutxo::eutxo_model::EuTx,
     model::{
         AssetAction, AssetId, AssetMinted, AssetValue, Block, BlockHeight, O2mIndexValue,
-        O2oIndexValue, Transaction, TxHash, TxIndex,
+        O2oIndexValue, TxHash, TxIndex,
     },
     rocks_db_batch::Families,
 };
@@ -26,7 +26,9 @@ use rocksdb::{
 };
 use std::{mem::size_of, sync::Arc};
 
-pub struct EuTxService {}
+pub struct EuTxService {
+    pub perist_coinbase_inputs: bool,
+}
 
 impl<'db> EuTxService {
     // Method to process the outputs of a transaction
@@ -312,7 +314,6 @@ impl<'db> EuTxService {
                 let asset_pk_bytes =
                     eutxo_codec_utxo::asset_pk_bytes(utxo_pk_bytes, &(asset_index as u8));
 
-                // append indexes to utxo_value_with_indexes
                 BigEndian::write_u64(
                     &mut asset_value_action_birth_pk[idx..idx + size_of::<AssetValue>()],
                     *asset_value,
@@ -336,7 +337,7 @@ impl<'db> EuTxService {
                     .copy_from_slice(&asset_birth_pk_bytes);
                 idx += size_of::<AssetBirthPkBytes>();
             }
-            self.persist_asset_value_with_index(
+            self.persist_asset_value_action_birth_pk(
                 utxo_pk_bytes,
                 &asset_value_action_birth_pk,
                 batch,
@@ -557,17 +558,17 @@ impl<'db> EuTxService {
         db_tx.delete_cf(&families.custom.assets_by_utxo_pk_cf, utxo_pk_bytes)
     }
 
-    fn persist_asset_value_with_index(
+    fn persist_asset_value_action_birth_pk(
         &self,
         utxo_pk_bytes: &UtxoPkBytes,
-        asset_value_with_index: &AssetValueActionBirthPk,
+        asset_value_action_birth_pk: &AssetValueActionBirthPk,
         batch: &mut WriteBatchWithTransaction<true>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) {
         batch.put_cf(
             &families.custom.assets_by_utxo_pk_cf,
             utxo_pk_bytes,
-            asset_value_with_index,
+            asset_value_action_birth_pk,
         );
     }
 
@@ -665,7 +666,7 @@ impl<'db> TxService<'db> for EuTxService {
         tx_pk_by_tx_hash_lru_cache.put(tx.tx_hash, tx_pk_bytes);
 
         self.persist_outputs(block_height, tx, db_tx, batch, families)?;
-        if !tx.is_coinbase() {
+        if self.perist_coinbase_inputs {
             self.persist_inputs(
                 block_height,
                 tx,
@@ -690,7 +691,7 @@ impl<'db> TxService<'db> for EuTxService {
     ) -> Result<(), rocksdb::Error> {
         let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
 
-        if !tx.is_coinbase() {
+        if self.perist_coinbase_inputs {
             self.remove_inputs(
                 block_height,
                 tx,

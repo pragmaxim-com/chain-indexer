@@ -1,4 +1,5 @@
 use crate::api::Storage;
+use crate::cli::Blockchain;
 use crate::cli::CliConfig;
 use crate::eutxo::eutxo_model::*;
 use crate::settings::IndexerSettings;
@@ -31,6 +32,11 @@ pub async fn run_eutxo_indexing(
         "{}/{}/{}",
         indexer_settings.db_path, "main", cli_config.blockchain
     );
+    let perist_coinbase_inputs: bool = match cli_config.blockchain {
+        Blockchain::Bitcoin => false,
+        Blockchain::Cardano => true,
+        Blockchain::Ergo => false,
+    };
     let disable_wal = indexer_settings.disable_wal;
 
     let tx_batch_size = indexer_settings.tx_batch_size;
@@ -91,7 +97,9 @@ pub async fn run_eutxo_indexing(
         db: Arc::clone(&db),
     }));
 
-    let tx_service = Arc::new(EuTxService {});
+    let tx_service = Arc::new(EuTxService {
+        perist_coinbase_inputs,
+    });
     let block_service = Arc::new(BlockService::new(tx_service));
 
     let indexer = Arc::new(Indexer::new(

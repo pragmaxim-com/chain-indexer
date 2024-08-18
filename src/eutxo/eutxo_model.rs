@@ -1,6 +1,6 @@
 use crate::model::{
-    AssetAction, AssetId, AssetValue, CompactionEnabled, O2mIndexValue, O2oIndexValue, Transaction,
-    TxHash, TxIndex,
+    AssetAction, AssetId, AssetValue, CompactionEnabled, O2mIndexValue, O2oIndexValue, TxHash,
+    TxIndex,
 };
 use derive_more::{AsRef, Display, From, Into};
 
@@ -42,20 +42,6 @@ pub struct EuTx {
     pub tx_index: TxIndex,
     pub tx_inputs: Vec<EuTxInput>,
     pub tx_outputs: Vec<EuUtxo>,
-}
-
-impl Transaction for EuTx {
-    fn is_coinbase(&self) -> bool {
-        self.tx_index.0 == 0
-    }
-
-    fn hash(&self) -> &TxHash {
-        &self.tx_hash
-    }
-
-    fn index(&self) -> &TxIndex {
-        &self.tx_index
-    }
 }
 
 pub const UTXO_VALUE_BY_PK_CF: &str = "UTXO_VALUE_BY_PK_CF";

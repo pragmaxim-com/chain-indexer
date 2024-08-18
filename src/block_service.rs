@@ -4,7 +4,7 @@ use crate::{
     codec_tx::TxPkBytes,
     eutxo::eutxo_codec_utxo::UtxoPkBytes,
     info,
-    model::{Block, BlockHash, BlockHeader, BlockHeight, O2oIndexValue, Transaction, TxHash},
+    model::{Block, BlockHash, BlockHeader, BlockHeight, O2oIndexValue, TxHash},
     rocks_db_batch::{CustomFamilies, Families},
 };
 use lru::LruCache;
@@ -12,14 +12,14 @@ use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction}
 use std::{cell::RefCell, num::NonZeroUsize};
 use std::{rc::Rc, sync::Arc};
 
-pub struct BlockService<'db, Tx: Transaction, CF: CustomFamilies<'db>> {
+pub struct BlockService<'db, Tx, CF: CustomFamilies<'db>> {
     pub(crate) tx_service: Arc<dyn TxService<'db, CF = CF, Tx = Tx>>,
     pub(crate) block_by_hash_lru_cache: RefCell<LruCache<BlockHash, Rc<Block<Tx>>>>,
     pub(crate) tx_pk_by_tx_hash_lru_cache: RefCell<LruCache<TxHash, TxPkBytes>>,
     pub(crate) utxo_pk_by_index_lru_cache: RefCell<LruCache<O2oIndexValue, UtxoPkBytes>>,
 }
 
-impl<'db, Tx: Transaction, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
+impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
     pub fn new(service: Arc<dyn TxService<'db, CF = CF, Tx = Tx>>) -> Self {
         BlockService {
             tx_service: service,

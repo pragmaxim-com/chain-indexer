@@ -118,12 +118,6 @@ Assets are for now just basic with single one-to-many secondary index with spent
 AssetValueAndBirthPk_by_UtxoPk:
     utxo_pk -> [asset_value|action|asset_birth_pk]
 
-Spent_UtxoAssetPk_by_InputAssetPk:
-    input_asset_pk -> utxo_asset_pk
-
-Spent_InputAssetPk_by_UtxoAssetPk:
-    utxo_asset_pk -> input_asset_pk
-
 ```
 
 ### Asset index

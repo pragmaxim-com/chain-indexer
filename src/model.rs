@@ -120,12 +120,6 @@ impl<T> Block<T> {
     }
 }
 
-pub trait Transaction {
-    fn is_coinbase(&self) -> bool;
-    fn hash(&self) -> &TxHash;
-    fn index(&self) -> &TxIndex;
-}
-
 pub type CompactionEnabled = bool;
 
 pub const META_CF: &str = "META_CF";

@@ -10,7 +10,6 @@ use crate::codec_block;
 use crate::info;
 use crate::model::Block;
 use crate::model::BlockHeader;
-use crate::model::Transaction;
 use crate::rocks_db_batch::CustomFamilies;
 use crate::rocks_db_batch::Families;
 use std::rc::Rc;
@@ -20,7 +19,7 @@ use std::sync::RwLock;
 
 pub const LAST_HEADER_KEY: &[u8] = b"last_header";
 
-pub struct Indexer<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send> {
+pub struct Indexer<'db, CF: CustomFamilies<'db>, OutTx: Send> {
     pub storage: Arc<RwLock<Storage>>,
     families: Arc<Families<'db, CF>>,
     service: Arc<BlockService<'db, OutTx, CF>>,
@@ -28,7 +27,7 @@ pub struct Indexer<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send> {
     disable_wal: bool,
 }
 
-impl<'db, CF: CustomFamilies<'db>, OutTx: Transaction + Send> Indexer<'db, CF, OutTx> {
+impl<'db, CF: CustomFamilies<'db>, OutTx: Send> Indexer<'db, CF, OutTx> {
     pub fn new(
         storage: Arc<RwLock<Storage>>,
         families: Arc<Families<'db, CF>>,

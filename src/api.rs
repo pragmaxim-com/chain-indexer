@@ -3,7 +3,7 @@ use std::{pin::Pin, sync::Arc};
 use crate::{
     codec_tx::TxPkBytes,
     eutxo::{eutxo_codec_utxo::UtxoPkBytes, eutxo_schema::DbSchema},
-    model::{Block, BlockHeader, BlockHeight, O2oIndexValue, Transaction, TxCount, TxHash},
+    model::{Block, BlockHeader, BlockHeight, O2oIndexValue, TxCount, TxHash},
     rocks_db_batch::{CustomFamilies, Families},
 };
 use async_trait::async_trait;
@@ -46,7 +46,7 @@ pub trait BlockProvider {
 
 pub trait TxService<'db> {
     type CF: CustomFamilies<'db>;
-    type Tx: Transaction;
+    type Tx;
 
     fn get_txs_by_height(
         &self,
