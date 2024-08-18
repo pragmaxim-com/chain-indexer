@@ -3,12 +3,12 @@ db_path = "/tmp/chain-indexer"
 tx_batch_size = 500
 disable_wal = false
 
-[cardano]
-api_host = "localhost:1337"
-socket_path = "/home/lisak/.cardano/db/node.socket"
-
 [bitcoin]
 api_host = "http://127.0.0.1:8332"
+
+[cardano]
+api_host = "localhost:1337"
+socket_path = "/var/lib/cardano-node/db/node.socket"
 
 [ergo]
 api_host = "http://127.0.0.1:9053"

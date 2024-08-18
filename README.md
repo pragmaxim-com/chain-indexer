@@ -10,6 +10,22 @@ Chain tip is "eventually consistent" due to using indexes over hashes, ie. forks
 
 Currently `Bitcoin`, `Cardano` and `Ergo` are supported.
 
+### Usage
+
+```
+# Bitcoin node is expected to run locally at port 8332, see config/settings.toml
+export BITCOIN__API_USERNAME="foo"
+export BITCOIN__API_PASSWORD="bar"
+cargo run -- --blockchain bitcoin
+
+# Cardano node is expected to run locally at port 1337, set socket_path at config/settings.toml
+cargo run -- --blockchain cardano
+
+# Ergo node is expected to run locally at port 9053, 
+export ERGO__API_KEY="foo"
+cargo run -- --blockchain ergo
+```
+
 ### Data model
 
 ```
