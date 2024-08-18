@@ -64,8 +64,8 @@ pub trait TxService<'db> {
         block: &Block<Self::Tx>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
-        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
+        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         utxo_birth_pk_by_index_cache: &mut LruCache<O2mIndexValue, Vec<u8>>,
         asset_birth_pk_by_asset_id_cache: &mut LruCache<AssetId, Vec<u8>>,
         families: &Families<'db, Self::CF>,
@@ -77,7 +77,7 @@ pub trait TxService<'db> {
         tx: &Self::Tx,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
         families: &Families<'db, Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 
@@ -86,8 +86,8 @@ pub trait TxService<'db> {
         block_height: &BlockHeight,
         tx: &Self::Tx,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
-        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
+        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         families: &Families<'db, Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 }

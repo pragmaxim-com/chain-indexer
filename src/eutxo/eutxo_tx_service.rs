@@ -96,13 +96,13 @@ impl<'db> EuTxService {
         tx: &EuTx,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
-        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
+        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) {
         for (input_index, input) in tx.tx_inputs.iter().enumerate() {
             let utxo_pk_opt: Option<[u8; 8]> = match input {
-                EuTxInput::TxHashInput(tx_input) => tx_pk_by_tx_hash_lru_cache
+                EuTxInput::TxHashInput(tx_input) => tx_pk_by_tx_hash_cache
                     .get(&tx_input.tx_hash)
                     .map(|tx_pk_bytes| {
                         eutxo_codec_utxo::utxo_pk_bytes_from(tx_pk_bytes, &tx_input.utxo_index)
@@ -118,21 +118,19 @@ impl<'db> EuTxService {
                                 )
                             })
                     }),
-                EuTxInput::OutputIndexInput(index_number, output_index) => {
-                    utxo_pk_by_index_lru_cache
-                        .get(&output_index)
-                        .map(|&arr| arr)
-                        .or_else(|| {
-                            let pk: Option<[u8; 8]> = db_tx
-                                .get_cf(
-                                    &families.custom.o2o_utxo_birth_pk_by_index_cf[index_number],
-                                    &output_index.0,
-                                )
-                                .unwrap()
-                                .map(|bytes| bytes.try_into().unwrap());
-                            pk
-                        })
-                }
+                EuTxInput::OutputIndexInput(index_number, output_index) => utxo_pk_by_index_cache
+                    .get(&output_index)
+                    .map(|&arr| arr)
+                    .or_else(|| {
+                        let pk: Option<[u8; 8]> = db_tx
+                            .get_cf(
+                                &families.custom.o2o_utxo_birth_pk_by_index_cf[index_number],
+                                &output_index.0,
+                            )
+                            .unwrap()
+                            .map(|bytes| bytes.try_into().unwrap());
+                        pk
+                    }),
             };
             match utxo_pk_opt {
                 Some(utxo_pk) => {
@@ -690,8 +688,8 @@ impl<'db> TxService<'db> for EuTxService {
         block: &Block<EuTx>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
-        utxo_pk_by_index_value_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
+        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         utxo_birth_pk_by_index_cache: &mut LruCache<O2mIndexValue, Vec<u8>>,
         asset_birth_pk_by_asset_id_cache: &mut LruCache<AssetId, Vec<u8>>,
         families: &Families<'db, EutxoFamilies<'db>>,
@@ -702,7 +700,7 @@ impl<'db> TxService<'db> for EuTxService {
                 tx,
                 db_tx,
                 batch,
-                tx_pk_by_tx_hash_lru_cache,
+                tx_pk_by_tx_hash_cache,
                 families,
             )?;
 
@@ -721,8 +719,8 @@ impl<'db> TxService<'db> for EuTxService {
                     tx,
                     db_tx,
                     batch,
-                    tx_pk_by_tx_hash_lru_cache,
-                    utxo_pk_by_index_value_lru_cache,
+                    tx_pk_by_tx_hash_cache,
+                    utxo_pk_by_index_cache,
                     families,
                 );
             }
@@ -736,13 +734,13 @@ impl<'db> TxService<'db> for EuTxService {
         tx: &EuTx,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
+        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
         let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
         batch.put_cf(&families.shared.tx_hash_by_pk_cf, &tx_pk_bytes, &tx.tx_hash);
         db_tx.put_cf(&families.shared.tx_pk_by_hash_cf, &tx.tx_hash, &tx_pk_bytes)?;
-        tx_pk_by_tx_hash_lru_cache.put(tx.tx_hash, tx_pk_bytes);
+        tx_pk_by_tx_hash_cache.put(tx.tx_hash, tx_pk_bytes);
         Ok(())
     }
 
@@ -751,8 +749,8 @@ impl<'db> TxService<'db> for EuTxService {
         block_height: &BlockHeight,
         tx: &EuTx,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
-        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
+        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
         let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
@@ -762,8 +760,8 @@ impl<'db> TxService<'db> for EuTxService {
                 block_height,
                 tx,
                 db_tx,
-                tx_pk_by_tx_hash_lru_cache,
-                utxo_pk_by_index_lru_cache,
+                tx_pk_by_tx_hash_cache,
+                utxo_pk_by_index_cache,
                 families,
             )?;
         }
@@ -773,7 +771,7 @@ impl<'db> TxService<'db> for EuTxService {
 
         db_tx.delete_cf(&families.shared.tx_pk_by_hash_cf, &tx.tx_hash)?;
 
-        tx_pk_by_tx_hash_lru_cache.pop(&tx.tx_hash);
+        tx_pk_by_tx_hash_cache.pop(&tx.tx_hash);
 
         Ok(())
     }
