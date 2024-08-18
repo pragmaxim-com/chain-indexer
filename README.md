@@ -1,4 +1,4 @@
-## DB schema
+## Chain Indexer
 
 Chain indexer is a universal blockchain indexing tool on top of RocksDB that generates `one-to-many` and `one-to-one` output-based indexes to be able to answer all sorts of explorer queries.
 
