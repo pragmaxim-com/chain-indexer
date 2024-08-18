@@ -74,6 +74,7 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         Ok(())
     }
 
+    #[warn(clippy::too_many_arguments)]
     pub(crate) fn persist_block(
         &self,
         block: Rc<Block<Tx>>,
@@ -153,7 +154,7 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
                 }
             })
             .filter_map(|result| match result {
-                Ok(Some(foo)) => Some(Ok(foo)),
+                Ok(Some(block)) => Some(Ok(block)),
                 Ok(None) => None,
                 Err(e) => Some(Err(e)),
             })
@@ -213,7 +214,7 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         families: &Families<'db, CF>,
     ) -> Result<Option<BlockHeader>, rocksdb::Error> {
         if let Some(value) = self.block_by_hash_cache.borrow_mut().get(block_hash) {
-            return Ok(Some(value.header.clone()));
+            Ok(Some(value.header.clone()))
         } else {
             let header_bytes = db_tx.get_cf(&families.shared.block_pk_by_hash_cf, block_hash)?;
             Ok(header_bytes.map(|bytes| codec_block::bytes_to_block_header(&bytes)))
@@ -229,7 +230,7 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
     ) -> Result<(), rocksdb::Error> {
         let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
 
-        let header_bytes = codec_block::block_header_to_bytes(&block_header);
+        let header_bytes = codec_block::block_header_to_bytes(block_header);
         batch.put_cf(
             &families.shared.block_hash_by_pk_cf,
             height_bytes,

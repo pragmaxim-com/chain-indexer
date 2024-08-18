@@ -22,7 +22,7 @@ impl CardanoIoProcessor {
 }
 
 impl IoProcessor<MultiEraInput<'_>, EuTxInput, MultiEraOutput<'_>, EuUtxo> for CardanoIoProcessor {
-    fn process_inputs(&self, ins: &Vec<MultiEraInput<'_>>) -> Vec<EuTxInput> {
+    fn process_inputs(&self, ins: &[MultiEraInput<'_>]) -> Vec<EuTxInput> {
         ins.iter()
             .map(|input| {
                 let tx_hash: [u8; 32] = **input.hash();
@@ -34,14 +34,14 @@ impl IoProcessor<MultiEraInput<'_>, EuTxInput, MultiEraOutput<'_>, EuUtxo> for C
             .collect()
     }
 
-    fn process_outputs(&self, outs: &Vec<MultiEraOutput<'_>>) -> Vec<EuUtxo> {
+    fn process_outputs(&self, outs: &[MultiEraOutput<'_>]) -> Vec<EuUtxo> {
         let mut result_outs = Vec::with_capacity(outs.len());
+        let mut ctx = ();
         for (out_index, out) in outs.iter().enumerate() {
             let address_opt = out.address().ok().map(|a| a.to_vec());
             let script_hash_opt = out.script_ref().map(|h| {
                 let mut buffer = Vec::new();
                 let mut encoder = Encoder::new(&mut buffer);
-                let mut ctx = ();
                 h.encode(&mut encoder, &mut ctx).unwrap();
                 buffer
             });

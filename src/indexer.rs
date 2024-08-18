@@ -22,7 +22,7 @@ pub const LAST_HEADER_KEY: &[u8] = b"last_header";
 pub struct Indexer<'db, CF: CustomFamilies<'db>, OutTx: Send> {
     pub storage: Arc<RwLock<Storage>>,
     families: Arc<Families<'db, CF>>,
-    service: Arc<BlockService<'db, OutTx, CF>>,
+    service: BlockService<'db, OutTx, CF>,
     block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
     disable_wal: bool,
 }
@@ -31,7 +31,7 @@ impl<'db, CF: CustomFamilies<'db>, OutTx: Send> Indexer<'db, CF, OutTx> {
     pub fn new(
         storage: Arc<RwLock<Storage>>,
         families: Arc<Families<'db, CF>>,
-        service: Arc<BlockService<'db, OutTx, CF>>,
+        service: BlockService<'db, OutTx, CF>,
         block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
         disable_wal: bool,
     ) -> Self {

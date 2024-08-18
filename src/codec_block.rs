@@ -56,7 +56,7 @@ pub fn bytes_to_block_hash(block_hash_bytes: &[u8]) -> BlockHash {
         "Block hash bytes must be 32 bytes long"
     );
     let mut hash: [u8; 32] = [0u8; 32];
-    hash.copy_from_slice(&block_hash_bytes);
+    hash.copy_from_slice(block_hash_bytes);
     hash.into()
 }
 

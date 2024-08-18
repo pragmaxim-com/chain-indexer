@@ -7,9 +7,9 @@ use super::eutxo_schema::DbSchema;
 pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<MultiThreaded> {
     let options = db_options::get_db_options();
     let existing_cfs =
-        OptimisticTransactionDB::<MultiThreaded>::list_cf(&options, &db_path).unwrap_or(vec![]);
+        OptimisticTransactionDB::<MultiThreaded>::list_cf(&options, db_path).unwrap_or_default();
 
-    let db = OptimisticTransactionDB::<MultiThreaded>::open_cf(&options, &db_path, &existing_cfs)
+    let db = OptimisticTransactionDB::<MultiThreaded>::open_cf(&options, db_path, &existing_cfs)
         .unwrap();
 
     if existing_cfs.is_empty() {

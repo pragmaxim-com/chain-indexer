@@ -5,6 +5,7 @@ use crate::eutxo::eutxo_model::*;
 use crate::settings::IndexerSettings;
 
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
@@ -102,16 +103,16 @@ pub async fn run_eutxo_indexing(
     let tx_service = Arc::new(EuTxService {
         perist_coinbase_inputs,
     });
-    let block_service = Arc::new(BlockService::new(tx_service));
+    let block_service = BlockService::new(tx_service);
 
-    let indexer = Arc::new(Indexer::new(
+    let indexer = Indexer::new(
         Arc::clone(&storage),
         Arc::clone(&families),
         block_service,
         Arc::clone(&block_provider),
         disable_wal,
-    ));
-    let syncer = ChainSyncer::new(block_provider, Arc::new(EuBlockMonitor::new(1000)), indexer);
+    );
+    let syncer = ChainSyncer::new(block_provider, Rc::new(EuBlockMonitor::new(1000)), indexer);
     let storage = Arc::clone(&storage);
     tokio::task::spawn(async move {
         match tokio::signal::ctrl_c().await {

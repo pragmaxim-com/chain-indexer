@@ -102,7 +102,7 @@ impl DbSchema {
                     })
                     .collect::<HashMap<DbIndexName, DbIndexNumber>>()
             })
-            .unwrap_or(HashMap::new());
+            .unwrap_or_default();
 
         DbSchema {
             o2m_index_number_by_name: o2m_index_number_by_name.clone(),

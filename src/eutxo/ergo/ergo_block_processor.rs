@@ -28,12 +28,12 @@ impl BlockProcessor for ErgoBlockProcessor {
 
     fn process_batch(
         &self,
-        block_batch: &Vec<Block<Self::FromTx>>,
+        block_batch: &[Block<Self::FromTx>],
         tx_count: TxCount,
     ) -> (Vec<Block<Self::IntoTx>>, TxCount) {
         (
             block_batch
-                .into_iter()
+                .iter()
                 .map(|btc_block| {
                     let eu_block: Block<Self::IntoTx> = self.process_block(btc_block);
                     eu_block

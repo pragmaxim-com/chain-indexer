@@ -30,7 +30,7 @@ impl BtcBlockProvider {
 
     pub fn process_batch(
         &self,
-        block_batch: &Vec<Block<bitcoin::Transaction>>,
+        block_batch: &[Block<bitcoin::Transaction>],
         tx_count: TxCount,
     ) -> (Vec<Block<EuTx>>, TxCount) {
         self.processor.process_batch(block_batch, tx_count)

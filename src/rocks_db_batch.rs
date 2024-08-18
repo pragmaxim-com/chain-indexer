@@ -17,12 +17,13 @@ pub struct SharedFamilies<'db> {
 
 impl<'db> SharedFamilies<'db> {
     fn get_all(&self) -> Vec<Arc<BoundColumnFamily<'db>>> {
-        let mut all = vec![];
-        all.push(Arc::clone(&self.meta_cf));
-        all.push(Arc::clone(&self.block_hash_by_pk_cf));
-        all.push(Arc::clone(&self.block_pk_by_hash_cf));
-        all.push(Arc::clone(&self.tx_hash_by_pk_cf));
-        all.push(Arc::clone(&self.tx_pk_by_hash_cf));
+        let all = vec![
+            Arc::clone(&self.meta_cf),
+            Arc::clone(&self.block_hash_by_pk_cf),
+            Arc::clone(&self.block_pk_by_hash_cf),
+            Arc::clone(&self.tx_hash_by_pk_cf),
+            Arc::clone(&self.tx_pk_by_hash_cf),
+        ];
         all
     }
 }

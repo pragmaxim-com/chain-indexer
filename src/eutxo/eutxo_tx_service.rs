@@ -119,8 +119,8 @@ impl<'db> EuTxService {
                             })
                     }),
                 EuTxInput::OutputIndexInput(index_number, output_index) => utxo_pk_by_index_cache
-                    .get(&output_index)
-                    .map(|&arr| arr)
+                    .get(output_index)
+                    .copied()
                     .or_else(|| {
                         let pk: Option<[u8; 8]> = db_tx
                             .get_cf(
@@ -139,8 +139,8 @@ impl<'db> EuTxService {
                         &tx.tx_index,
                         &(input_index as u16),
                     );
-                    batch.put_cf(&families.custom.utxo_pk_by_input_pk_cf, &input_pk, utxo_pk);
-                    batch.put_cf(&families.custom.input_pk_by_utxo_pk_cf, utxo_pk, &input_pk);
+                    batch.put_cf(&families.custom.utxo_pk_by_input_pk_cf, input_pk, utxo_pk);
+                    batch.put_cf(&families.custom.input_pk_by_utxo_pk_cf, utxo_pk, input_pk);
                 }
                 None => {
                     // println!("Genesis {}", output_index);
@@ -180,7 +180,7 @@ impl<'db> EuTxService {
                     .to_vec(),
                 EuTxInput::OutputIndexInput(index_number, output_index) => {
                     utxo_pk_by_index_lru_cache
-                        .get(&output_index)
+                        .get(output_index)
                         .map(|o| o.to_vec())
                         .or_else(|| {
                             db_tx
@@ -226,7 +226,7 @@ impl<'db> EuTxService {
 
     fn get_o2m_utxo_indexes(
         &self,
-        o2m_index_pks: &Vec<(DbIndexNumber, UtxoBirthPkBytes)>,
+        o2m_index_pks: &[(DbIndexNumber, UtxoBirthPkBytes)],
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<Vec<(DbIndexNumber, O2mIndexValue)>, rocksdb::Error> {
@@ -316,7 +316,7 @@ impl<'db> EuTxService {
         asset_birth_pk_by_asset_id_cache: &mut LruCache<AssetId, Vec<u8>>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
-        if utxo.assets.len() > 0 {
+        if !utxo.assets.is_empty() {
             // start building the asset_value_action_indexes
             let asset_elem_size =
                 size_of::<AssetValue>() + size_of::<AssetAction>() + size_of::<AssetBirthPkBytes>();
@@ -433,7 +433,7 @@ impl<'db> EuTxService {
         }
 
         self.persist_utxo_value_with_indexes(
-            &utxo_pk_bytes,
+            utxo_pk_bytes,
             &utxo_value_with_indexes,
             batch,
             families,
@@ -521,7 +521,7 @@ impl<'db> EuTxService {
     fn remove_assets(
         &self,
         utxo_pk_bytes: &UtxoPkBytes,
-        assets: &Vec<(AssetId, AssetValue, AssetAction)>,
+        assets: &[(AssetId, AssetValue, AssetAction)],
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
@@ -538,7 +538,7 @@ impl<'db> EuTxService {
                 eutxo_codec_utxo::get_asset_pk_from_relation,
             )?;
         }
-        self.remove_asset_value_with_indexes(&utxo_pk_bytes, db_tx, families)?;
+        self.remove_asset_value_with_indexes(utxo_pk_bytes, db_tx, families)?;
         Ok(())
     }
 
@@ -599,9 +599,9 @@ impl<'db> EuTxService {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
     ) -> Result<(Vec<u8>, AssetMinted), rocksdb::Error> {
-        if let Some(existing_birth_pk_vec) = cache.get(&index_value) {
+        if let Some(existing_birth_pk_vec) = cache.get(index_value) {
             let birth_pk_with_pk =
-                eutxo_codec_utxo::concat_birth_pk_with_pk(&existing_birth_pk_vec, pk_bytes);
+                eutxo_codec_utxo::concat_birth_pk_with_pk(existing_birth_pk_vec, pk_bytes);
             batch.put_cf(birth_pk_with_pk_cf, &birth_pk_with_pk, vec![]);
             Ok((existing_birth_pk_vec.clone(), false))
         } else if let Some(existing_birth_pk_vec) =
@@ -631,9 +631,9 @@ impl<'db> EuTxService {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
     ) -> Result<(Vec<u8>, AssetMinted), rocksdb::Error> {
-        if let Some(existing_birth_pk_vec) = cache.get(&index_value) {
+        if let Some(existing_birth_pk_vec) = cache.get(index_value) {
             let birth_pk_with_pk =
-                eutxo_codec_utxo::concat_birth_pk_with_pk(&existing_birth_pk_vec, pk_bytes);
+                eutxo_codec_utxo::concat_birth_pk_with_pk(existing_birth_pk_vec, pk_bytes);
             batch.put_cf(birth_pk_with_pk_cf, &birth_pk_with_pk, vec![]);
             Ok((existing_birth_pk_vec.clone(), false))
         } else if let Some(existing_birth_pk_vec) =
@@ -663,7 +663,7 @@ impl<'db> TxService<'db> for EuTxService {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<Vec<EuTx>, rocksdb::Error> {
-        let height_bytes = codec_block::block_height_to_bytes(&block_height);
+        let height_bytes = codec_block::block_height_to_bytes(block_height);
         db_tx
             .prefix_iterator_cf(&families.shared.tx_hash_by_pk_cf, height_bytes)
             .map(|result| {
@@ -738,8 +738,8 @@ impl<'db> TxService<'db> for EuTxService {
         families: &Families<'db, EutxoFamilies<'db>>,
     ) -> Result<(), rocksdb::Error> {
         let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
-        batch.put_cf(&families.shared.tx_hash_by_pk_cf, &tx_pk_bytes, &tx.tx_hash);
-        db_tx.put_cf(&families.shared.tx_pk_by_hash_cf, &tx.tx_hash, &tx_pk_bytes)?;
+        batch.put_cf(&families.shared.tx_hash_by_pk_cf, tx_pk_bytes, tx.tx_hash);
+        db_tx.put_cf(&families.shared.tx_pk_by_hash_cf, tx.tx_hash, tx_pk_bytes)?;
         tx_pk_by_tx_hash_cache.put(tx.tx_hash, tx_pk_bytes);
         Ok(())
     }
@@ -769,7 +769,7 @@ impl<'db> TxService<'db> for EuTxService {
 
         db_tx.delete_cf(&families.shared.tx_hash_by_pk_cf, tx_pk_bytes)?;
 
-        db_tx.delete_cf(&families.shared.tx_pk_by_hash_cf, &tx.tx_hash)?;
+        db_tx.delete_cf(&families.shared.tx_pk_by_hash_cf, tx.tx_hash)?;
 
         tx_pk_by_tx_hash_cache.pop(&tx.tx_hash);
 

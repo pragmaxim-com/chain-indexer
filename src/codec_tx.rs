@@ -25,7 +25,7 @@ pub fn hash_bytes_to_tx_hash(bytes: &[u8]) -> TxHash {
     assert_eq!(bytes.len(), 32, "tx hash bytes must be 32 bytes long");
     assert_eq!(bytes.len(), 32, "Block hash bytes must be 32 bytes long");
     let mut hash: [u8; 32] = [0u8; 32];
-    hash.copy_from_slice(&bytes);
+    hash.copy_from_slice(bytes);
     hash.into()
 }
 

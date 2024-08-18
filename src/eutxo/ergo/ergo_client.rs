@@ -98,7 +98,7 @@ impl ErgoClient {
             let status = response.status();
             let text = response.text().await.unwrap_or_else(|_| String::new());
             error!("Request failed with status {}: {}", status, text);
-            return Err("Request failed".to_string());
+            Err("Request failed".to_string())
         } else {
             let node_info = response
                 .json::<NodeInfo>()

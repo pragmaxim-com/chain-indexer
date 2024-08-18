@@ -52,6 +52,6 @@ impl CardanoClient {
             .fetch_single(point)
             .await
             .map_err(|e| e.to_string())?;
-        hex::decode(&block_str).map_err(|e| e.to_string())
+        hex::decode(block_str).map_err(|e| e.to_string())
     }
 }

@@ -6,23 +6,26 @@ use crate::{
     info,
     rocks_db_batch::CustomFamilies,
 };
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
+use std::{
+    rc::Rc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 pub struct ChainSyncer<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> {
     pub is_shutdown: Arc<AtomicBool>,
     pub block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
-    pub monitor: Arc<dyn BlockMonitor<OutTx>>,
-    pub indexer: Arc<Indexer<'db, CF, OutTx>>,
+    pub monitor: Rc<dyn BlockMonitor<OutTx>>,
+    pub indexer: Indexer<'db, CF, OutTx>,
 }
 
 impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> ChainSyncer<'db, CF, OutTx> {
     pub fn new(
         block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
-        monitor: Arc<dyn BlockMonitor<OutTx>>,
-        indexer: Arc<Indexer<'db, CF, OutTx>>,
+        monitor: Rc<dyn BlockMonitor<OutTx>>,
+        indexer: Indexer<'db, CF, OutTx>,
     ) -> Self {
         ChainSyncer {
             is_shutdown: Arc::new(AtomicBool::new(false)),

@@ -30,15 +30,12 @@ impl ErgoIoProcessor {
 }
 
 impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
-    fn process_inputs(&self, ins: &Vec<BoxId>) -> Vec<EuTxInput> {
+    fn process_inputs(&self, ins: &[BoxId]) -> Vec<EuTxInput> {
         ins.iter()
             .map(|input| {
                 if let Some(index_number) = self.db_schema.o2o_index_number_by_name.get("BOX_ID") {
                     let box_id_slice: &[u8] = input.as_ref();
-                    EuTxInput::OutputIndexInput(
-                        (*index_number).into(),
-                        O2oIndexValue(box_id_slice.to_vec()),
-                    )
+                    EuTxInput::OutputIndexInput(*index_number, O2oIndexValue(box_id_slice.to_vec()))
                 } else {
                     panic!("TODO, this should not be done for each input !!!")
                 }
@@ -46,7 +43,7 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
             .collect()
     }
 
-    fn process_outputs(&self, outs: &Vec<ErgoBox>) -> Vec<EuUtxo> {
+    fn process_outputs(&self, outs: &[ErgoBox]) -> Vec<EuUtxo> {
         let mut result_outs = Vec::with_capacity(outs.len());
         for (out_index, out) in outs.iter().enumerate() {
             let box_id = out.box_id();

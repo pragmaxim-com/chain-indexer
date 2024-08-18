@@ -24,7 +24,7 @@ impl BtcBlockProcessor {
     fn process_tx(&self, tx_index: &TxIndex, tx: &bitcoin::Transaction) -> EuTx {
         EuTx {
             tx_hash: tx.compute_txid().to_byte_array().into(),
-            tx_index: tx_index.clone(),
+            tx_index: *tx_index,
             tx_inputs: self.io_processor.process_inputs(&tx.input),
             tx_outputs: self.io_processor.process_outputs(&tx.output),
         }
@@ -49,12 +49,12 @@ impl BlockProcessor for BtcBlockProcessor {
 
     fn process_batch(
         &self,
-        block_batch: &Vec<Block<Self::FromTx>>,
+        block_batch: &[Block<Self::FromTx>],
         tx_count: TxCount,
     ) -> (Vec<Block<Self::IntoTx>>, TxCount) {
         (
             block_batch
-                .into_iter()
+                .iter()
                 .map(|btc_block| {
                     let eu_block: Block<Self::IntoTx> = self.process_block(btc_block);
                     eu_block

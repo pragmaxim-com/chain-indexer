@@ -21,14 +21,14 @@ pub trait BlockProcessor {
 
     fn process_batch(
         &self,
-        block_batch: &Vec<Block<Self::FromTx>>,
+        block_batch: &[Block<Self::FromTx>],
         tx_count: TxCount,
     ) -> (Vec<Block<Self::IntoTx>>, TxCount);
 }
 
 pub trait IoProcessor<FromInput, IntoInput, FromOutput, IntoOutput> {
-    fn process_inputs(&self, ins: &Vec<FromInput>) -> Vec<IntoInput>;
-    fn process_outputs(&self, outs: &Vec<FromOutput>) -> Vec<IntoOutput>;
+    fn process_inputs(&self, ins: &[FromInput]) -> Vec<IntoInput>;
+    fn process_outputs(&self, outs: &[FromOutput]) -> Vec<IntoOutput>;
 }
 
 #[async_trait]
@@ -59,6 +59,7 @@ pub trait TxService<'db> {
         families: &Families<'db, Self::CF>,
     ) -> Result<Vec<Self::Tx>, rocksdb::Error>;
 
+    #[warn(clippy::too_many_arguments)]
     fn persist_txs(
         &self,
         block: &Block<Self::Tx>,
@@ -93,7 +94,7 @@ pub trait TxService<'db> {
 }
 
 pub trait BlockMonitor<Tx> {
-    fn monitor(&self, block_batch: &Vec<Block<Tx>>, tx_count: &TxCount);
+    fn monitor(&self, block_batch: &[Block<Tx>], tx_count: &TxCount);
 }
 
 pub struct Storage {
