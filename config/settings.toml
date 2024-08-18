@@ -1,6 +1,6 @@
 [indexer]
 db_path = "/tmp/chain-indexer"
-tx_batch_size = 1000
+tx_batch_size = 500
 disable_wal = false
 
 [cardano]

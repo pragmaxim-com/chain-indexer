@@ -2,7 +2,9 @@
 
 Chain indexer is a universal blockchain indexing tool on top of RocksDB that generates `one-to-many` and `one-to-one` output-based indexes to be able to answer all sorts of explorer queries.
 
-Indexer uses block/tx/box indexes over hashes which allows for much better space efficiency and for ~ 3 000 - 6 000 txs/s throughput with just one CPU core and the slowest SSD, depending on `WAL` being on/off. Mote that average count of outputs/assets per tx matters. 
+Indexer uses block/tx/box indexes over hashes which allows for much better space efficiency and for ~ 3 000 - 5 000 txs/s throughput with just quad-core and the slowest SSD, depending on `WAL` being on/off. Mote that average count of outputs/assets per tx matters. 
+
+`WAL` disabling is currently useless as [rocksdb flushing does not work](https://github.com/facebook/rocksdb/issues/12906).
 
 Chain tip is "eventually consistent" due to using indexes over hashes, ie. forks get settled eventually and superseded forks are deleted from DB.
 

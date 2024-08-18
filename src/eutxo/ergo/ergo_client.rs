@@ -51,7 +51,7 @@ impl ErgoClient {
     fn build_async_client() -> Result<Client, String> {
         let builder = Client::builder();
         builder
-            .timeout(Duration::from_millis(3000))
+            .timeout(Duration::from_millis(10000))
             .build()
             .map_err(|e| e.to_string())
     }
@@ -68,7 +68,7 @@ impl ErgoClient {
     fn build_blocking_client() -> Result<blocking::Client, String> {
         let builder = blocking::Client::builder();
         builder
-            .timeout(Duration::from_millis(3000))
+            .timeout(Duration::from_millis(10000))
             .build()
             .map_err(|e| e.to_string())
     }

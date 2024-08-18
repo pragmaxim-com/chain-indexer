@@ -40,7 +40,7 @@ impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> ChainSyncer<'db, CF, O
         self.block_provider
             .stream(self.indexer.get_last_header(), min_batch_size)
             .await
-            .map(|(block_batch, tx_count)| {
+            .for_each(|(block_batch, tx_count)| async move {
                 let chain_link = block_batch.last().is_some_and(|curr_block| {
                     curr_block.header.height.0 + 100 > chain_tip_header.height.0
                 });
@@ -49,7 +49,6 @@ impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> ChainSyncer<'db, CF, O
                     .persist_blocks(block_batch, chain_link)
                     .unwrap_or_else(|e| panic!("Unable to persist blocks due to {}", e))
             })
-            .count()
             .await;
     }
 
