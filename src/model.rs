@@ -51,14 +51,6 @@ pub type TxCount = usize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct TxIndex(pub u16);
 
-#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
-pub struct O2oIndexValue(pub Vec<u8>);
-impl fmt::Display for O2oIndexValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", hex::encode(&self.0))
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct TxHash(pub [u8; 32]);
 impl fmt::Display for TxHash {
@@ -87,7 +79,14 @@ impl TryFrom<Box<[u8]>> for TxHash {
     }
 }
 
-pub type AssetId = Vec<u8>;
+#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
+pub struct AssetId(pub Vec<u8>);
+impl fmt::Display for AssetId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.0))
+    }
+}
+
 pub type AssetIndex = u8;
 pub type AssetValue = u64;
 pub type AssetMinted = bool;
@@ -103,6 +102,14 @@ pub enum AssetAction {
 #[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct O2mIndexValue(pub Vec<u8>);
 impl fmt::Display for O2mIndexValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.0))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
+pub struct O2oIndexValue(pub Vec<u8>);
+impl fmt::Display for O2oIndexValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(&self.0))
     }

@@ -4,7 +4,7 @@ use crate::{
         eutxo_model::{EuTxInput, EuUtxo, TxHashWithIndex},
         eutxo_schema::DbSchema,
     },
-    model::{AssetAction, O2mIndexValue},
+    model::{AssetAction, AssetId, AssetValue, O2mIndexValue},
 };
 use pallas::{
     codec::minicbor::{Encode, Encoder},
@@ -61,7 +61,8 @@ impl IoProcessor<MultiEraInput<'_>, EuTxInput, MultiEraOutput<'_>, EuUtxo> for C
             }
 
             let assets = out.non_ada_assets();
-            let mut result = Vec::with_capacity(assets.len());
+            let mut result: Vec<(AssetId, AssetValue, AssetAction)> =
+                Vec::with_capacity(assets.len());
             for policy_asset in assets {
                 let policy_id = policy_asset.policy().to_vec();
 
@@ -76,7 +77,7 @@ impl IoProcessor<MultiEraInput<'_>, EuTxInput, MultiEraOutput<'_>, EuUtxo> for C
                         _ => AssetAction::Transfer,
                     };
                     let amount = any_coin.abs() as u64;
-                    result.push((asset_id, amount, action));
+                    result.push((asset_id.into(), amount, action));
                 }
             }
             result_outs.push(EuUtxo {

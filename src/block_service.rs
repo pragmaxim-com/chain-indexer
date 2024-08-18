@@ -4,7 +4,9 @@ use crate::{
     codec_tx::TxPkBytes,
     eutxo::eutxo_codec_utxo::UtxoPkBytes,
     info,
-    model::{Block, BlockHash, BlockHeader, BlockHeight, O2oIndexValue, TxHash},
+    model::{
+        AssetId, Block, BlockHash, BlockHeader, BlockHeight, O2mIndexValue, O2oIndexValue, TxHash,
+    },
     rocks_db_batch::{CustomFamilies, Families},
 };
 use lru::LruCache;
@@ -14,20 +16,28 @@ use std::{rc::Rc, sync::Arc};
 
 pub struct BlockService<'db, Tx, CF: CustomFamilies<'db>> {
     pub(crate) tx_service: Arc<dyn TxService<'db, CF = CF, Tx = Tx>>,
-    pub(crate) block_by_hash_lru_cache: RefCell<LruCache<BlockHash, Rc<Block<Tx>>>>,
-    pub(crate) tx_pk_by_tx_hash_lru_cache: RefCell<LruCache<TxHash, TxPkBytes>>,
-    pub(crate) utxo_pk_by_index_lru_cache: RefCell<LruCache<O2oIndexValue, UtxoPkBytes>>,
+    pub(crate) block_by_hash_cache: RefCell<LruCache<BlockHash, Rc<Block<Tx>>>>,
+    pub(crate) tx_pk_by_tx_hash_cache: RefCell<LruCache<TxHash, TxPkBytes>>,
+    pub(crate) utxo_pk_by_index_cache: RefCell<LruCache<O2oIndexValue, UtxoPkBytes>>,
+    pub(crate) utxo_birth_pk_by_index_cache: RefCell<LruCache<O2mIndexValue, Vec<u8>>>,
+    pub(crate) asset_birth_pk_by_asset_id_cache: RefCell<LruCache<AssetId, Vec<u8>>>,
 }
 
 impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
     pub fn new(service: Arc<dyn TxService<'db, CF = CF, Tx = Tx>>) -> Self {
         BlockService {
             tx_service: service,
-            block_by_hash_lru_cache: RefCell::new(LruCache::new(NonZeroUsize::new(1_000).unwrap())),
-            tx_pk_by_tx_hash_lru_cache: RefCell::new(LruCache::new(
+            block_by_hash_cache: RefCell::new(LruCache::new(NonZeroUsize::new(1_000).unwrap())),
+            tx_pk_by_tx_hash_cache: RefCell::new(LruCache::new(
                 NonZeroUsize::new(5_000_000).unwrap(),
             )),
-            utxo_pk_by_index_lru_cache: RefCell::new(LruCache::new(
+            utxo_pk_by_index_cache: RefCell::new(LruCache::new(
+                NonZeroUsize::new(5_000_000).unwrap(),
+            )),
+            utxo_birth_pk_by_index_cache: RefCell::new(LruCache::new(
+                NonZeroUsize::new(5_000_000).unwrap(),
+            )),
+            asset_birth_pk_by_asset_id_cache: RefCell::new(LruCache::new(
                 NonZeroUsize::new(5_000_000).unwrap(),
             )),
         }
@@ -40,16 +50,21 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         batch: &mut WriteBatchWithTransaction<true>,
         families: &Families<'db, CF>,
     ) -> Result<(), rocksdb::Error> {
-        let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
-        let mut block_height_by_hash_lru_cache = self.block_by_hash_lru_cache.borrow_mut();
-        let mut utxo_pk_by_index_lru_cache = self.utxo_pk_by_index_lru_cache.borrow_mut();
+        let mut tx_pk_by_tx_hash_cache = self.tx_pk_by_tx_hash_cache.borrow_mut();
+        let mut block_height_by_hash_lru_cache = self.block_by_hash_cache.borrow_mut();
+        let mut utxo_pk_by_index_cache = self.utxo_pk_by_index_cache.borrow_mut();
+        let mut utxo_birth_pk_by_index_cache = self.utxo_birth_pk_by_index_cache.borrow_mut();
+        let mut asset_birth_pk_by_asset_id_cache =
+            self.asset_birth_pk_by_asset_id_cache.borrow_mut();
 
         for block in blocks {
             self.persist_block(
                 block,
                 &mut block_height_by_hash_lru_cache,
-                &mut tx_pk_by_tx_hash_lru_cache,
-                &mut utxo_pk_by_index_lru_cache,
+                &mut tx_pk_by_tx_hash_cache,
+                &mut utxo_pk_by_index_cache,
+                &mut utxo_birth_pk_by_index_cache,
+                &mut asset_birth_pk_by_asset_id_cache,
                 db_tx,
                 batch,
                 families,
@@ -62,9 +77,11 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
     pub(crate) fn persist_block(
         &self,
         block: Rc<Block<Tx>>,
-        block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
-        tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
-        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
+        block_height_by_hash_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
+        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
+        utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
+        utxo_birth_pk_by_index_cache: &mut LruCache<O2mIndexValue, Vec<u8>>,
+        asset_birth_pk_by_asset_id_cache: &mut LruCache<AssetId, Vec<u8>>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         families: &Families<'db, CF>,
@@ -73,12 +90,14 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
             &block,
             db_tx,
             batch,
-            tx_pk_by_tx_hash_lru_cache,
-            utxo_pk_by_index_lru_cache,
+            tx_pk_by_tx_hash_cache,
+            utxo_pk_by_index_cache,
+            utxo_birth_pk_by_index_cache,
+            asset_birth_pk_by_asset_id_cache,
             families,
         )?;
         self.persist_header(&block.header, db_tx, batch, families)?;
-        block_height_by_hash_lru_cache.put(block.header.hash, Rc::clone(&block));
+        block_height_by_hash_cache.put(block.header.hash, Rc::clone(&block));
         Ok(())
     }
 
@@ -88,9 +107,9 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<'db, CF>,
     ) -> Result<(), String> {
-        let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_lru_cache.borrow_mut();
-        let mut block_height_by_hash_lru_cache = self.block_by_hash_lru_cache.borrow_mut();
-        let mut utxo_pk_by_index_lru_cache = self.utxo_pk_by_index_lru_cache.borrow_mut();
+        let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_cache.borrow_mut();
+        let mut block_height_by_hash_lru_cache = self.block_by_hash_cache.borrow_mut();
+        let mut utxo_pk_by_index_lru_cache = self.utxo_pk_by_index_cache.borrow_mut();
 
         for tx in block.txs.iter() {
             self.tx_service
@@ -154,7 +173,7 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<'db, CF>,
     ) -> Result<Option<Rc<Block<Tx>>>, rocksdb::Error> {
-        if let Some(value) = self.block_by_hash_lru_cache.borrow_mut().get(block_hash) {
+        if let Some(value) = self.block_by_hash_cache.borrow_mut().get(block_hash) {
             Ok(Some(Rc::clone(value)))
         } else {
             let header_opt = self.get_block_header_by_hash(block_hash, db_tx, families)?;
@@ -193,7 +212,7 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<'db, CF>,
     ) -> Result<Option<BlockHeader>, rocksdb::Error> {
-        if let Some(value) = self.block_by_hash_lru_cache.borrow_mut().get(block_hash) {
+        if let Some(value) = self.block_by_hash_cache.borrow_mut().get(block_hash) {
             return Ok(Some(value.header.clone()));
         } else {
             let header_bytes = db_tx.get_cf(&families.shared.block_pk_by_hash_cf, block_hash)?;

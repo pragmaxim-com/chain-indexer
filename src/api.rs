@@ -3,7 +3,9 @@ use std::{pin::Pin, sync::Arc};
 use crate::{
     codec_tx::TxPkBytes,
     eutxo::{eutxo_codec_utxo::UtxoPkBytes, eutxo_schema::DbSchema},
-    model::{Block, BlockHeader, BlockHeight, O2oIndexValue, TxCount, TxHash},
+    model::{
+        AssetId, Block, BlockHeader, BlockHeight, O2mIndexValue, O2oIndexValue, TxCount, TxHash,
+    },
     rocks_db_batch::{CustomFamilies, Families},
 };
 use async_trait::async_trait;
@@ -64,6 +66,8 @@ pub trait TxService<'db> {
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
         utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
+        utxo_birth_pk_by_index_cache: &mut LruCache<O2mIndexValue, Vec<u8>>,
+        asset_birth_pk_by_asset_id_cache: &mut LruCache<AssetId, Vec<u8>>,
         families: &Families<'db, Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 
@@ -74,7 +78,6 @@ pub trait TxService<'db> {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_lru_cache: &mut LruCache<TxHash, TxPkBytes>,
-        utxo_pk_by_index_lru_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         families: &Families<'db, Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 

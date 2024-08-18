@@ -16,7 +16,7 @@ use crate::{
         eutxo_model::{EuTxInput, EuUtxo},
         eutxo_schema::DbSchema,
     },
-    model::{AssetAction, O2mIndexValue, O2oIndexValue},
+    model::{AssetAction, AssetId, AssetValue, O2mIndexValue, O2oIndexValue},
 };
 
 pub struct ErgoIoProcessor {
@@ -92,7 +92,7 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
                 }
             }
 
-            let mut result_assets = vec![];
+            let mut result_assets: Vec<(AssetId, AssetValue, AssetAction)> = vec![];
             if let Some(assets) = out.tokens() {
                 for asset in assets {
                     let asset_id: Vec<u8> = asset.token_id.into();
@@ -107,7 +107,7 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
                         true => AssetAction::Mint, // TODO!! for Minting it might not be enough to check first boxId
                         _ => AssetAction::Transfer,
                     };
-                    result_assets.push((asset_id, amount_u64, action));
+                    result_assets.push((asset_id.into(), amount_u64, action));
                 }
             }
             result_outs.push(EuUtxo {
