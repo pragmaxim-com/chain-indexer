@@ -36,12 +36,6 @@ impl ErgoBlockProvider {
     }
 }
 
-impl ErgoBlockProvider {
-    pub(crate) async fn get_best_block_header(&self) -> Result<BlockHeader, String> {
-        self.client.get_best_block_async().await.map(|b| b.header)
-    }
-}
-
 #[async_trait]
 impl BlockProvider for ErgoBlockProvider {
     type OutTx = EuTx;
@@ -56,12 +50,16 @@ impl BlockProvider for ErgoBlockProvider {
         Ok(processed_block)
     }
 
+    async fn get_chain_tip(&self) -> Result<BlockHeader, String> {
+        self.client.get_best_block_async().await.map(|b| b.header)
+    }
+
     async fn stream(
         &self,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, TxCount)> + Send + 'life0>> {
-        let best_header = self.get_best_block_header().await.unwrap();
+        let best_header = self.get_chain_tip().await.unwrap();
         let last_height = last_header.map_or(1, |h| h.height.0);
         info!("Initiating index from {} to {}", last_height, best_header);
         let heights = last_height..=best_header.height.0;

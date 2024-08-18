@@ -7,6 +7,7 @@ use crate::settings::IndexerSettings;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock;
+use std::time::Duration;
 
 use crate::block_service::BlockService;
 use crate::eutxo::eutxo_block_monitor::EuBlockMonitor;
@@ -20,6 +21,7 @@ use crate::rocks_db_batch::{Families, SharedFamilies};
 use crate::syncer::ChainSyncer;
 use crate::{api::BlockProvider, eutxo::eutxo_storage};
 use rocksdb::BoundColumnFamily;
+use tokio::time;
 
 use super::eutxo_schema::DbIndexNumber;
 
@@ -106,7 +108,7 @@ pub async fn run_eutxo_indexing(
         Arc::clone(&storage),
         Arc::clone(&families),
         block_service,
-        Arc::clone(&block_provider) as Arc<dyn BlockProvider<OutTx = EuTx>>,
+        Arc::clone(&block_provider),
         disable_wal,
     ));
     let syncer = ChainSyncer::new(block_provider, Arc::new(EuBlockMonitor::new(1000)), indexer);
@@ -125,5 +127,11 @@ pub async fn run_eutxo_indexing(
             }
         }
     });
-    syncer.sync(tx_batch_size).await
+
+    let mut interval = time::interval(Duration::from_secs(1));
+
+    loop {
+        syncer.sync(tx_batch_size).await;
+        interval.tick().await;
+    }
 }

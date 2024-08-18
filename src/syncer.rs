@@ -13,7 +13,7 @@ use std::sync::{
 
 pub struct ChainSyncer<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> {
     pub is_shutdown: Arc<AtomicBool>,
-    pub block_source: Arc<dyn BlockProvider<OutTx = OutTx>>,
+    pub block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
     pub monitor: Arc<dyn BlockMonitor<OutTx>>,
     pub indexer: Arc<Indexer<'db, CF, OutTx>>,
 }
@@ -26,19 +26,21 @@ impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> ChainSyncer<'db, CF, O
     ) -> Self {
         ChainSyncer {
             is_shutdown: Arc::new(AtomicBool::new(false)),
-            block_source: block_provider,
+            block_provider,
             monitor,
             indexer,
         }
     }
 
     pub async fn sync(&self, min_batch_size: usize) {
-        let is_chain_tip = false; // TODO check for ChainTip presence to start chainlinking
-        self.block_source
+        let chain_tip_header = self.block_provider.get_chain_tip().await.unwrap();
+        self.block_provider
             .stream(self.indexer.get_last_header(), min_batch_size)
             .await
             .map(|(block_batch, tx_count)| {
-                let chain_link = block_batch.last().is_some_and(|_| is_chain_tip);
+                let chain_link = block_batch.last().is_some_and(|curr_block| {
+                    curr_block.header.height.0 + 100 > chain_tip_header.height.0
+                });
                 self.monitor.monitor(&block_batch, &tx_count);
                 self.indexer
                     .persist_blocks(block_batch, chain_link)

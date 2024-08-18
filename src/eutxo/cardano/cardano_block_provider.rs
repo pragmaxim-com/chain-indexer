@@ -47,6 +47,11 @@ impl BlockProvider for CardanoBlockProvider {
         self.processor.io_processor.db_schema.clone()
     }
 
+    async fn get_chain_tip(&self) -> Result<BlockHeader, String> {
+        let cbor = self.client.get_best_block().await?;
+        self.processor.process_block(&cbor).map(|b| b.header)
+    }
+
     fn get_processed_block(&self, h: BlockHeader) -> Result<Block<Self::OutTx>, String> {
         let point = Point::new(
             (h.timestamp.0 - GENESIS_START_TIME) as u64,

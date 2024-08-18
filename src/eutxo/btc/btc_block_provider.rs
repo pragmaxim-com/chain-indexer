@@ -49,6 +49,10 @@ impl BlockProvider for BtcBlockProvider {
         self.processor.io_processor.db_schema.clone()
     }
 
+    async fn get_chain_tip(&self) -> Result<BlockHeader, String> {
+        self.client.get_best_block()
+    }
+
     fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, String> {
         let block = self.client.get_block_by_hash(header.hash)?;
         let processed_block = self.processor.process_block(&block);

@@ -37,6 +37,8 @@ pub trait BlockProvider {
 
     fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, String>;
 
+    async fn get_chain_tip(&self) -> Result<BlockHeader, String>;
+
     async fn stream(
         &self,
         last_header: Option<BlockHeader>,
