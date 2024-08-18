@@ -97,16 +97,14 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
                 for asset in assets {
                     let asset_id: Vec<u8> = asset.token_id.into();
                     let amount = asset.amount;
-                    let amount_i64: i64 = amount.into();
                     let amount_u64: u64 = amount.into();
                     let is_mint = outs.first().is_some_and(|o| {
                         let new_token_id: TokenId = o.box_id().into();
                         new_token_id == asset.token_id
                     });
 
-                    let action = match (is_mint, amount_i64 < 0) {
-                        (true, _) => AssetAction::Mint, // TODO!! for Minting it might not be enough to check first boxId
-                        (_, true) => AssetAction::Burn, // TODO!! I don't know how burning works in ergo
+                    let action = match is_mint {
+                        true => AssetAction::Mint, // TODO!! for Minting it might not be enough to check first boxId
                         _ => AssetAction::Transfer,
                     };
                     result_assets.push((asset_id, amount_u64, action));
