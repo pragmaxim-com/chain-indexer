@@ -1,6 +1,6 @@
 use crate::api::{BlockProcessor, IoProcessor};
 use crate::eutxo::eutxo_model::EuTx;
-use crate::model::{AssetAction, AssetId, AssetValue, Block, TxCount, TxIndex};
+use crate::model::{AssetAction, AssetId, AssetValue, Block, BlockHeader, TxCount, TxIndex};
 use bitcoin_hashes::Hash;
 
 use super::btc_io_processor::BtcIoProcessor;
@@ -22,45 +22,54 @@ impl BtcBlockProcessor {
     }
 
     fn process_tx(&self, tx_index: &TxIndex, tx: &bitcoin::Transaction) -> EuTx {
+        let (_, outputs) = self.io_processor.process_outputs(&tx.output);
         EuTx {
             tx_hash: tx.compute_txid().to_byte_array().into(),
             tx_index: *tx_index,
             tx_inputs: self.io_processor.process_inputs(&tx.input),
-            tx_outputs: self.io_processor.process_outputs(&tx.output),
+            tx_outputs: outputs,
         }
     }
 }
 
 impl BlockProcessor for BtcBlockProcessor {
-    type FromTx = bitcoin::Transaction;
+    type FromBlock = bitcoin::Block;
     type IntoTx = EuTx;
 
-    fn process_block(&self, btc_block: &Block<Self::FromTx>) -> Block<Self::IntoTx> {
-        Block::new(
-            btc_block.header.clone(),
-            btc_block
-                .txs
+    fn process_block(&self, block: &Self::FromBlock) -> Result<Block<Self::IntoTx>, String> {
+        let height = block.bip34_block_height().map_err(|e| e.to_string())?;
+        let header = BlockHeader {
+            height: (height as u32).into(),
+            timestamp: block.header.time.into(),
+            hash: block.block_hash().to_byte_array().into(),
+            prev_hash: block.header.prev_blockhash.to_byte_array().into(),
+        };
+
+        let mut block_weight = 0;
+        Ok(Block::new(
+            header,
+            block
+                .txdata
                 .iter()
                 .enumerate()
-                .map(|(tx_index, tx)| self.process_tx(&(tx_index as u16).into(), tx))
+                .map(|(tx_index, tx)| {
+                    block_weight += tx.input.len() + tx.output.len();
+                    self.process_tx(&(tx_index as u16).into(), tx)
+                })
                 .collect(),
-        )
+            block_weight,
+        ))
     }
 
     fn process_batch(
         &self,
-        block_batch: &[Block<Self::FromTx>],
+        block_batch: &[Self::FromBlock],
         tx_count: TxCount,
-    ) -> (Vec<Block<Self::IntoTx>>, TxCount) {
-        (
-            block_batch
-                .iter()
-                .map(|btc_block| {
-                    let eu_block: Block<Self::IntoTx> = self.process_block(btc_block);
-                    eu_block
-                })
-                .collect(),
-            tx_count,
-        )
+    ) -> Result<(Vec<Block<Self::IntoTx>>, TxCount), String> {
+        let blocks: Result<Vec<Block<Self::IntoTx>>, String> = block_batch
+            .iter()
+            .map(|btc_block| self.process_block(btc_block))
+            .collect();
+        blocks.map(|blocks| (blocks, tx_count))
     }
 }

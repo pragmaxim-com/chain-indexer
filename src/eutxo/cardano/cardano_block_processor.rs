@@ -2,9 +2,9 @@ use pallas::ledger::traverse::MultiEraBlock;
 
 use super::{cardano_client::CBOR, cardano_io_processor::CardanoIoProcessor};
 use crate::{
-    api::IoProcessor,
+    api::{BlockProcessor, IoProcessor},
     eutxo::eutxo_model::EuTx,
-    model::{AssetId, AssetValue, Block, BlockHash, BlockHeader, TxIndex},
+    model::{AssetId, AssetValue, Block, BlockHash, BlockHeader, TxCount, TxIndex},
 };
 pub const EMPTY_ASSETS_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
 
@@ -21,8 +21,13 @@ impl CardanoBlockProcessor {
     pub fn new(io_processor: CardanoIoProcessor) -> Self {
         CardanoBlockProcessor { io_processor }
     }
+}
 
-    pub fn process_block(&self, block: &CBOR) -> Result<Block<EuTx>, String> {
+impl BlockProcessor for CardanoBlockProcessor {
+    type FromBlock = CBOR;
+    type IntoTx = EuTx;
+
+    fn process_block(&self, block: &CBOR) -> Result<Block<EuTx>, String> {
         let b = MultiEraBlock::decode(block).map_err(|e| e.to_string())?;
 
         let hash: [u8; 32] = *b.header().hash();
@@ -38,21 +43,36 @@ impl CardanoBlockProcessor {
             prev_hash: BlockHash(prev_hash),
         };
 
-        Ok(Block::new(
-            header,
-            b.txs()
-                .iter()
-                .enumerate()
-                .map(|(tx_index, tx)| {
-                    let tx_hash: [u8; 32] = *tx.hash();
-                    EuTx {
-                        tx_hash: tx_hash.into(),
-                        tx_index: TxIndex(tx_index as u16),
-                        tx_inputs: self.io_processor.process_inputs(&tx.inputs()),
-                        tx_outputs: self.io_processor.process_outputs(&tx.outputs().to_vec()),
-                    }
-                })
-                .collect(),
-        ))
+        let mut block_weight = 0;
+        let txs: Vec<pallas::ledger::traverse::MultiEraTx> = b.txs();
+        let mut result_txs = Vec::with_capacity(txs.len());
+
+        for (tx_index, tx) in txs.iter().enumerate() {
+            let tx_hash: [u8; 32] = *tx.hash();
+            let inputs = self.io_processor.process_inputs(&tx.inputs());
+            let (box_weight, outputs) = self.io_processor.process_outputs(&tx.outputs().to_vec()); //TODO perf check
+            block_weight += box_weight;
+            block_weight += inputs.len();
+            result_txs.push(EuTx {
+                tx_hash: tx_hash.into(),
+                tx_index: TxIndex(tx_index as u16),
+                tx_inputs: inputs,
+                tx_outputs: outputs,
+            })
+        }
+
+        Ok(Block::new(header, result_txs, block_weight))
+    }
+
+    fn process_batch(
+        &self,
+        block_batch: &[Self::FromBlock],
+        tx_count: TxCount,
+    ) -> Result<(Vec<Block<Self::IntoTx>>, TxCount), String> {
+        let blocks: Result<Vec<Block<Self::IntoTx>>, String> = block_batch
+            .iter()
+            .map(|btc_block| self.process_block(btc_block))
+            .collect();
+        blocks.map(|blocks| (blocks, tx_count))
     }
 }

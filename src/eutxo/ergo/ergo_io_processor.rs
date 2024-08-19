@@ -14,18 +14,28 @@ use crate::{
     api::IoProcessor,
     eutxo::{
         eutxo_model::{EuTxInput, EuUtxo},
-        eutxo_schema::DbSchema,
+        eutxo_schema::{DbIndexNumber, DbSchema},
     },
-    model::{AssetAction, AssetId, AssetValue, O2mIndexValue, O2oIndexValue},
+    model::{AssetAction, AssetId, AssetValue, BoxWeight, O2mIndexValue, O2oIndexValue},
 };
 
 pub struct ErgoIoProcessor {
     pub db_schema: DbSchema,
+    pub box_id_index_number: DbIndexNumber,
 }
 
 impl ErgoIoProcessor {
     pub fn new(db_schema: DbSchema) -> Self {
-        ErgoIoProcessor { db_schema }
+        let schema = db_schema.clone();
+        ErgoIoProcessor {
+            db_schema,
+            box_id_index_number: schema
+                .clone()
+                .o2o_index_number_by_name
+                .get("BOX_ID")
+                .unwrap()
+                .to_owned(),
+        }
     }
 }
 
@@ -33,18 +43,18 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
     fn process_inputs(&self, ins: &[BoxId]) -> Vec<EuTxInput> {
         ins.iter()
             .map(|input| {
-                if let Some(index_number) = self.db_schema.o2o_index_number_by_name.get("BOX_ID") {
-                    let box_id_slice: &[u8] = input.as_ref();
-                    EuTxInput::OutputIndexInput(*index_number, O2oIndexValue(box_id_slice.to_vec()))
-                } else {
-                    panic!("TODO, this should not be done for each input !!!")
-                }
+                let box_id_slice: &[u8] = input.as_ref();
+                EuTxInput::OutputIndexInput(
+                    self.box_id_index_number,
+                    O2oIndexValue(box_id_slice.to_vec()),
+                )
             })
             .collect()
     }
 
-    fn process_outputs(&self, outs: &[ErgoBox]) -> Vec<EuUtxo> {
+    fn process_outputs(&self, outs: &[ErgoBox]) -> (BoxWeight, Vec<EuUtxo>) {
         let mut result_outs = Vec::with_capacity(outs.len());
+        let mut asset_count = 0;
         for (out_index, out) in outs.iter().enumerate() {
             let box_id = out.box_id();
             let box_id_slice: &[u8] = box_id.as_ref();
@@ -89,24 +99,30 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
                 }
             }
 
-            let mut result_assets: Vec<(AssetId, AssetValue, AssetAction)> = vec![];
-            if let Some(assets) = out.tokens() {
-                for asset in assets {
-                    let asset_id: Vec<u8> = asset.token_id.into();
-                    let amount = asset.amount;
-                    let amount_u64: u64 = amount.into();
-                    let is_mint = outs.first().is_some_and(|o| {
-                        let new_token_id: TokenId = o.box_id().into();
-                        new_token_id == asset.token_id
-                    });
+            let result_assets: Vec<(AssetId, AssetValue, AssetAction)> =
+                if let Some(assets) = out.tokens() {
+                    let mut result = Vec::with_capacity(assets.len());
+                    for asset in assets {
+                        let asset_id: Vec<u8> = asset.token_id.into();
+                        let amount = asset.amount;
+                        let amount_u64: u64 = amount.into();
+                        let is_mint = outs.first().is_some_and(|o| {
+                            let new_token_id: TokenId = o.box_id().into();
+                            new_token_id == asset.token_id
+                        });
 
-                    let action = match is_mint {
-                        true => AssetAction::Mint, // TODO!! for Minting it might not be enough to check first boxId
-                        _ => AssetAction::Transfer,
-                    };
-                    result_assets.push((asset_id.into(), amount_u64, action));
-                }
-            }
+                        let action = match is_mint {
+                            true => AssetAction::Mint, // TODO!! for Minting it might not be enough to check first boxId
+                            _ => AssetAction::Transfer,
+                        };
+                        result.push((asset_id.into(), amount_u64, action));
+                    }
+                    result
+                } else {
+                    vec![]
+                };
+
+            asset_count += result_assets.len();
             result_outs.push(EuUtxo {
                 utxo_index: (out_index as u16).into(),
                 o2m_db_indexes,
@@ -115,6 +131,6 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
                 utxo_value: (*out.value.as_u64()).into(),
             })
         }
-        result_outs
+        (asset_count + result_outs.len(), result_outs)
     }
 }

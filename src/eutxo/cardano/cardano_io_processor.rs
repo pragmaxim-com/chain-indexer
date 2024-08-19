@@ -4,7 +4,7 @@ use crate::{
         eutxo_model::{EuTxInput, EuUtxo, TxHashWithIndex},
         eutxo_schema::DbSchema,
     },
-    model::{AssetAction, AssetId, AssetValue, O2mIndexValue},
+    model::{AssetAction, AssetId, AssetValue, BoxWeight, O2mIndexValue},
 };
 use pallas::{
     codec::minicbor::{Encode, Encoder},
@@ -34,8 +34,9 @@ impl IoProcessor<MultiEraInput<'_>, EuTxInput, MultiEraOutput<'_>, EuUtxo> for C
             .collect()
     }
 
-    fn process_outputs(&self, outs: &[MultiEraOutput<'_>]) -> Vec<EuUtxo> {
+    fn process_outputs(&self, outs: &[MultiEraOutput<'_>]) -> (BoxWeight, Vec<EuUtxo>) {
         let mut result_outs = Vec::with_capacity(outs.len());
+        let mut asset_count = 0;
         let mut ctx = ();
         for (out_index, out) in outs.iter().enumerate() {
             let address_opt = out.address().ok().map(|a| a.to_vec());
@@ -61,7 +62,7 @@ impl IoProcessor<MultiEraInput<'_>, EuTxInput, MultiEraOutput<'_>, EuUtxo> for C
             }
 
             let assets = out.non_ada_assets();
-            let mut result: Vec<(AssetId, AssetValue, AssetAction)> =
+            let mut result_assets: Vec<(AssetId, AssetValue, AssetAction)> =
                 Vec::with_capacity(assets.len());
             for policy_asset in assets {
                 let policy_id = policy_asset.policy().to_vec();
@@ -77,17 +78,18 @@ impl IoProcessor<MultiEraInput<'_>, EuTxInput, MultiEraOutput<'_>, EuUtxo> for C
                         _ => AssetAction::Transfer,
                     };
                     let amount = any_coin.abs() as u64;
-                    result.push((asset_id.into(), amount, action));
+                    result_assets.push((asset_id.into(), amount, action));
                 }
             }
+            asset_count += result_assets.len();
             result_outs.push(EuUtxo {
                 utxo_index: (out_index as u16).into(),
                 o2m_db_indexes,
                 o2o_db_indexes: vec![],
-                assets: result,
+                assets: result_assets,
                 utxo_value: out.lovelace_amount().into(),
             })
         }
-        result_outs
+        (asset_count + result_outs.len(), result_outs)
     }
 }
