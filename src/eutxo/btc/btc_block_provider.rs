@@ -2,7 +2,7 @@ use crate::{
     api::{BlockProcessor, BlockProvider},
     eutxo::{eutxo_model::EuTx, eutxo_schema::DbSchema},
     info,
-    model::{Block, BlockHeader, TxCount},
+    model::{BatchWeight, Block, BlockHeader, TxCount},
     settings::BitcoinConfig,
 };
 use async_trait::async_trait;
@@ -68,7 +68,7 @@ impl BlockProvider for BtcBlockProvider {
         &self,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
-    ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, TxCount)> + Send + 'life0>> {
+    ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, BatchWeight)> + Send + 'life0>> {
         let best_header = self.get_best_block_header().await.unwrap();
         let last_height = last_header.map_or(0, |h| h.height.0);
         info!("Indexing from {} to {}", last_height, best_header);

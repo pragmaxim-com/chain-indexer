@@ -1,8 +1,9 @@
 use crate::api::BlockProcessor;
+use crate::model::BatchWeight;
 use crate::{
     api::BlockProvider,
     eutxo::{eutxo_model::EuTx, eutxo_schema::DbSchema},
-    model::{Block, BlockHeader, TxCount},
+    model::{Block, BlockHeader},
     settings::CardanoConfig,
 };
 use min_batch::ext::MinBatchExt;
@@ -69,7 +70,7 @@ impl BlockProvider for CardanoBlockProvider {
         &self,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
-    ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, TxCount)> + Send + 'life0>> {
+    ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, BatchWeight)> + Send + 'life0>> {
         let last_point = last_header.clone().map_or(Point::Origin, |h| {
             Point::new(h.timestamp.0 as u64, h.hash.0.to_vec())
         });

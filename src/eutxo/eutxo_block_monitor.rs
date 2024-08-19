@@ -3,46 +3,46 @@ use std::{cell::RefCell, time::Instant};
 use crate::{
     api::BlockMonitor,
     info,
-    model::{Block, TxCount},
+    model::{BatchWeight, Block},
 };
 
 use super::eutxo_model::EuTx;
 
 pub struct EuBlockMonitor {
-    min_tx_count_report: usize,
+    min_weight_report: usize,
     start_time: Instant,
-    total_and_last_report_tx_count: RefCell<(usize, usize)>,
+    total_and_last_report_weight: RefCell<(usize, usize)>,
 }
 
 impl EuBlockMonitor {
     pub fn new(min_tx_count_report: usize) -> Self {
         EuBlockMonitor {
-            min_tx_count_report,
+            min_weight_report: min_tx_count_report,
             start_time: Instant::now(),
-            total_and_last_report_tx_count: RefCell::new((0, 0)),
+            total_and_last_report_weight: RefCell::new((0, 0)),
         }
     }
 }
 
 impl BlockMonitor<EuTx> for EuBlockMonitor {
-    fn monitor(&self, block_batch: &[Block<EuTx>], tx_count: &TxCount) {
-        let mut total_tx_count = self.total_and_last_report_tx_count.borrow_mut();
-        let new_total_tx_count = total_tx_count.0 + tx_count;
-        if new_total_tx_count > total_tx_count.1 + self.min_tx_count_report {
-            *total_tx_count = (new_total_tx_count, new_total_tx_count);
+    fn monitor(&self, block_batch: &[Block<EuTx>], batch_weight: &BatchWeight) {
+        let mut total_weight = self.total_and_last_report_weight.borrow_mut();
+        let new_total_weight = total_weight.0 + batch_weight;
+        if new_total_weight > total_weight.1 + self.min_weight_report {
+            *total_weight = (new_total_weight, new_total_weight);
             let last_block = block_batch.last().unwrap();
             let total_time = self.start_time.elapsed().as_secs();
-            let txs_per_sec = format!("{:.1}", new_total_tx_count as f64 / total_time as f64);
+            let txs_per_sec = format!("{:.1}", new_total_weight as f64 / total_time as f64);
             info!(
-                "{} Blocks @ {} from {} at {} txs/sec, total {}",
+                "{} Blocks @ {} from {} at {} ins+outs+assets per second, total {}",
                 block_batch.len(),
                 last_block.header.height,
                 last_block.header.timestamp,
                 txs_per_sec,
-                new_total_tx_count
+                new_total_weight
             );
         } else {
-            *total_tx_count = (new_total_tx_count, total_tx_count.1);
+            *total_weight = (new_total_weight, total_weight.1);
         }
     }
 }

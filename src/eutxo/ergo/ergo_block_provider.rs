@@ -10,7 +10,7 @@ use crate::{
     api::{BlockProcessor, BlockProvider},
     eutxo::{eutxo_model::EuTx, eutxo_schema::DbSchema},
     info,
-    model::{Block, BlockHeader, TxCount},
+    model::{BatchWeight, Block, BlockHeader},
     settings::ErgoConfig,
 };
 
@@ -61,7 +61,7 @@ impl BlockProvider for ErgoBlockProvider {
         &self,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
-    ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, TxCount)> + Send + 'life0>> {
+    ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, BatchWeight)> + Send + 'life0>> {
         let best_header = self.get_chain_tip().await.unwrap();
         let last_height = last_header.map_or(1, |h| h.height.0);
         info!("Indexing from {} to {}", last_height, best_header);

@@ -4,8 +4,8 @@ use crate::{
     codec_tx::TxPkBytes,
     eutxo::{eutxo_codec_utxo::UtxoPkBytes, eutxo_schema::DbSchema},
     model::{
-        AssetId, Block, BlockHeader, BlockHeight, BoxWeight, O2mIndexValue, O2oIndexValue, TxCount,
-        TxHash,
+        AssetId, BatchWeight, Block, BlockHeader, BlockHeight, BoxWeight, O2mIndexValue,
+        O2oIndexValue, TxCount, TxHash,
     },
     rocks_db_batch::{CustomFamilies, Families},
 };
@@ -46,7 +46,7 @@ pub trait BlockProvider {
         &self,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
-    ) -> Pin<Box<dyn Stream<Item = (Vec<Block<Self::OutTx>>, TxCount)> + Send + 'life0>>;
+    ) -> Pin<Box<dyn Stream<Item = (Vec<Block<Self::OutTx>>, BatchWeight)> + Send + 'life0>>;
 }
 
 pub trait TxService<'db> {
@@ -95,7 +95,7 @@ pub trait TxService<'db> {
 }
 
 pub trait BlockMonitor<Tx> {
-    fn monitor(&self, block_batch: &[Block<Tx>], tx_count: &TxCount);
+    fn monitor(&self, block_batch: &[Block<Tx>], batch_weight: &BatchWeight);
 }
 
 pub struct Storage {

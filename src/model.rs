@@ -49,6 +49,7 @@ impl fmt::Display for BlockHash {
 pub type TxCount = usize;
 pub type BoxWeight = usize;
 pub type BlockWeight = usize;
+pub type BatchWeight = usize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct TxIndex(pub u16);
