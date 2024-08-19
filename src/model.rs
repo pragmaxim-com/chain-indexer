@@ -47,6 +47,8 @@ impl fmt::Display for BlockHash {
 }
 
 pub type TxCount = usize;
+pub type BoxWeight = usize;
+pub type BlockWeight = usize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct TxIndex(pub u16);
@@ -119,11 +121,16 @@ impl fmt::Display for O2oIndexValue {
 pub struct Block<T> {
     pub header: BlockHeader,
     pub txs: Vec<T>,
+    pub weight: BlockWeight,
 }
 
 impl<T> Block<T> {
-    pub fn new(header: BlockHeader, txs: Vec<T>) -> Self {
-        Self { header, txs }
+    pub fn new(header: BlockHeader, txs: Vec<T>, weight: BlockWeight) -> Self {
+        Self {
+            header,
+            txs,
+            weight,
+        }
     }
 }
 

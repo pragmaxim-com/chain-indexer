@@ -1,2 +1,4 @@
 ergo - registers 
 cardano - datum
+
+indexing at chain tip starts from inclusive instead of exclusive block

@@ -1,19 +1,19 @@
-use pallas::network::miniprotocols::chainsync::NextResponse;
-use pallas::network::miniprotocols::Point;
-use tokio::runtime::Runtime;
-
+use crate::api::BlockProcessor;
 use crate::{
     api::BlockProvider,
     eutxo::{eutxo_model::EuTx, eutxo_schema::DbSchema},
     model::{Block, BlockHeader, TxCount},
     settings::CardanoConfig,
 };
+use min_batch::ext::MinBatchExt;
+use pallas::network::miniprotocols::chainsync::NextResponse;
+use pallas::network::miniprotocols::Point;
 use std::{pin::Pin, sync::Arc};
+use tokio::runtime::Runtime;
 
 use crate::info;
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
-use min_batch::ext::MinBatchExt;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -48,8 +48,11 @@ impl BlockProvider for CardanoBlockProvider {
     }
 
     async fn get_chain_tip(&self) -> Result<BlockHeader, String> {
-        let cbor = self.client.get_best_block().await?;
-        self.processor.process_block(&cbor).map(|b| b.header)
+        self.client
+            .get_best_block()
+            .await
+            .and_then(|b| self.processor.process_block(&b))
+            .map(|b| b.header)
     }
 
     fn get_processed_block(&self, h: BlockHeader) -> Result<Block<Self::OutTx>, String> {
@@ -67,7 +70,7 @@ impl BlockProvider for CardanoBlockProvider {
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, TxCount)> + Send + 'life0>> {
-        let last_point = last_header.map_or(Point::Origin, |h| {
+        let last_point = last_header.clone().map_or(Point::Origin, |h| {
             Point::new(h.timestamp.0 as u64, h.hash.0.to_vec())
         });
 
@@ -75,7 +78,7 @@ impl BlockProvider for CardanoBlockProvider {
         let node_client = Arc::clone(&self.client.node_client);
 
         tokio::spawn(async move {
-            let (from, to) = node_client
+            let (_, to) = node_client
                 .lock()
                 .await
                 .chainsync()
@@ -84,9 +87,9 @@ impl BlockProvider for CardanoBlockProvider {
                 .unwrap();
 
             info!(
-                "Streaming cardano blocks from {:?} to {:?}",
-                from.unwrap_or(Point::Origin),
-                to
+                "Indexing from {} to {}",
+                last_header.map(|h| h.height.0).unwrap_or(0),
+                to.1
             );
             loop {
                 match node_client
@@ -116,12 +119,12 @@ impl BlockProvider for CardanoBlockProvider {
                 let processor = Arc::clone(&self.processor);
                 tokio::task::spawn_blocking(move || processor.process_block(&cbor).unwrap())
             })
-            .buffered(num_cpus::get())
+            .buffered(num_cpus::get() / 2)
             .map(|res| match res {
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),
             })
-            .min_batch_with_weight(min_batch_size, |block| block.txs.len())
+            .min_batch_with_weight(min_batch_size, |block| block.weight)
             .boxed()
     }
 }

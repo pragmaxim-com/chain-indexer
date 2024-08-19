@@ -1,9 +1,8 @@
 use crate::{
     error,
-    model::{Block, BlockHash, BlockHeader, BlockHeight},
+    model::{BlockHash, BlockHeight},
 };
 use ergo_lib::chain::block::FullBlock;
-use ergo_lib::chain::transaction::Transaction;
 use reqwest::{
     blocking,
     header::{ACCEPT, CONTENT_TYPE},
@@ -25,20 +24,6 @@ pub struct NodeInfo {
 pub struct ErgoClient {
     pub(crate) node_url: Url,
     pub(crate) api_key: String,
-}
-
-impl From<FullBlock> for Block<Transaction> {
-    fn from(block: FullBlock) -> Block<Transaction> {
-        let block_hash: [u8; 32] = block.header.id.0.into();
-        let prev_block_hash: [u8; 32] = block.header.parent_id.0.into();
-        let header = BlockHeader {
-            height: block.header.height.into(),
-            timestamp: ((block.header.timestamp / 1000) as u32).into(),
-            hash: block_hash.into(),
-            prev_hash: prev_block_hash.into(),
-        };
-        Block::new(header, block.block_transactions.transactions.to_vec())
-    }
 }
 
 impl ErgoClient {
@@ -76,14 +61,14 @@ impl ErgoClient {
     pub(crate) async fn get_block_by_height_async(
         &self,
         height: BlockHeight,
-    ) -> Result<Block<Transaction>, String> {
+    ) -> Result<FullBlock, String> {
         let block_ids = self.get_block_ids_by_height_async(height).await?;
 
         self.get_block_by_hash_async(block_ids.first().unwrap())
             .await
     }
 
-    pub(crate) async fn get_best_block_async(&self) -> Result<Block<Transaction>, String> {
+    pub(crate) async fn get_best_block_async(&self) -> Result<FullBlock, String> {
         let node_info_url: Url = self.node_url.join("info").map_err(|e| e.to_string())?;
 
         let response = ErgoClient::set_async_req_headers(
@@ -130,10 +115,7 @@ impl ErgoClient {
         .map_err(|e| e.to_string())
     }
 
-    pub(crate) fn get_block_by_hash_sync(
-        &self,
-        hash: BlockHash,
-    ) -> Result<Block<Transaction>, String> {
+    pub(crate) fn get_block_by_hash_sync(&self, hash: BlockHash) -> Result<FullBlock, String> {
         let url = self
             .node_url
             .join(&format!("blocks/{}", hex::encode(hash.0)))
@@ -146,13 +128,13 @@ impl ErgoClient {
         .map_err(|e| e.to_string())?
         .json::<FullBlock>()
         .map_err(|e| e.to_string())?;
-        Ok(block.into())
+        Ok(block)
     }
 
     pub(crate) async fn get_block_by_hash_async(
         &self,
         block_hash: &str,
-    ) -> Result<Block<Transaction>, String> {
+    ) -> Result<FullBlock, String> {
         let url = self
             .node_url
             .join(&format!("blocks/{}", block_hash))
@@ -167,7 +149,7 @@ impl ErgoClient {
         .json::<FullBlock>()
         .await
         .map_err(|e| e.to_string())?;
-        Ok(block.into())
+        Ok(block)
     }
 }
 

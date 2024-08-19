@@ -46,12 +46,15 @@ impl BlockProvider for ErgoBlockProvider {
 
     fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, String> {
         let block = self.client.get_block_by_hash_sync(header.hash)?;
-        let processed_block = self.processor.process_block(&block);
-        Ok(processed_block)
+        self.processor.process_block(&block)
     }
 
     async fn get_chain_tip(&self) -> Result<BlockHeader, String> {
-        self.client.get_best_block_async().await.map(|b| b.header)
+        self.client
+            .get_best_block_async()
+            .await
+            .and_then(|b| self.processor.process_block(&b))
+            .map(|b| b.header)
     }
 
     async fn stream(
@@ -61,32 +64,33 @@ impl BlockProvider for ErgoBlockProvider {
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, TxCount)> + Send + 'life0>> {
         let best_header = self.get_chain_tip().await.unwrap();
         let last_height = last_header.map_or(1, |h| h.height.0);
-        info!("Initiating index from {} to {}", last_height, best_header);
+        info!("Indexing from {} to {}", last_height, best_header);
         let heights = last_height..=best_header.height.0;
 
         tokio_stream::iter(heights)
             .map(|height| {
                 let client = Arc::clone(&self.client);
-                tokio::task::spawn(
-                    async move { client.get_block_by_height_async(height.into()).await },
-                )
+                tokio::task::spawn(async move {
+                    client
+                        .get_block_by_height_async(height.into())
+                        .await
+                        .unwrap()
+                })
             })
             .buffered(num_cpus::get() / 2)
             .map(|res| match res {
-                Ok(Ok(block)) => block,
-                Ok(Err(e)) => panic!("Error: {:?}", e),
+                Ok(block) => {
+                    let processor = Arc::clone(&self.processor);
+                    tokio::task::spawn_blocking(move || processor.process_block(&block).unwrap())
+                }
                 Err(e) => panic!("Error: {:?}", e),
-            })
-            .min_batch_with_weight(min_batch_size, |block| block.txs.len())
-            .map(|(blocks, tx_count)| {
-                let processor = Arc::clone(&self.processor);
-                tokio::task::spawn_blocking(move || processor.process_batch(&blocks, tx_count))
             })
             .buffered(num_cpus::get() / 2)
             .map(|res| match res {
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),
             })
+            .min_batch_with_weight(min_batch_size, |block| block.weight)
             .boxed()
     }
 }

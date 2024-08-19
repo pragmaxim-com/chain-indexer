@@ -1,7 +1,7 @@
 use crate::api::IoProcessor;
 use crate::eutxo::eutxo_model::{EuTxInput, EuUtxo, TxHashWithIndex};
 use crate::eutxo::eutxo_schema::DbSchema;
-use crate::model::{AssetAction, AssetId, AssetValue, O2mIndexValue};
+use crate::model::{AssetAction, AssetId, AssetValue, BoxWeight, O2mIndexValue};
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
 use bitcoin_hashes::Hash;
@@ -29,7 +29,7 @@ impl IoProcessor<bitcoin::TxIn, EuTxInput, bitcoin::TxOut, EuUtxo> for BtcIoProc
             })
             .collect()
     }
-    fn process_outputs(&self, outs: &[bitcoin::TxOut]) -> Vec<EuUtxo> {
+    fn process_outputs(&self, outs: &[bitcoin::TxOut]) -> (BoxWeight, Vec<EuUtxo>) {
         let mut result_outs = Vec::with_capacity(outs.len());
         for (out_index, out) in outs.iter().enumerate() {
             let address_opt = if let Ok(address) =
@@ -68,6 +68,6 @@ impl IoProcessor<bitcoin::TxIn, EuTxInput, bitcoin::TxOut, EuUtxo> for BtcIoProc
                 utxo_value: out.value.to_sat().into(),
             })
         }
-        result_outs
+        (result_outs.len(), result_outs)
     }
 }

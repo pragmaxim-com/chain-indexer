@@ -30,14 +30,17 @@ impl BtcBlockProvider {
 
     pub fn process_batch(
         &self,
-        block_batch: &[Block<bitcoin::Transaction>],
+        block_batch: &[bitcoin::Block],
         tx_count: TxCount,
-    ) -> (Vec<Block<EuTx>>, TxCount) {
+    ) -> Result<(Vec<Block<EuTx>>, TxCount), String> {
         self.processor.process_batch(block_batch, tx_count)
     }
 
     pub(crate) async fn get_best_block_header(&self) -> Result<BlockHeader, String> {
-        self.client.get_best_block()
+        self.client
+            .get_best_block()
+            .and_then(|b| self.processor.process_block(&b))
+            .map(|b| b.header)
     }
 }
 
@@ -50,13 +53,15 @@ impl BlockProvider for BtcBlockProvider {
     }
 
     async fn get_chain_tip(&self) -> Result<BlockHeader, String> {
-        self.client.get_best_block()
+        self.client
+            .get_best_block()
+            .and_then(|b| self.processor.process_block(&b))
+            .map(|b| b.header)
     }
 
     fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, String> {
         let block = self.client.get_block_by_hash(header.hash)?;
-        let processed_block = self.processor.process_block(&block);
-        Ok(processed_block)
+        self.processor.process_block(&block)
     }
 
     async fn stream(
@@ -66,7 +71,7 @@ impl BlockProvider for BtcBlockProvider {
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, TxCount)> + Send + 'life0>> {
         let best_header = self.get_best_block_header().await.unwrap();
         let last_height = last_header.map_or(0, |h| h.height.0);
-        info!("Initiating index from {} to {}", last_height, best_header);
+        info!("Indexing from {} to {}", last_height, best_header);
         let heights = last_height..=best_header.height.0;
 
         tokio_stream::iter(heights)
@@ -76,21 +81,20 @@ impl BlockProvider for BtcBlockProvider {
                     client.get_block_by_height(height.into()).unwrap()
                 })
             })
-            .buffered(num_cpus::get())
+            .buffered(num_cpus::get() / 2)
+            .map(|res| match res {
+                Ok(block) => {
+                    let processor = Arc::clone(&self.processor);
+                    tokio::task::spawn_blocking(move || processor.process_block(&block).unwrap())
+                }
+                Err(e) => panic!("Error: {:?}", e),
+            })
+            .buffered(num_cpus::get() / 2)
             .map(|res| match res {
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),
             })
-            .min_batch_with_weight(min_batch_size, |block| block.txs.len())
-            .map(|(blocks, tx_count)| {
-                let processor = Arc::clone(&self.processor);
-                tokio::task::spawn_blocking(move || processor.process_batch(&blocks, tx_count))
-            })
-            .buffered(num_cpus::get())
-            .map(|res| match res {
-                Ok(block) => block,
-                Err(e) => panic!("Error: {:?}", e),
-            })
+            .min_batch_with_weight(min_batch_size, |block| block.weight)
             .boxed()
     }
 }

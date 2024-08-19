@@ -4,7 +4,8 @@ use crate::{
     codec_tx::TxPkBytes,
     eutxo::{eutxo_codec_utxo::UtxoPkBytes, eutxo_schema::DbSchema},
     model::{
-        AssetId, Block, BlockHeader, BlockHeight, O2mIndexValue, O2oIndexValue, TxCount, TxHash,
+        AssetId, Block, BlockHeader, BlockHeight, BoxWeight, O2mIndexValue, O2oIndexValue, TxCount,
+        TxHash,
     },
     rocks_db_batch::{CustomFamilies, Families},
 };
@@ -14,21 +15,21 @@ use lru::LruCache;
 use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction};
 
 pub trait BlockProcessor {
-    type FromTx: Send;
+    type FromBlock: Send;
     type IntoTx: Send;
 
-    fn process_block(&self, block: &Block<Self::FromTx>) -> Block<Self::IntoTx>;
+    fn process_block(&self, block: &Self::FromBlock) -> Result<Block<Self::IntoTx>, String>;
 
     fn process_batch(
         &self,
-        block_batch: &[Block<Self::FromTx>],
+        block_batch: &[Self::FromBlock],
         tx_count: TxCount,
-    ) -> (Vec<Block<Self::IntoTx>>, TxCount);
+    ) -> Result<(Vec<Block<Self::IntoTx>>, TxCount), String>;
 }
 
 pub trait IoProcessor<FromInput, IntoInput, FromOutput, IntoOutput> {
     fn process_inputs(&self, ins: &[FromInput]) -> Vec<IntoInput>;
-    fn process_outputs(&self, outs: &[FromOutput]) -> Vec<IntoOutput>;
+    fn process_outputs(&self, outs: &[FromOutput]) -> (BoxWeight, Vec<IntoOutput>);
 }
 
 #[async_trait]

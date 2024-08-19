@@ -184,7 +184,7 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
                         self.tx_service
                             .get_txs_by_height(&block_header.height, db_tx, families)?;
 
-                    Ok(Some(Rc::new(Block::new(block_header, txs))))
+                    Ok(Some(Rc::new(Block::new(block_header, txs, 0)))) // TODO weight ?
                 }
                 None => Ok(None),
             }
