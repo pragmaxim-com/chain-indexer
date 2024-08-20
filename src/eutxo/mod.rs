@@ -8,4 +8,5 @@ pub mod eutxo_families;
 pub mod eutxo_model;
 pub mod eutxo_schema;
 pub mod eutxo_storage;
-pub mod eutxo_tx_service;
+pub mod eutxo_tx_read_service;
+pub mod eutxo_tx_write_service;

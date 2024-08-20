@@ -2,6 +2,7 @@ use chrono::DateTime;
 use core::fmt;
 use derive_more::{AsRef, Display, From, Into};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockHeader {
@@ -33,7 +34,7 @@ impl fmt::Display for BlockTimestamp {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct BlockHeight(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash, Deserialize, Serialize)]
 pub struct BlockHash(pub [u8; 32]);
 impl AsRef<[u8]> for BlockHash {
     fn as_ref(&self) -> &[u8] {

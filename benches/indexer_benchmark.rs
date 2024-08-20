@@ -2,7 +2,7 @@ use std::{fs, sync::Arc, time::Duration};
 
 use ci::{
     api::{BlockProcessor, BlockProvider, Storage},
-    block_service::BlockService,
+    block_write_service::BlockWriteService,
     eutxo::{
         btc::{
             btc_block_processor::BtcBlockProcessor, btc_block_provider::BtcBlockProvider,
@@ -11,7 +11,7 @@ use ci::{
         eutxo_index_manager::DbSchema,
         eutxo_model::EuTx,
         eutxo_storage,
-        eutxo_tx_service::EuTxService,
+        eutxo_tx_write_service::EuTxService,
     },
     indexer::Indexer,
     info,
@@ -45,7 +45,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         families: &families,
     };
     let tx_service: Arc<EuTxService> = Arc::new(EuTxService {});
-    let block_service = Arc::new(BlockService::new(tx_service));
+    let block_service = Arc::new(BlockWriteService::new(tx_service));
 
     let block_provider: Arc<
         dyn BlockProvider<InTx = bitcoin::Transaction, OutTx = EuTx> + Send + Sync,

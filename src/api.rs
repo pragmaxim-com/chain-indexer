@@ -1,4 +1,4 @@
-use std::{pin::Pin, sync::Arc};
+use std::pin::Pin;
 
 use crate::{
     codec_tx::TxPkBytes,
@@ -49,16 +49,19 @@ pub trait BlockProvider {
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block<Self::OutTx>>, BatchWeight)> + Send + 'life0>>;
 }
 
-pub trait TxService<'db> {
-    type CF: CustomFamilies<'db>;
+pub trait TxReadService: Sync + Sync {
+    type CF: CustomFamilies;
     type Tx;
 
     fn get_txs_by_height(
         &self,
         block_height: &BlockHeight,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        families: &Families<'db, Self::CF>,
     ) -> Result<Vec<Self::Tx>, rocksdb::Error>;
+}
+
+pub trait TxWriteService {
+    type CF: CustomFamilies;
+    type Tx;
 
     #[warn(clippy::too_many_arguments)]
     fn persist_txs(
@@ -70,7 +73,7 @@ pub trait TxService<'db> {
         utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         utxo_birth_pk_by_index_cache: &mut LruCache<O2mIndexValue, Vec<u8>>,
         asset_birth_pk_by_asset_id_cache: &mut LruCache<AssetId, Vec<u8>>,
-        families: &Families<'db, Self::CF>,
+        families: &Families<Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 
     fn persist_tx(
@@ -80,7 +83,7 @@ pub trait TxService<'db> {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
-        families: &Families<'db, Self::CF>,
+        families: &Families<Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 
     fn remove_tx(
@@ -90,14 +93,10 @@ pub trait TxService<'db> {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
         utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
-        families: &Families<'db, Self::CF>,
+        families: &Families<Self::CF>,
     ) -> Result<(), rocksdb::Error>;
 }
 
 pub trait BlockMonitor<Tx> {
     fn monitor(&self, block_batch: &[Block<Tx>], batch_weight: &BatchWeight);
-}
-
-pub struct Storage {
-    pub db: Arc<OptimisticTransactionDB<MultiThreaded>>,
 }

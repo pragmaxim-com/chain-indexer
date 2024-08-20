@@ -1,10 +1,13 @@
 pub mod api;
-pub mod block_service;
+pub mod block_read_service;
+pub mod block_write_service;
 pub mod cli;
 pub mod codec_block;
 pub mod codec_tx;
 pub mod db_options;
 pub mod eutxo;
+pub mod experiment;
+pub mod http;
 pub mod indexer;
 pub mod logger;
 pub mod model;
