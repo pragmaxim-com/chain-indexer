@@ -107,9 +107,6 @@ pub async fn run_eutxo_indexing_and_http_server(
         }
     }
 
-    info!("RocksDB successfully flushed and closed.");
-    storage.db.flush().unwrap();
     info!("Stopping server.");
     server_handle.stop(true).await;
-    info!("Have a wonderful day or night.");
 }
