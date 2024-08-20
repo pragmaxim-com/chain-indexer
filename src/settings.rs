@@ -5,6 +5,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub indexer: IndexerSettings,
+    pub http: HttpSettings,
     pub bitcoin: BitcoinConfig,
     pub cardano: CardanoConfig,
     pub ergo: ErgoConfig,
@@ -15,6 +16,11 @@ pub struct IndexerSettings {
     pub db_path: String,
     pub tx_batch_size: usize,
     pub disable_wal: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct HttpSettings {
+    pub bind_address: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

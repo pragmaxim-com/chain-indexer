@@ -1,138 +1,115 @@
-use crate::api::Storage;
+use crate::block_read_service::BlockReadService;
 use crate::cli::Blockchain;
 use crate::cli::CliConfig;
-use crate::eutxo::eutxo_model::*;
+use crate::experiment::Persistence;
+use crate::http::paths;
+use crate::indexer::Indexer;
+use crate::settings::HttpSettings;
 use crate::settings::IndexerSettings;
 
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::RwLock;
 use std::time::Duration;
 
-use crate::block_service::BlockService;
+use crate::block_write_service::BlockWriteService;
 use crate::eutxo::eutxo_block_monitor::EuBlockMonitor;
-use crate::eutxo::eutxo_families::EutxoFamilies;
 use crate::eutxo::eutxo_model::EuTx;
-use crate::eutxo::eutxo_tx_service::EuTxService;
-use crate::indexer::Indexer;
 use crate::info;
-use crate::model::*;
-use crate::rocks_db_batch::{Families, SharedFamilies};
 use crate::syncer::ChainSyncer;
 use crate::{api::BlockProvider, eutxo::eutxo_storage};
-use rocksdb::BoundColumnFamily;
+use actix_web::web;
+use actix_web::App;
+use actix_web::HttpServer;
+use tokio::signal::unix::signal;
+use tokio::signal::unix::SignalKind;
 use tokio::time;
 
-use super::eutxo_schema::DbIndexNumber;
+use super::eutxo_tx_read_service::EuTxReadService;
+use super::eutxo_tx_write_service::EuTxWriteService;
 
-pub async fn run_eutxo_indexing(
-    indexer_settings: IndexerSettings,
+pub async fn run_eutxo_indexing_and_http_server(
+    indexer_conf: IndexerSettings,
+    http_conf: HttpSettings,
     cli_config: CliConfig,
     block_provider: Arc<dyn BlockProvider<OutTx = EuTx>>,
 ) {
     let db_path: String = format!(
         "{}/{}/{}",
-        indexer_settings.db_path, "main", cli_config.blockchain
+        indexer_conf.db_path, "main", cli_config.blockchain
     );
     let perist_coinbase_inputs: bool = match cli_config.blockchain {
         Blockchain::Bitcoin => false,
         Blockchain::Cardano => true,
         Blockchain::Ergo => false,
     };
-    let disable_wal = indexer_settings.disable_wal;
 
-    let tx_batch_size = indexer_settings.tx_batch_size;
+    let disable_wal = indexer_conf.disable_wal;
+    let tx_batch_size = indexer_conf.tx_batch_size;
     let db_shema = block_provider.get_schema();
     let db = Arc::new(eutxo_storage::get_db(&db_shema, &db_path));
-    let families = Arc::new(Families {
-        shared: SharedFamilies {
-            meta_cf: db.cf_handle(META_CF).unwrap(),
-            block_hash_by_pk_cf: db.cf_handle(BLOCK_PK_BY_HASH_CF).unwrap(),
-            block_pk_by_hash_cf: db.cf_handle(BLOCK_HASH_BY_PK_CF).unwrap(),
-            tx_hash_by_pk_cf: db.cf_handle(TX_HASH_BY_PK_CF).unwrap(),
-            tx_pk_by_hash_cf: db.cf_handle(TX_PK_BY_HASH_CF).unwrap(),
-        },
-        custom: EutxoFamilies {
-            utxo_value_by_pk_cf: db.cf_handle(UTXO_VALUE_BY_PK_CF).unwrap(),
-            utxo_pk_by_input_pk_cf: db.cf_handle(UTXO_PK_BY_INPUT_PK_CF).unwrap(),
-            input_pk_by_utxo_pk_cf: db.cf_handle(INPUT_PK_BY_UTXO_PK_CF).unwrap(),
-            o2m_utxo_birth_pk_relations_cf: db_shema
-                .o2m_index_name_by_number
-                .utxo_birth_pk_relations
-                .iter()
-                .map(|(index_number, index_name, _)| {
-                    (*index_number, db.cf_handle(index_name).unwrap())
-                })
-                .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
-            o2m_utxo_birth_pk_by_index_cf: db_shema
-                .o2m_index_name_by_number
-                .utxo_birth_pk_by_index
-                .iter()
-                .map(|(index_number, index_name, _)| {
-                    (*index_number, db.cf_handle(index_name).unwrap())
-                })
-                .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
-            o2m_index_by_utxo_birth_pk_cf: db_shema
-                .o2m_index_name_by_number
-                .index_by_utxo_birth_pk
-                .iter()
-                .map(|(index_number, index_name, _)| {
-                    (*index_number, db.cf_handle(index_name).unwrap())
-                })
-                .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
-            o2o_utxo_birth_pk_by_index_cf: db_shema
-                .o2o_index_name_by_number
-                .utxo_birth_pk_by_index
-                .iter()
-                .map(|(index_number, index_name, _)| {
-                    (*index_number, db.cf_handle(index_name).unwrap())
-                })
-                .collect::<HashMap<DbIndexNumber, Arc<BoundColumnFamily>>>(),
-            assets_by_utxo_pk_cf: db.cf_handle(ASSET_BY_ASSET_PK_CF).unwrap(),
-            asset_id_by_asset_birth_pk_cf: db.cf_handle(ASSET_ID_BY_ASSET_BIRTH_PK_CF).unwrap(),
-            asset_birth_pk_by_asset_id_cf: db.cf_handle(ASSET_BIRTH_PK_BY_ASSET_ID_CF).unwrap(),
-            asset_birth_pk_with_asset_pk_cf: db.cf_handle(ASSET_BIRTH_PK_WITH_ASSET_PK_CF).unwrap(),
-        },
-    });
 
-    let storage = Arc::new(RwLock::new(Storage {
-        db: Arc::clone(&db),
-    }));
+    let storage = Arc::new(Persistence::new(Arc::clone(&db), &db_shema));
 
-    let tx_service = Arc::new(EuTxService {
-        perist_coinbase_inputs,
-    });
-    let block_service = BlockService::new(tx_service);
+    let tx_read_service = Arc::new(EuTxReadService::new(Arc::clone(&storage)));
+
+    let block_read_service = Arc::new(BlockReadService::new(Arc::clone(&storage), tx_read_service));
+    let block_write_service = Arc::new(BlockWriteService::new(
+        Arc::new(EuTxWriteService::new(perist_coinbase_inputs)),
+        Arc::clone(&block_read_service),
+    ));
 
     let indexer = Indexer::new(
         Arc::clone(&storage),
-        Arc::clone(&families),
-        block_service,
+        block_write_service,
         Arc::clone(&block_provider),
         disable_wal,
     );
     let syncer = ChainSyncer::new(block_provider, Rc::new(EuBlockMonitor::new(1000)), indexer);
-    let storage = Arc::clone(&storage);
-    tokio::task::spawn(async move {
-        match tokio::signal::ctrl_c().await {
-            Ok(()) => {
-                info!("Received interrupt signal");
-                storage.write().unwrap().db.flush().unwrap();
-                info!("RocksDB successfully flushed and closed.");
-                std::process::exit(0);
-            }
-            Err(err) => {
-                eprintln!("Unable to listen for shutdown signal: {}", err);
-                std::process::exit(1);
-            }
+
+    let server = HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(Arc::clone(&block_read_service)))
+            .route("/blocks", web::post().to(paths::blocks::get_block_by_hash))
+    })
+    .bind(http_conf.bind_address.clone())
+    .unwrap()
+    .run();
+
+    let server_handle = server.handle();
+
+    info!("Starting Indexing into {}", db_path);
+    let indexing_fut = async {
+        let mut interval = time::interval(Duration::from_secs(1));
+        loop {
+            syncer.sync(tx_batch_size).await;
+            interval.tick().await;
         }
-    });
+    };
 
-    let mut interval = time::interval(Duration::from_secs(1));
+    info!("Starting http server at {}", http_conf.bind_address);
+    let server_fut = async { server.await };
 
-    loop {
-        syncer.sync(tx_batch_size).await;
-        interval.tick().await;
+    let mut sigint = signal(SignalKind::interrupt()).expect("Failed to listen for SIGINT");
+    let mut sigterm = signal(SignalKind::terminate()).expect("Failed to listen for SIGTERM");
+
+    tokio::select! {
+        _ = sigint.recv() => {
+            println!("Received SIGINT, shutting down...");
+        }
+        _ = sigterm.recv() => {
+            println!("Received SIGTERM, shutting down...");
+        }
+        _ = server_fut => {
+            // This branch should not happen since server_fut runs indefinitely
+        }
+        _ = indexing_fut => {
+            // This branch should not happen since indexing_fut runs indefinitely
+        }
     }
+
+    info!("RocksDB successfully flushed and closed.");
+    storage.db.flush().unwrap();
+    info!("Stopping server.");
+    server_handle.stop(true).await;
+    info!("Have a wonderful day or night.");
 }

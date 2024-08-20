@@ -14,18 +14,18 @@ use std::{
     },
 };
 
-pub struct ChainSyncer<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> {
+pub struct ChainSyncer<CF: CustomFamilies, OutTx: Send + 'static> {
     pub is_shutdown: Arc<AtomicBool>,
     pub block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
     pub monitor: Rc<dyn BlockMonitor<OutTx>>,
-    pub indexer: Indexer<'db, CF, OutTx>,
+    pub indexer: Indexer<CF, OutTx>,
 }
 
-impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> ChainSyncer<'db, CF, OutTx> {
+impl<CF: CustomFamilies, OutTx: Send + 'static> ChainSyncer<CF, OutTx> {
     pub fn new(
         block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
         monitor: Rc<dyn BlockMonitor<OutTx>>,
-        indexer: Indexer<'db, CF, OutTx>,
+        indexer: Indexer<CF, OutTx>,
     ) -> Self {
         ChainSyncer {
             is_shutdown: Arc::new(AtomicBool::new(false)),
@@ -40,11 +40,11 @@ impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> ChainSyncer<'db, CF, O
         self.block_provider
             .stream(self.indexer.get_last_header(), min_batch_size)
             .await
-            .for_each(|(block_batch, tx_count)| async move {
+            .for_each(|(block_batch, batch_weight)| async move {
                 let chain_link = block_batch.last().is_some_and(|curr_block| {
                     curr_block.header.height.0 + 100 > chain_tip_header.height.0
                 });
-                self.monitor.monitor(&block_batch, &tx_count);
+                self.monitor.monitor(&block_batch, &batch_weight);
                 self.indexer
                     .persist_blocks(block_batch, chain_link)
                     .unwrap_or_else(|e| panic!("Unable to persist blocks due to {}", e))
@@ -57,8 +57,6 @@ impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> ChainSyncer<'db, CF, O
             info!("Acquiring db lock for flushing closing...");
             self.indexer
                 .storage
-                .write()
-                .unwrap()
                 .db
                 .flush()
                 .expect("Failed to flush RocksDB");
@@ -68,7 +66,7 @@ impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> ChainSyncer<'db, CF, O
     }
 }
 
-impl<'db, CF: CustomFamilies<'db>, OutTx: Send + 'static> Drop for ChainSyncer<'db, CF, OutTx> {
+impl<CF: CustomFamilies, OutTx: Send + 'static> Drop for ChainSyncer<CF, OutTx> {
     fn drop(&mut self) {
         info!("Dropping indexer");
         self.flush_and_shutdown();

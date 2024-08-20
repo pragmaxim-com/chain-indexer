@@ -1,12 +1,11 @@
 use crate::{
-    api::TxService,
+    api::TxWriteService,
+    block_read_service::BlockReadService,
     codec_block,
     codec_tx::TxPkBytes,
     eutxo::eutxo_codec_utxo::UtxoPkBytes,
     info,
-    model::{
-        AssetId, Block, BlockHash, BlockHeader, BlockHeight, O2mIndexValue, O2oIndexValue, TxHash,
-    },
+    model::{AssetId, Block, BlockHash, BlockHeader, O2mIndexValue, O2oIndexValue, TxHash},
     rocks_db_batch::{CustomFamilies, Families},
 };
 use lru::LruCache;
@@ -14,8 +13,9 @@ use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction}
 use std::{cell::RefCell, num::NonZeroUsize};
 use std::{rc::Rc, sync::Arc};
 
-pub struct BlockService<'db, Tx, CF: CustomFamilies<'db>> {
-    pub(crate) tx_service: Arc<dyn TxService<'db, CF = CF, Tx = Tx>>,
+pub struct BlockWriteService<Tx, CF: CustomFamilies> {
+    pub(crate) tx_service: Arc<dyn TxWriteService<CF = CF, Tx = Tx>>,
+    pub(crate) block_service: Arc<BlockReadService<Tx, CF>>,
     pub(crate) block_by_hash_cache: RefCell<LruCache<BlockHash, Rc<Block<Tx>>>>,
     pub(crate) tx_pk_by_tx_hash_cache: RefCell<LruCache<TxHash, TxPkBytes>>,
     pub(crate) utxo_pk_by_index_cache: RefCell<LruCache<O2oIndexValue, UtxoPkBytes>>,
@@ -23,10 +23,14 @@ pub struct BlockService<'db, Tx, CF: CustomFamilies<'db>> {
     pub(crate) asset_birth_pk_by_asset_id_cache: RefCell<LruCache<AssetId, Vec<u8>>>,
 }
 
-impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
-    pub fn new(service: Arc<dyn TxService<'db, CF = CF, Tx = Tx>>) -> Self {
-        BlockService {
-            tx_service: service,
+impl<Tx, CF: CustomFamilies> BlockWriteService<Tx, CF> {
+    pub fn new(
+        tx_service: Arc<dyn TxWriteService<CF = CF, Tx = Tx>>,
+        block_service: Arc<BlockReadService<Tx, CF>>,
+    ) -> Self {
+        BlockWriteService {
+            tx_service,
+            block_service,
             block_by_hash_cache: RefCell::new(LruCache::new(NonZeroUsize::new(1_000).unwrap())),
             tx_pk_by_tx_hash_cache: RefCell::new(LruCache::new(
                 NonZeroUsize::new(5_000_000).unwrap(),
@@ -48,10 +52,10 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         blocks: Vec<Rc<Block<Tx>>>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
-        families: &Families<'db, CF>,
+        families: &Families<CF>,
     ) -> Result<(), rocksdb::Error> {
         let mut tx_pk_by_tx_hash_cache = self.tx_pk_by_tx_hash_cache.borrow_mut();
-        let mut block_height_by_hash_lru_cache = self.block_by_hash_cache.borrow_mut();
+        let mut block_by_hash_cache = self.block_by_hash_cache.borrow_mut();
         let mut utxo_pk_by_index_cache = self.utxo_pk_by_index_cache.borrow_mut();
         let mut utxo_birth_pk_by_index_cache = self.utxo_birth_pk_by_index_cache.borrow_mut();
         let mut asset_birth_pk_by_asset_id_cache =
@@ -60,7 +64,7 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         for block in blocks {
             self.persist_block(
                 block,
-                &mut block_height_by_hash_lru_cache,
+                &mut block_by_hash_cache,
                 &mut tx_pk_by_tx_hash_cache,
                 &mut utxo_pk_by_index_cache,
                 &mut utxo_birth_pk_by_index_cache,
@@ -78,14 +82,14 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
     pub(crate) fn persist_block(
         &self,
         block: Rc<Block<Tx>>,
-        block_height_by_hash_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
+        block_by_hash_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
         tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
         utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         utxo_birth_pk_by_index_cache: &mut LruCache<O2mIndexValue, Vec<u8>>,
         asset_birth_pk_by_asset_id_cache: &mut LruCache<AssetId, Vec<u8>>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
-        families: &Families<'db, CF>,
+        families: &Families<CF>,
     ) -> Result<(), rocksdb::Error> {
         self.tx_service.persist_txs(
             &block,
@@ -98,19 +102,19 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
             families,
         )?;
         self.persist_header(&block.header, db_tx, batch, families)?;
-        block_height_by_hash_cache.put(block.header.hash, Rc::clone(&block));
+        block_by_hash_cache.put(block.header.hash, Rc::clone(&block));
         Ok(())
     }
 
     pub(crate) fn remove_block(
         &self,
-        block: Rc<Block<Tx>>,
+        block: Arc<Block<Tx>>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        families: &Families<'db, CF>,
+        families: &Families<CF>,
     ) -> Result<(), String> {
-        let mut tx_pk_by_tx_hash_lru_cache = self.tx_pk_by_tx_hash_cache.borrow_mut();
-        let mut block_height_by_hash_lru_cache = self.block_by_hash_cache.borrow_mut();
-        let mut utxo_pk_by_index_lru_cache = self.utxo_pk_by_index_cache.borrow_mut();
+        let mut tx_pk_by_tx_hash_cache = self.tx_pk_by_tx_hash_cache.borrow_mut();
+        let mut block_by_hash_cache = self.block_by_hash_cache.borrow_mut();
+        let mut utxo_pk_by_index_cache = self.utxo_pk_by_index_cache.borrow_mut();
 
         for tx in block.txs.iter() {
             self.tx_service
@@ -118,18 +122,13 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
                     &block.header.height,
                     tx,
                     db_tx,
-                    &mut tx_pk_by_tx_hash_lru_cache,
-                    &mut utxo_pk_by_index_lru_cache,
+                    &mut tx_pk_by_tx_hash_cache,
+                    &mut utxo_pk_by_index_cache,
                     families,
                 )
                 .map_err(|e| e.into_string())?;
         }
-        self.remove_header(
-            &block.header,
-            db_tx,
-            &mut block_height_by_hash_lru_cache,
-            families,
-        )
+        self.remove_header(&block.header, db_tx, &mut block_by_hash_cache, families)
     }
 
     pub(crate) fn update_blocks(
@@ -137,17 +136,18 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         blocks: Vec<Rc<Block<Tx>>>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
-        families: &Families<'db, CF>,
-    ) -> Result<Vec<Rc<Block<Tx>>>, String> {
+        families: &Families<CF>,
+    ) -> Result<Vec<Arc<Block<Tx>>>, String> {
         info!("Updating {} blocks", blocks.len());
-        let removed_blocks: Result<Vec<Rc<Block<Tx>>>, String> = blocks
+        let removed_blocks: Result<Vec<Arc<Block<Tx>>>, String> = blocks
             .iter()
             .map(|block| {
-                if let Some(block_to_remove) =
-                    self.get_block_by_height(block.header.height, db_tx, families)?
+                if let Some(block_to_remove) = self
+                    .block_service
+                    .get_block_by_height(block.header.height)?
                 {
                     info!("Removing block {}", block_to_remove.header);
-                    self.remove_block(Rc::clone(&block_to_remove), db_tx, families)?;
+                    self.remove_block(Arc::clone(&block_to_remove), db_tx, families)?;
                     Ok(Some(block_to_remove))
                 } else {
                     Ok(None)
@@ -167,66 +167,12 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
 
         removed_blocks
     }
-
-    fn get_block_by_hash(
-        &self,
-        block_hash: &BlockHash,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        families: &Families<'db, CF>,
-    ) -> Result<Option<Rc<Block<Tx>>>, rocksdb::Error> {
-        if let Some(value) = self.block_by_hash_cache.borrow_mut().get(block_hash) {
-            Ok(Some(Rc::clone(value)))
-        } else {
-            let header_opt = self.get_block_header_by_hash(block_hash, db_tx, families)?;
-            match header_opt {
-                Some(block_header) => {
-                    let txs =
-                        self.tx_service
-                            .get_txs_by_height(&block_header.height, db_tx, families)?;
-
-                    Ok(Some(Rc::new(Block::new(block_header, txs, 0)))) // TODO weight ?
-                }
-                None => Ok(None),
-            }
-        }
-    }
-
-    fn get_block_by_height(
-        &self,
-        block_height: BlockHeight,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        families: &Families<'db, CF>,
-    ) -> Result<Option<Rc<Block<Tx>>>, rocksdb::Error> {
-        let height_bytes = codec_block::block_height_to_bytes(&block_height);
-        let hash_bytes = db_tx.get_cf(&families.shared.block_hash_by_pk_cf, height_bytes)?;
-
-        if let Some(hash) = hash_bytes.map(|bytes| codec_block::bytes_to_block_hash(&bytes)) {
-            self.get_block_by_hash(&hash, db_tx, families)
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub(crate) fn get_block_header_by_hash(
-        &self,
-        block_hash: &BlockHash,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        families: &Families<'db, CF>,
-    ) -> Result<Option<BlockHeader>, rocksdb::Error> {
-        if let Some(value) = self.block_by_hash_cache.borrow_mut().get(block_hash) {
-            Ok(Some(value.header.clone()))
-        } else {
-            let header_bytes = db_tx.get_cf(&families.shared.block_pk_by_hash_cf, block_hash)?;
-            Ok(header_bytes.map(|bytes| codec_block::bytes_to_block_header(&bytes)))
-        }
-    }
-
     pub(crate) fn persist_header(
         &self,
         block_header: &BlockHeader,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
-        families: &Families<'db, CF>,
+        families: &Families<CF>,
     ) -> Result<(), rocksdb::Error> {
         let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
 
@@ -249,8 +195,8 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
         &self,
         block_header: &BlockHeader,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        block_height_by_hash_lru_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
-        families: &Families<'db, CF>,
+        block_by_hash_cache: &mut LruCache<BlockHash, Rc<Block<Tx>>>,
+        families: &Families<CF>,
     ) -> Result<(), String> {
         let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
 
@@ -262,7 +208,7 @@ impl<'db, Tx, CF: CustomFamilies<'db>> BlockService<'db, Tx, CF> {
             .delete_cf(&families.shared.block_pk_by_hash_cf, block_header.hash.0)
             .map_err(|e| e.to_string())?;
 
-        block_height_by_hash_lru_cache.pop(&block_header.hash);
+        block_by_hash_cache.pop(&block_header.hash);
 
         Ok(())
     }
