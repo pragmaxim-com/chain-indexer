@@ -69,7 +69,6 @@ impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
                     .map_err(|err| ServiceError::new(&err.to_string()))
                     .and_then(|(_, hash_bytes)| {
                         let block_hash = codec_block::bytes_to_block_hash(&hash_bytes);
-                        info!("Received http request for block {}", block_hash);
                         self.get_block_by_hash(&block_hash)
                     })
             })
@@ -100,14 +99,10 @@ impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
         &self,
         block_hash: &BlockHash,
     ) -> Result<Option<BlockHeader>, ServiceError> {
-        if let Some(value) = self.block_by_hash_cache.lock().unwrap().get(block_hash) {
-            Ok(Some(value.header.clone()))
-        } else {
-            let header_bytes = self.storage.db.get_cf(
-                &self.storage.families.shared.block_pk_by_hash_cf,
-                block_hash,
-            )?;
-            Ok(header_bytes.map(|bytes| codec_block::bytes_to_block_header(&bytes)))
-        }
+        let header_bytes = self.storage.db.get_cf(
+            &self.storage.families.shared.block_pk_by_hash_cf,
+            block_hash,
+        )?;
+        Ok(header_bytes.map(|bytes| codec_block::bytes_to_block_header(&bytes)))
     }
 }

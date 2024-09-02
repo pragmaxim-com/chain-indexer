@@ -12,7 +12,6 @@ use crate::codec_block;
 use crate::info;
 use crate::persistence::Persistence;
 use crate::rocks_db_batch::CustomFamilies;
-use std::rc::Rc;
 
 use std::sync::Arc;
 
@@ -63,9 +62,9 @@ impl<CF: CustomFamilies, OutTx: Send> Indexer<CF, OutTx> {
 
     fn chain_link(
         &self,
-        block: Rc<Block<OutTx>>, // Use Rc to manage ownership and avoid lifetimes issues
-        winning_fork: &mut Vec<Rc<Block<OutTx>>>, // Use Rc for the vector as well
-    ) -> Result<Vec<Rc<Block<OutTx>>>, ServiceError> {
+        block: Arc<Block<OutTx>>, // Use Arc to manage ownership and avoid lifetimes issues
+        winning_fork: &mut Vec<Arc<Block<OutTx>>>, // Use Rc for the vector as well
+    ) -> Result<Vec<Arc<Block<OutTx>>>, ServiceError> {
         let prev_header: Option<BlockHeader> = self
             .block_write_service
             .block_service
@@ -73,25 +72,25 @@ impl<CF: CustomFamilies, OutTx: Send> Indexer<CF, OutTx> {
             .unwrap();
 
         if block.header.height.0 == 1 {
-            winning_fork.insert(0, Rc::clone(&block)); // Clone the Rc, not the block
+            winning_fork.insert(0, Arc::clone(&block)); // Clone the Rc, not the block
             Ok(winning_fork.clone())
         } else if prev_header
             .as_ref()
             .is_some_and(|ph| ph.height.0 == block.header.height.0 - 1)
         {
-            winning_fork.insert(0, Rc::clone(&block));
+            winning_fork.insert(0, Arc::clone(&block));
             Ok(winning_fork.clone())
         } else if prev_header.is_none() {
             info!(
                 "Fork detected at {}@{}, downloading parent {}",
                 block.header.height, block.header.hash, block.header.prev_hash,
             );
-            let downloaded_prev_block = Rc::new(
+            let downloaded_prev_block = Arc::new(
                 self.block_provider
                     .get_processed_block(block.header.clone())?,
             );
 
-            winning_fork.insert(0, Rc::clone(&block));
+            winning_fork.insert(0, Arc::clone(&block));
             self.chain_link(downloaded_prev_block, winning_fork)
         } else {
             panic!("Unexpected condition") // todo pretty print blocks
@@ -117,9 +116,9 @@ impl<CF: CustomFamilies, OutTx: Send> Indexer<CF, OutTx> {
             .into_iter()
             .map(|block| {
                 if chain_link {
-                    self.chain_link(Rc::new(block), &mut vec![]).unwrap()
+                    self.chain_link(Arc::new(block), &mut vec![]).unwrap()
                 } else {
-                    vec![Rc::new(block)]
+                    vec![Arc::new(block)]
                 }
             })
             .map(|linked_blocks| match linked_blocks.len() {
