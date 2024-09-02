@@ -7,6 +7,7 @@ use crate::persistence::Persistence;
 use crate::settings::HttpSettings;
 use crate::settings::IndexerSettings;
 
+use std::io;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,12 +18,24 @@ use crate::eutxo::eutxo_model::EuTx;
 use crate::info;
 use crate::syncer::ChainSyncer;
 use crate::{api::BlockProvider, eutxo::eutxo_storage};
+use actix_web::dev::Server;
+use futures::future::join;
+use futures::future::ready;
 use tokio::signal::unix::signal;
 use tokio::signal::unix::SignalKind;
 use tokio::time;
 
 use super::eutxo_tx_read_service::EuTxReadService;
 use super::eutxo_tx_write_service::EuTxWriteService;
+
+async fn maybe_run_server(http_conf: &HttpSettings, server: Server) -> io::Result<()> {
+    if http_conf.enable {
+        info!("Starting http server at {}", http_conf.bind_address);
+        server.await
+    } else {
+        ready(io::Result::Ok(())).await
+    }
+}
 
 pub async fn run_eutxo_indexing_and_http_server(
     indexer_conf: IndexerSettings,
@@ -67,20 +80,26 @@ pub async fn run_eutxo_indexing_and_http_server(
 
     let server_handle = server.handle();
 
-    info!("Starting Indexing into {}", db_path);
-    let indexing_fut = async {
-        let mut interval = time::interval(Duration::from_secs(1));
-        loop {
-            syncer.sync(tx_batch_size).await;
-            interval.tick().await;
-        }
-    };
+    let server_fut = maybe_run_server(&http_conf, server);
 
-    info!("Starting http server at {}", http_conf.bind_address);
-    let server_fut = async { server.await };
+    let indexing_fut = if indexer_conf.enable {
+        info!("Starting Indexing into {}", db_path);
+        async {
+            let mut interval = time::interval(Duration::from_secs(1));
+            loop {
+                syncer.sync(tx_batch_size).await;
+                interval.tick().await;
+            }
+        }
+        .await
+    } else {
+        ready(()) // Return an empty future if the feature flag is false
+    };
 
     let mut sigint = signal(SignalKind::interrupt()).expect("Failed to listen for SIGINT");
     let mut sigterm = signal(SignalKind::terminate()).expect("Failed to listen for SIGTERM");
+
+    let combined_fut = join(server_fut, indexing_fut);
 
     tokio::select! {
         _ = sigint.recv() => {
@@ -89,11 +108,8 @@ pub async fn run_eutxo_indexing_and_http_server(
         _ = sigterm.recv() => {
             println!("Received SIGTERM, shutting down...");
         }
-        _ = server_fut => {
-            // This branch should not happen since server_fut runs indefinitely
-        }
-        _ = indexing_fut => {
-            // This branch should not happen since indexing_fut runs indefinitely
+        _ = combined_fut => {
+
         }
     }
 

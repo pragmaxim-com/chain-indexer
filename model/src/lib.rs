@@ -10,6 +10,7 @@ pub type TxCount = usize;
 pub type BoxWeight = usize;
 pub type BlockWeight = usize;
 pub type BatchWeight = usize;
+use serde::de::Error as DeError;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct O2mIndexValue(pub Vec<u8>);
@@ -78,6 +79,19 @@ impl AsRef<[u8]> for BlockHash {
         &self.0
     }
 }
+impl From<String> for BlockHash {
+    fn from(hex_string: String) -> Self {
+        let bytes = hex::decode(hex_string).expect("Failed to decode hex string");
+        assert!(
+            bytes.len() == 32,
+            "Hex string must decode to exactly 32 bytes"
+        );
+        let mut array = [0u8; 32];
+        array.copy_from_slice(&bytes);
+
+        BlockHash(array)
+    }
+}
 impl fmt::Display for BlockHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(self.0))
@@ -100,7 +114,7 @@ impl<'de> Deserialize<'de> for BlockHash {
         D: Deserializer<'de>,
     {
         let hex_string = String::deserialize(deserializer)?;
-        let bytes = hex::decode(&hex_string).map_err(D::Error::custom)?;
+        let bytes = hex::decode(&hex_string).map_err(DeError::custom)?;
 
         if bytes.len() != 32 {
             return Err(DeError::custom("Invalid length for BlockHash"));

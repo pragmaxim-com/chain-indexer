@@ -13,6 +13,7 @@ pub struct AppConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IndexerSettings {
+    pub enable: bool,
     pub db_path: String,
     pub tx_batch_size: usize,
     pub disable_wal: bool,
@@ -20,6 +21,7 @@ pub struct IndexerSettings {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct HttpSettings {
+    pub enable: bool,
     pub bind_address: String,
 }
 

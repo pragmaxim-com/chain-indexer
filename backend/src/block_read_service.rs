@@ -1,11 +1,12 @@
 use crate::{
     api::{ServiceError, TxReadService},
-    codec_block,
+    codec_block, info,
     persistence::Persistence,
     rocks_db_batch::CustomFamilies,
 };
 use lru::LruCache;
 use model::{Block, BlockHash, BlockHeader, BlockHeight};
+use rocksdb::IteratorMode;
 use std::{
     num::NonZeroUsize,
     sync::{Arc, Mutex},
@@ -46,9 +47,37 @@ impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
                     cache.put(block_hash.clone(), block.clone());
                     Ok(Some(block))
                 }
-                None => Ok(None),
+                None => {
+                    info!("Not found {}", block_hash);
+                    Ok(None)
+                }
             }
         }
+    }
+
+    pub(crate) fn get_latest_block(&self) -> Result<Option<Arc<Block<Tx>>>, ServiceError> {
+        let latest_block = self
+            .storage
+            .db
+            .iterator_cf(
+                &self.storage.families.shared.block_hash_by_pk_cf,
+                IteratorMode::End,
+            )
+            .take(1)
+            .map(|result| {
+                result
+                    .map_err(|err| ServiceError::new(&err.to_string()))
+                    .and_then(|(_, hash_bytes)| {
+                        let block_hash = codec_block::bytes_to_block_hash(&hash_bytes);
+                        info!("Received http request for block {}", block_hash);
+                        self.get_block_by_hash(&block_hash)
+                    })
+            })
+            .collect::<Result<Vec<Option<Arc<Block<Tx>>>>, ServiceError>>()?
+            .into_iter()
+            .find_map(|option| option);
+        info!("Found but {}", latest_block.is_some());
+        Ok(latest_block)
     }
 
     pub(crate) fn get_block_by_height(
@@ -60,7 +89,6 @@ impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
             &self.storage.families.shared.block_hash_by_pk_cf,
             height_bytes,
         )?;
-
         if let Some(hash) = hash_bytes.map(|bytes| codec_block::bytes_to_block_hash(&bytes)) {
             self.get_block_by_hash(&hash)
         } else {
