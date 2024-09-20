@@ -10,16 +10,16 @@ use crate::{
 use lru::LruCache;
 use model::{AssetId, Block, BlockHeader, O2mIndexValue, O2oIndexValue, TxHash};
 use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction};
-use std::sync::Arc;
-use std::{cell::RefCell, num::NonZeroUsize};
+use std::num::NonZeroUsize;
+use std::sync::{Arc, Mutex};
 
 pub struct BlockWriteService<Tx, CF: CustomFamilies> {
     pub(crate) tx_service: Arc<dyn TxWriteService<CF = CF, Tx = Tx>>,
     pub(crate) block_service: Arc<BlockReadService<Tx, CF>>,
-    pub(crate) tx_pk_by_tx_hash_cache: RefCell<LruCache<TxHash, TxPkBytes>>,
-    pub(crate) utxo_pk_by_index_cache: RefCell<LruCache<O2oIndexValue, UtxoPkBytes>>,
-    pub(crate) utxo_birth_pk_by_index_cache: RefCell<LruCache<O2mIndexValue, Vec<u8>>>,
-    pub(crate) asset_birth_pk_by_asset_id_cache: RefCell<LruCache<AssetId, Vec<u8>>>,
+    pub(crate) tx_pk_by_tx_hash_cache: Mutex<LruCache<TxHash, TxPkBytes>>,
+    pub(crate) utxo_pk_by_index_cache: Mutex<LruCache<O2oIndexValue, UtxoPkBytes>>,
+    pub(crate) utxo_birth_pk_by_index_cache: Mutex<LruCache<O2mIndexValue, Vec<u8>>>,
+    pub(crate) asset_birth_pk_by_asset_id_cache: Mutex<LruCache<AssetId, Vec<u8>>>,
 }
 
 impl<Tx, CF: CustomFamilies> BlockWriteService<Tx, CF> {
@@ -30,33 +30,33 @@ impl<Tx, CF: CustomFamilies> BlockWriteService<Tx, CF> {
         BlockWriteService {
             tx_service,
             block_service,
-            tx_pk_by_tx_hash_cache: RefCell::new(LruCache::new(
+            tx_pk_by_tx_hash_cache: Mutex::new(LruCache::new(
                 NonZeroUsize::new(5_000_000).unwrap(),
             )),
-            utxo_pk_by_index_cache: RefCell::new(LruCache::new(
+            utxo_pk_by_index_cache: Mutex::new(LruCache::new(
                 NonZeroUsize::new(5_000_000).unwrap(),
             )),
-            utxo_birth_pk_by_index_cache: RefCell::new(LruCache::new(
+            utxo_birth_pk_by_index_cache: Mutex::new(LruCache::new(
                 NonZeroUsize::new(5_000_000).unwrap(),
             )),
-            asset_birth_pk_by_asset_id_cache: RefCell::new(LruCache::new(
+            asset_birth_pk_by_asset_id_cache: Mutex::new(LruCache::new(
                 NonZeroUsize::new(5_000_000).unwrap(),
             )),
         }
     }
 
-    pub(crate) fn persist_blocks(
+    pub fn persist_blocks(
         &self,
         blocks: Vec<Arc<Block<Tx>>>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
         families: &Families<CF>,
     ) -> Result<(), rocksdb::Error> {
-        let mut tx_pk_by_tx_hash_cache = self.tx_pk_by_tx_hash_cache.borrow_mut();
-        let mut utxo_pk_by_index_cache = self.utxo_pk_by_index_cache.borrow_mut();
-        let mut utxo_birth_pk_by_index_cache = self.utxo_birth_pk_by_index_cache.borrow_mut();
+        let mut tx_pk_by_tx_hash_cache = self.tx_pk_by_tx_hash_cache.lock().unwrap();
+        let mut utxo_pk_by_index_cache = self.utxo_pk_by_index_cache.lock().unwrap();
+        let mut utxo_birth_pk_by_index_cache = self.utxo_birth_pk_by_index_cache.lock().unwrap();
         let mut asset_birth_pk_by_asset_id_cache =
-            self.asset_birth_pk_by_asset_id_cache.borrow_mut();
+            self.asset_birth_pk_by_asset_id_cache.lock().unwrap();
 
         for block in blocks {
             self.persist_block(
@@ -108,8 +108,8 @@ impl<Tx, CF: CustomFamilies> BlockWriteService<Tx, CF> {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<CF>,
     ) -> Result<(), ServiceError> {
-        let mut tx_pk_by_tx_hash_cache = self.tx_pk_by_tx_hash_cache.borrow_mut();
-        let mut utxo_pk_by_index_cache = self.utxo_pk_by_index_cache.borrow_mut();
+        let mut tx_pk_by_tx_hash_cache = self.tx_pk_by_tx_hash_cache.lock().unwrap();
+        let mut utxo_pk_by_index_cache = self.utxo_pk_by_index_cache.lock().unwrap();
 
         for tx in block.txs.iter() {
             self.tx_service.remove_tx(
@@ -175,7 +175,7 @@ impl<Tx, CF: CustomFamilies> BlockWriteService<Tx, CF> {
             block_header.hash.0,
         );
         db_tx.put_cf(
-            &families.shared.block_pk_by_hash_cf,
+            &families.shared.block_header_by_hash_cf,
             block_header.hash.0,
             header_bytes,
         )?;
@@ -193,7 +193,10 @@ impl<Tx, CF: CustomFamilies> BlockWriteService<Tx, CF> {
 
         db_tx.delete_cf(&families.shared.block_hash_by_pk_cf, height_bytes)?;
 
-        db_tx.delete_cf(&families.shared.block_pk_by_hash_cf, block_header.hash.0)?;
+        db_tx.delete_cf(
+            &families.shared.block_header_by_hash_cf,
+            block_header.hash.0,
+        )?;
 
         Ok(())
     }

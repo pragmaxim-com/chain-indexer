@@ -18,6 +18,6 @@ ergo:
     ADDRESS:
       enabled: true
     ERGO_TREE_HASH:
-      enabled: true
+      enabled: false
     ERGO_TREE_T8_HASH:
-      enabled: true
+      enabled: false

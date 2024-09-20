@@ -11,7 +11,7 @@ use backend::settings::AppConfig;
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    let config = AppConfig::new();
+    let config = AppConfig::new("config/settings");
     let cli_clonfig: CliConfig = CliConfig::parse();
     let schema = DbSchema::load_config("config/schema.yaml");
     match config {

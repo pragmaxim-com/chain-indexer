@@ -28,7 +28,7 @@ impl Persistence<EutxoFamilies> {
                             db.cf_handle(BLOCK_PK_BY_HASH_CF).unwrap(),
                         )
                     },
-                    block_pk_by_hash_cf: unsafe {
+                    block_header_by_hash_cf: unsafe {
                         transmute::<_, Arc<BoundColumnFamily<'static>>>(
                             db.cf_handle(BLOCK_HASH_BY_PK_CF).unwrap(),
                         )

@@ -143,7 +143,7 @@ impl<CF: CustomFamilies, OutTx: Send> Indexer<CF, OutTx> {
         // persist last height to db_tx and commit
         if let Some(header) = last_block_header {
             self.persist_last_block(&header, &db_tx)?;
-
+            self.storage.db.write_opt(batch, &write_options)?;
             db_tx.commit()?;
         }
         Ok(())

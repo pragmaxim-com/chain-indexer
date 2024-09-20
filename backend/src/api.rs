@@ -136,7 +136,7 @@ pub trait TxReadService: Sync + Sync {
     fn get_txs_by_height(&self, block_height: &BlockHeight) -> Result<Vec<Self::Tx>, ServiceError>;
 }
 
-pub trait TxWriteService {
+pub trait TxWriteService: Sync + Sync {
     type CF: CustomFamilies;
     type Tx;
 

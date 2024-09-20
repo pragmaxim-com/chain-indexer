@@ -19,7 +19,7 @@ pub type AssetBirthPkBytes = AssetPkBytes;
 pub type AssetValueActionBirthPk = Vec<u8>;
 
 #[derive(Debug, PartialEq, Clone)]
-struct EutxoPk {
+pub struct EutxoPk {
     pub block_height: BlockHeight,
     pub tx_index: TxIndex,
     pub utxo_index: UtxoIndex,
@@ -121,8 +121,8 @@ pub fn bytes_to_utxo(
     Vec<(DbIndexNumber, O2oIndexValue)>,
 ) {
     let utxo_value = UtxoValue(BigEndian::read_u64(&bytes[0..8]));
-    let mut o2m_indexes = vec![];
-    let mut o2o_indexes: Vec<(u8, O2oIndexValue)> = vec![];
+    let mut o2m_indexes: Vec<(DbIndexNumber, UtxoPkBytes)> = vec![];
+    let mut o2o_indexes: Vec<(DbIndexNumber, O2oIndexValue)> = vec![];
     let mut index = 8;
     while index < bytes.len() {
         if index + 9 <= bytes.len() {
@@ -296,5 +296,32 @@ mod tests {
 
         // Assert that the original arrays match the split arrays
         assert_eq!(pk_split, pk);
+    }
+
+    #[test]
+    fn test_utxo_value_roundtrip() {
+        // Initial test data
+        let utxo_value = UtxoValue(1234567890);
+        let utxo_birth_pk_by_cf_index: Vec<(DbIndexNumber, UtxoPkBytes)> = vec![
+            (1, [1, 2, 3, 4, 5, 6, 7, 8]),
+            (2, [9, 10, 11, 12, 13, 14, 15, 16]),
+        ];
+
+        // Convert the UTXO value to bytes
+        let serialized_bytes = utxo_to_bytes(&utxo_value, utxo_birth_pk_by_cf_index.clone());
+
+        // Convert the bytes back to UTXO structure
+        let (deserialized_utxo_value, deserialized_utxo_birth_pk_by_cf_index, _o2o_indexes) =
+            bytes_to_utxo(&serialized_bytes);
+
+        // Assert the roundtrip values are the same
+        assert_eq!(
+            utxo_value.0, deserialized_utxo_value.0,
+            "UTXO value mismatch"
+        );
+        assert_eq!(
+            utxo_birth_pk_by_cf_index, deserialized_utxo_birth_pk_by_cf_index,
+            "UTXO birth pk mismatch"
+        );
     }
 }

@@ -45,11 +45,11 @@ pub struct CardanoConfig {
 }
 
 impl AppConfig {
-    pub fn new() -> Result<Self, ConfigError> {
+    pub fn new(path: &str) -> Result<Self, ConfigError> {
         match dotenv() {
             Ok(_) => {
                 let builder = Config::builder()
-                    .add_source(File::with_name("config/settings").required(true))
+                    .add_source(File::with_name(path).required(true))
                     .add_source(File::with_name("local-settings").required(false))
                     .add_source(
                         Environment::with_prefix("BITCOIN")

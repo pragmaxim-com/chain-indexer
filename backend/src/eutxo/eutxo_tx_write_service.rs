@@ -31,7 +31,7 @@ pub struct EuTxWriteService {
 }
 
 impl EuTxWriteService {
-    pub(crate) fn new(perist_coinbase_inputs: bool) -> Self {
+    pub fn new(perist_coinbase_inputs: bool) -> Self {
         EuTxWriteService {
             perist_coinbase_inputs,
         }
@@ -292,7 +292,6 @@ impl EuTxWriteService {
         for (index_number, index_value) in utxo.o2m_db_indexes.iter() {
             utxo_value_with_indexes[index] = *index_number;
             index += size_of::<DbIndexNumber>();
-
             let (utxo_birth_pk_bytes, _) = self.persist_birth_pk_or_relation_with_pk(
                 index_value,
                 utxo_pk_bytes,
@@ -309,9 +308,8 @@ impl EuTxWriteService {
             index += size_of::<UtxoBirthPkBytes>();
         }
 
-        for (cf_index, index_value) in utxo.o2o_db_indexes.iter() {
-            // index number
-            utxo_value_with_indexes[index] = *cf_index;
+        for (index_number, index_value) in utxo.o2o_db_indexes.iter() {
+            utxo_value_with_indexes[index] = *index_number;
             index += size_of::<DbIndexNumber>();
             // index value size
 
@@ -326,7 +324,7 @@ impl EuTxWriteService {
             index += index_value.0.len();
 
             db_tx.put_cf(
-                &families.custom.o2o_utxo_birth_pk_by_index_cf[cf_index],
+                &families.custom.o2o_utxo_birth_pk_by_index_cf[index_number],
                 &index_value.0,
                 utxo_pk_bytes,
             )?;
@@ -494,7 +492,7 @@ impl EuTxWriteService {
         pk_bytes: &[u8],
         cache: &mut LruCache<O2mIndexValue, Vec<u8>>,
         birth_pk_by_index_cf: &Arc<BoundColumnFamily>,
-        birth_pk_with_pk_cf: &Arc<BoundColumnFamily>,
+        birth_pk_relations_cf: &Arc<BoundColumnFamily>,
         index_by_birth_pk_cf: &Arc<BoundColumnFamily>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
@@ -502,14 +500,14 @@ impl EuTxWriteService {
         if let Some(existing_birth_pk_vec) = cache.get(index_value) {
             let birth_pk_with_pk =
                 eutxo_codec_utxo::concat_birth_pk_with_pk(existing_birth_pk_vec, pk_bytes);
-            batch.put_cf(birth_pk_with_pk_cf, &birth_pk_with_pk, vec![]);
+            batch.put_cf(birth_pk_relations_cf, &birth_pk_with_pk, vec![]);
             Ok((existing_birth_pk_vec.clone(), false))
         } else if let Some(existing_birth_pk_vec) =
             db_tx.get_cf(birth_pk_by_index_cf, &index_value.0)?
         {
             let birth_pk_with_pk =
                 eutxo_codec_utxo::concat_birth_pk_with_pk(&existing_birth_pk_vec, pk_bytes);
-            batch.put_cf(birth_pk_with_pk_cf, &birth_pk_with_pk, vec![]);
+            batch.put_cf(birth_pk_relations_cf, &birth_pk_with_pk, vec![]);
             Ok((existing_birth_pk_vec, false))
         } else {
             let pk_bytes_vec = pk_bytes.to_vec();

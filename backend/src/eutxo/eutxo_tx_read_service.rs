@@ -68,7 +68,6 @@ impl EuTxReadService {
                         utxo_birth_pk,
                     )?
                     .unwrap();
-
                 Ok((*cf_index, index_value.into()))
             })
             .collect::<Result<Vec<(DbIndexNumber, O2mIndexValue)>, rocksdb::Error>>()
@@ -79,13 +78,15 @@ impl EuTxReadService {
         block_height: &BlockHeight,
         tx_index: &TxIndex,
     ) -> Result<Vec<EuUtxo>, rocksdb::Error> {
-        let pk_bytes = codec_tx::tx_pk_bytes(block_height, tx_index);
+        let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, tx_index);
         self.storage
             .db
-            .prefix_iterator_cf(&self.storage.families.custom.utxo_value_by_pk_cf, pk_bytes)
+            .prefix_iterator_cf(
+                &self.storage.families.custom.utxo_value_by_pk_cf,
+                tx_pk_bytes,
+            )
             .map(|result| {
                 result.and_then(|(utxo_pk, utxo_value_bytes)| {
-                    let utxo_index = eutxo_codec_utxo::utxo_index_from_pk_bytes(&utxo_pk);
                     let (utxo_value, o2m_index_pks, o2o_db_indexes) =
                         eutxo_codec_utxo::bytes_to_utxo(&utxo_value_bytes);
 
@@ -94,6 +95,8 @@ impl EuTxReadService {
 
                     let assets: Vec<(AssetId, AssetValue, AssetAction)> =
                         self.get_assets(&utxo_pk)?;
+
+                    let utxo_index = eutxo_codec_utxo::utxo_index_from_pk_bytes(&utxo_pk);
 
                     Ok(EuUtxo {
                         utxo_index,

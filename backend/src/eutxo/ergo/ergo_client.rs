@@ -85,7 +85,7 @@ impl ErgoClient {
         }
     }
 
-    pub(crate) async fn get_block_ids_by_height_async(
+    pub async fn get_block_ids_by_height_async(
         &self,
         height: BlockHeight,
     ) -> Result<Vec<String>, ServiceError> {
@@ -103,10 +103,23 @@ impl ErgoClient {
         Ok(block_ids)
     }
 
-    pub(crate) fn get_block_by_hash_sync(
+    pub fn get_block_ids_by_height_sync(
         &self,
-        hash: BlockHash,
-    ) -> Result<FullBlock, ServiceError> {
+        height: BlockHeight,
+    ) -> Result<Vec<String>, ServiceError> {
+        let block_ids_url = self
+            .node_url
+            .join(&format!("blocks/at/{}", &height.0.to_string()))?;
+        let block_ids = ErgoClient::set_blocking_req_headers(
+            ErgoClient::build_blocking_client()?.get(block_ids_url),
+            &self.api_key,
+        )
+        .send()?
+        .json::<Vec<String>>()?;
+        Ok(block_ids)
+    }
+
+    pub fn get_block_by_hash_sync(&self, hash: BlockHash) -> Result<FullBlock, ServiceError> {
         let url = self
             .node_url
             .join(&format!("blocks/{}", hex::encode(hash.0)))?;

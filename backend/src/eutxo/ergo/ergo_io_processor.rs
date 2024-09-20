@@ -68,14 +68,14 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
                 .map(|a| a.content_bytes())
                 .ok();
 
-            let mut o2o_db_indexes: Vec<(u8, O2oIndexValue)> = Vec::with_capacity(2);
+            let mut o2o_db_indexes: Vec<(DbIndexNumber, O2oIndexValue)> = Vec::with_capacity(2);
             if let Some(index_number) = self.db_schema.o2o_index_number_by_name.get("BOX_ID") {
                 o2o_db_indexes.push((*index_number, box_id_bytes.into()));
             } else {
                 panic!("Ergo BOX_ID index is missing in schema.yaml")
             }
 
-            let mut o2m_db_indexes: Vec<(u8, O2mIndexValue)> = Vec::with_capacity(2);
+            let mut o2m_db_indexes: Vec<(DbIndexNumber, O2mIndexValue)> = Vec::with_capacity(3);
             if let Some(index_number) = self
                 .db_schema
                 .o2m_index_number_by_name

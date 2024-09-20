@@ -10,7 +10,7 @@ pub trait CustomFamilies {
 pub struct SharedFamilies {
     pub meta_cf: Arc<BoundColumnFamily<'static>>,
     pub block_hash_by_pk_cf: Arc<BoundColumnFamily<'static>>,
-    pub block_pk_by_hash_cf: Arc<BoundColumnFamily<'static>>,
+    pub block_header_by_hash_cf: Arc<BoundColumnFamily<'static>>,
     pub tx_hash_by_pk_cf: Arc<BoundColumnFamily<'static>>,
     pub tx_pk_by_hash_cf: Arc<BoundColumnFamily<'static>>,
 }
@@ -20,7 +20,7 @@ impl SharedFamilies {
         let all = vec![
             Arc::clone(&self.meta_cf),
             Arc::clone(&self.block_hash_by_pk_cf),
-            Arc::clone(&self.block_pk_by_hash_cf),
+            Arc::clone(&self.block_header_by_hash_cf),
             Arc::clone(&self.tx_hash_by_pk_cf),
             Arc::clone(&self.tx_pk_by_hash_cf),
         ];

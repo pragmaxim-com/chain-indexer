@@ -9,7 +9,7 @@ use model::{Block, BlockHash, BlockHeader, BlockHeight};
 use rocksdb::IteratorMode;
 use std::{
     num::NonZeroUsize,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 pub struct BlockReadService<Tx, CF: CustomFamilies> {
@@ -19,7 +19,7 @@ pub struct BlockReadService<Tx, CF: CustomFamilies> {
 }
 
 impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
-    pub(crate) fn new(
+    pub fn new(
         storage: Arc<Persistence<CF>>,
         tx_service: Arc<dyn TxReadService<CF = CF, Tx = Tx> + Send + Sync>,
     ) -> Self {
@@ -31,11 +31,16 @@ impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
             ))),
         }
     }
-    pub(crate) fn get_block_by_hash(
+    pub fn get_block_by_hash(
         &self,
         block_hash: &BlockHash,
     ) -> Result<Option<Arc<Block<Tx>>>, ServiceError> {
-        let mut cache = self.block_by_hash_cache.lock().unwrap();
+        let mut cache: MutexGuard<_> = match self.block_by_hash_cache.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                poisoned.into_inner() // Recover the poisoned lock
+            }
+        };
         if let Some(value) = cache.get(block_hash) {
             Ok(Some(Arc::clone(value)))
         } else {
@@ -75,7 +80,6 @@ impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
             .collect::<Result<Vec<Option<Arc<Block<Tx>>>>, ServiceError>>()?
             .into_iter()
             .find_map(|option| option);
-        info!("Found but {}", latest_block.is_some());
         Ok(latest_block)
     }
 
@@ -100,7 +104,7 @@ impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
         block_hash: &BlockHash,
     ) -> Result<Option<BlockHeader>, ServiceError> {
         let header_bytes = self.storage.db.get_cf(
-            &self.storage.families.shared.block_pk_by_hash_cf,
+            &self.storage.families.shared.block_header_by_hash_cf,
             block_hash,
         )?;
         Ok(header_bytes.map(|bytes| codec_block::bytes_to_block_header(&bytes)))

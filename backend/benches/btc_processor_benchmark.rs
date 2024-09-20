@@ -10,7 +10,7 @@ use backend::{
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let config = settings::AppConfig::new().unwrap();
+    let config = settings::AppConfig::new("config/settings").unwrap();
     let blockchain = config.blockchain;
     let api_host = blockchain.api_host;
     let api_username = blockchain.api_username;
