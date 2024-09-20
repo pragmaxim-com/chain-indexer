@@ -60,7 +60,7 @@ BlockHash_by_HeightPk:
     block_height -> block_hash
 
 HeightPk_by_BlockHash:
-    block_hash -> block_height|block_timestamp
+    block_hash -> block_height|block_timestamp|prev_hash
 ```
 
 ### Transactions

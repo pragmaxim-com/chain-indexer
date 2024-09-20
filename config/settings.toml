@@ -1,9 +1,11 @@
 [indexer]
 db_path = "/tmp/chain-indexer"
+enable = true
 tx_batch_size = 1000
 disable_wal = false
 
 [http]
+enable = true
 bind_address = "127.0.0.1:3031"
 
 [bitcoin]
