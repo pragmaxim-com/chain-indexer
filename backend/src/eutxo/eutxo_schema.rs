@@ -1,8 +1,13 @@
 use indexmap::IndexMap;
 use model::eutxo_model::{DbIndexEnabled, DbIndexName, DbIndexNumber};
+use rocksdb::{Options, SliceTransform};
 use serde::Deserialize;
 
-use std::{collections::HashMap, fs};
+use std::{collections::HashMap, fs, mem::size_of};
+
+use crate::db_options;
+
+use super::eutxo_codec_utxo::UtxoBirthPkBytes;
 
 pub type CompactionEnabled = bool;
 
@@ -18,29 +23,7 @@ pub const INPUT_PK_BY_UTXO_PK_CF: &str = "INPUT_PK_BY_UTXO_PK_CF";
 pub const ASSET_BY_ASSET_PK_CF: &str = "ASSET_BY_ASSET_PK_CF";
 pub const ASSET_ID_BY_ASSET_BIRTH_PK_CF: &str = "ASSET_ID_BY_ASSET_BIRTH_PK_CF";
 pub const ASSET_BIRTH_PK_BY_ASSET_ID_CF: &str = "ASSET_BIRTH_PK_BY_ASSET_ID_CF";
-pub const ASSET_BIRTH_PK_WITH_ASSET_PK_CF: &str = "ASSET_BIRTH_PK_WITH_ASSET_PK_CF";
-
-pub fn get_eutxo_column_families() -> Vec<(&'static str, CompactionEnabled)> {
-    vec![
-        (UTXO_VALUE_BY_PK_CF, false),
-        (UTXO_PK_BY_INPUT_PK_CF, false),
-        (INPUT_PK_BY_UTXO_PK_CF, false),
-        (ASSET_BY_ASSET_PK_CF, false),
-        (ASSET_ID_BY_ASSET_BIRTH_PK_CF, false),
-        (ASSET_BIRTH_PK_BY_ASSET_ID_CF, true),
-        (ASSET_BIRTH_PK_WITH_ASSET_PK_CF, false),
-    ]
-}
-
-pub fn get_shared_column_families() -> Vec<(&'static str, CompactionEnabled)> {
-    vec![
-        (META_CF, true),
-        (BLOCK_HASH_BY_PK_CF, true),
-        (BLOCK_PK_BY_HASH_CF, true),
-        (TX_HASH_BY_PK_CF, true),
-        (TX_PK_BY_HASH_CF, true),
-    ]
-}
+pub const ASSET_BIRTH_PK_RELATIONS_CF: &str = "ASSET_BIRTH_PK_RELATIONS_CF";
 
 #[derive(Debug, Deserialize)]
 struct DbOutputIndexInfo {
@@ -70,26 +53,25 @@ impl From<SchemaDefinitionHolder> for DbSchemaHolder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct O2mIndexNameByNumber {
-    pub utxo_birth_pk_relations: Vec<(DbIndexNumber, DbIndexName, CompactionEnabled)>,
-    pub utxo_birth_pk_by_index: Vec<(DbIndexNumber, DbIndexName, CompactionEnabled)>,
-    pub index_by_utxo_birth_pk: Vec<(DbIndexNumber, DbIndexName, CompactionEnabled)>,
+    pub utxo_birth_pk_relations: Vec<(DbIndexNumber, DbIndexName, Options)>,
+    pub utxo_birth_pk_by_index: Vec<(DbIndexNumber, DbIndexName, Options)>,
+    pub index_by_utxo_birth_pk: Vec<(DbIndexNumber, DbIndexName, Options)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct O2oIndexNameByNumber {
-    pub utxo_birth_pk_by_index: Vec<(DbIndexNumber, DbIndexName, CompactionEnabled)>,
+    pub utxo_birth_pk_by_index: Vec<(DbIndexNumber, DbIndexName, Options)>,
 }
 
-#[derive(Debug)]
 pub struct DbSchemaHolder {
     pub bitcoin: DbSchema,
     pub cardano: DbSchema,
     pub ergo: DbSchema,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DbSchema {
     pub o2m_index_number_by_name: HashMap<DbIndexName, DbIndexNumber>,
     pub o2o_index_number_by_name: HashMap<DbIndexName, DbIndexNumber>,
@@ -143,30 +125,35 @@ impl DbSchema {
                 utxo_birth_pk_relations: o2m_index_number_by_name
                     .iter()
                     .map(|(index_name, index_number)| {
+                        let extractor =
+                            SliceTransform::create_fixed_prefix(size_of::<UtxoBirthPkBytes>());
+                        let options: Options = db_options::get_db_options(false, Some(extractor));
                         (
                             *index_number,
                             format!("O2M_{}_RELATIONS", *index_name),
-                            false,
+                            options,
                         )
                     })
                     .collect(),
                 utxo_birth_pk_by_index: o2m_index_number_by_name
                     .iter()
                     .map(|(index_name, index_number)| {
+                        let options: Options = db_options::get_db_options(false, None);
                         (
                             *index_number,
                             format!("O2M_UTXO_BIRTH_PK_BY_{}", *index_name),
-                            true,
+                            options,
                         )
                     })
                     .collect(),
                 index_by_utxo_birth_pk: o2m_index_number_by_name
                     .iter()
                     .map(|(index_name, index_number)| {
+                        let options: Options = db_options::get_db_options(false, None);
                         (
                             *index_number,
                             format!("O2M_{}_BY_UTXO_BIRTH_PK", *index_name),
-                            false,
+                            options,
                         )
                     })
                     .collect(),
@@ -175,15 +162,80 @@ impl DbSchema {
                 utxo_birth_pk_by_index: o2o_index_number_by_name
                     .iter()
                     .map(|(index_name, index_number)| {
+                        let options: Options = db_options::get_db_options(false, None);
                         (
                             *index_number,
                             format!("O2O_UTXO_BIRTH_PK_BY_{}", *index_name),
-                            true,
+                            options,
                         )
                     })
                     .collect(),
             },
         }
+    }
+
+    pub fn get_cf_names_with_options(&self) -> Vec<(&str, Options)> {
+        let mut result = Vec::new();
+        let static_cfs = vec![
+            (META_CF, false, None),
+            (BLOCK_HASH_BY_PK_CF, false, None),
+            (BLOCK_PK_BY_HASH_CF, false, None),
+            (
+                TX_HASH_BY_PK_CF,
+                false,
+                Some(SliceTransform::create_fixed_prefix(4)),
+            ),
+            (TX_PK_BY_HASH_CF, false, None),
+            (
+                UTXO_VALUE_BY_PK_CF,
+                false,
+                Some(SliceTransform::create_fixed_prefix(6)),
+            ),
+            (
+                UTXO_PK_BY_INPUT_PK_CF,
+                false,
+                Some(SliceTransform::create_fixed_prefix(6)),
+            ),
+            (INPUT_PK_BY_UTXO_PK_CF, false, None),
+            (ASSET_BY_ASSET_PK_CF, false, None),
+            (ASSET_ID_BY_ASSET_BIRTH_PK_CF, false, None),
+            (ASSET_BIRTH_PK_BY_ASSET_ID_CF, false, None),
+            (ASSET_BIRTH_PK_RELATIONS_CF, true, None),
+        ];
+        result.extend(
+            static_cfs
+                .into_iter()
+                .map(|(cf, disable_autocompation, extractor)| {
+                    (
+                        cf,
+                        db_options::get_db_options(disable_autocompation, extractor),
+                    )
+                }),
+        );
+        // One To Many
+        for (_, index_utxo_birth_pk_with_utxo_pk, options) in
+            self.o2m_index_name_by_number.utxo_birth_pk_relations.iter()
+        {
+            result.push((index_utxo_birth_pk_with_utxo_pk.as_str(), options.clone()));
+        }
+        for (_, index_by_utxo_birth_pk, options) in
+            self.o2m_index_name_by_number.index_by_utxo_birth_pk.iter()
+        {
+            result.push((index_by_utxo_birth_pk.as_str(), options.clone()));
+        }
+        for (_, utxo_birth_pk_by_index, options) in
+            self.o2m_index_name_by_number.utxo_birth_pk_by_index.iter()
+        {
+            result.push((utxo_birth_pk_by_index.as_str(), options.clone()));
+        }
+
+        // One To One
+        for (_, utxo_birth_pk_by_index, options) in
+            self.o2o_index_name_by_number.utxo_birth_pk_by_index.iter()
+        {
+            result.push((utxo_birth_pk_by_index.as_str(), options.clone()));
+        }
+        result
     }
 }
 

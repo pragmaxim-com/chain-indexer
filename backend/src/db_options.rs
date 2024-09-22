@@ -1,10 +1,10 @@
-use rocksdb::Options;
+use rocksdb::{Options, SliceTransform};
 
-use crate::info;
-
-pub fn get_db_options() -> Options {
+pub fn get_db_options(
+    disable_autocompation: bool,
+    prefix_extractor_opt: Option<SliceTransform>,
+) -> Options {
     let num_cores = num_cpus::get() as i32;
-    info!("Number of CPU cores: {}", num_cores);
 
     let mut opts = Options::default();
     opts.create_if_missing(true);
@@ -19,7 +19,10 @@ pub fn get_db_options() -> Options {
     opts.set_target_file_size_base(256 * 1024 * 1024); // 256 MB
     opts.set_max_bytes_for_level_base(2048 * 1024 * 1024); // 2GB for compaction
     opts.set_allow_mmap_writes(true); // cannot be used together with use_direct_io_for_flush_and_compaction
-    opts.set_disable_auto_compactions(true);
+    opts.set_disable_auto_compactions(disable_autocompation);
+    if let Some(prefix_extractor) = prefix_extractor_opt {
+        opts.set_prefix_extractor(prefix_extractor);
+    }
 
     // opts.set_level_compaction_dynamic_level_bytes(true);
     // opts.set_max_subcompactions(num_cores as u32 / 2);

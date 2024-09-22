@@ -17,7 +17,7 @@ pub struct EutxoFamilies {
     pub assets_by_utxo_pk_cf: Arc<BoundColumnFamily<'static>>,
     pub asset_id_by_asset_birth_pk_cf: Arc<BoundColumnFamily<'static>>,
     pub asset_birth_pk_by_asset_id_cf: Arc<BoundColumnFamily<'static>>,
-    pub asset_birth_pk_with_asset_pk_cf: Arc<BoundColumnFamily<'static>>,
+    pub asset_birth_pk_relations_cf: Arc<BoundColumnFamily<'static>>,
 }
 
 impl CustomFamilies for EutxoFamilies {
@@ -29,7 +29,7 @@ impl CustomFamilies for EutxoFamilies {
             Arc::clone(&self.assets_by_utxo_pk_cf),
             Arc::clone(&self.asset_id_by_asset_birth_pk_cf),
             Arc::clone(&self.asset_birth_pk_by_asset_id_cf),
-            Arc::clone(&self.asset_birth_pk_with_asset_pk_cf),
+            Arc::clone(&self.asset_birth_pk_relations_cf),
         ];
 
         for (_, x) in self.o2m_utxo_birth_pk_relations_cf.iter() {

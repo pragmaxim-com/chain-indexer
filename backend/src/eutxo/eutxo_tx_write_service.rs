@@ -243,7 +243,7 @@ impl EuTxWriteService {
                     &asset_pk_bytes,
                     asset_birth_pk_by_asset_id_cache,
                     &families.custom.asset_birth_pk_by_asset_id_cf,
-                    &families.custom.asset_birth_pk_with_asset_pk_cf,
+                    &families.custom.asset_birth_pk_relations_cf,
                     &families.custom.asset_id_by_asset_birth_pk_cf,
                     db_tx,
                     batch,
@@ -374,7 +374,7 @@ impl EuTxWriteService {
         pk_bytes: &[u8; N],
         index_value: &[u8],
         birth_pk_by_index_cf: &Arc<BoundColumnFamily>,
-        birth_pk_with_pk_cf: &Arc<BoundColumnFamily>,
+        birth_pk_relations_cf: &Arc<BoundColumnFamily>,
         index_by_birth_pk_cf: &Arc<BoundColumnFamily>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         mut f: F,
@@ -387,7 +387,7 @@ impl EuTxWriteService {
         // find and remove relations if any, if there are no relations yet, it was a new index and we delete it
         let mut relations_counter = 0;
         db_tx
-            .prefix_iterator_cf(birth_pk_with_pk_cf, &birth_pk)
+            .prefix_iterator_cf(birth_pk_relations_cf, &birth_pk)
             .filter_map(|result| match result {
                 Ok((relation, _)) => {
                     relations_counter += 1;
@@ -405,7 +405,7 @@ impl EuTxWriteService {
                 relations_to_delete
                     .iter()
                     .map(|relation_to_delete| {
-                        db_tx.delete_cf(birth_pk_with_pk_cf, relation_to_delete)
+                        db_tx.delete_cf(birth_pk_relations_cf, relation_to_delete)
                     })
                     .collect::<Result<Vec<()>, rocksdb::Error>>()
             })?;
@@ -430,7 +430,7 @@ impl EuTxWriteService {
                 &asset_pk_bytes,
                 &asset_id.0,
                 &families.custom.asset_birth_pk_by_asset_id_cf,
-                &families.custom.asset_birth_pk_with_asset_pk_cf,
+                &families.custom.asset_birth_pk_relations_cf,
                 &families.custom.asset_id_by_asset_birth_pk_cf,
                 db_tx,
                 eutxo_codec_utxo::get_asset_pk_from_relation,
@@ -524,7 +524,7 @@ impl EuTxWriteService {
         pk_bytes: &[u8],
         cache: &mut LruCache<AssetId, Vec<u8>>,
         birth_pk_by_index_cf: &Arc<BoundColumnFamily>,
-        birth_pk_with_pk_cf: &Arc<BoundColumnFamily>,
+        birth_pk_relations_cf: &Arc<BoundColumnFamily>,
         index_by_birth_pk_cf: &Arc<BoundColumnFamily>,
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         batch: &mut WriteBatchWithTransaction<true>,
@@ -532,14 +532,14 @@ impl EuTxWriteService {
         if let Some(existing_birth_pk_vec) = cache.get(index_value) {
             let birth_pk_with_pk =
                 eutxo_codec_utxo::concat_birth_pk_with_pk(existing_birth_pk_vec, pk_bytes);
-            batch.put_cf(birth_pk_with_pk_cf, &birth_pk_with_pk, vec![]);
+            batch.put_cf(birth_pk_relations_cf, &birth_pk_with_pk, vec![]);
             Ok((existing_birth_pk_vec.clone(), false))
         } else if let Some(existing_birth_pk_vec) =
             db_tx.get_cf(birth_pk_by_index_cf, &index_value.0)?
         {
             let birth_pk_with_pk =
                 eutxo_codec_utxo::concat_birth_pk_with_pk(&existing_birth_pk_vec, pk_bytes);
-            batch.put_cf(birth_pk_with_pk_cf, &birth_pk_with_pk, vec![]);
+            batch.put_cf(birth_pk_relations_cf, &birth_pk_with_pk, vec![]);
             Ok((existing_birth_pk_vec, false))
         } else {
             let pk_bytes_vec = pk_bytes.to_vec();

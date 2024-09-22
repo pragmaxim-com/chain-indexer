@@ -38,7 +38,8 @@ mod tests {
             Arc::new(EuTxWriteService::new(false)),
             Arc::clone(&block_read_service),
         );
-        for height in 1..100_000 {
+
+        for height in 1..11 {
             let block_hashes = block_provider
                 .client
                 .get_block_ids_by_height_sync(BlockHeight(height))
@@ -72,10 +73,8 @@ mod tests {
             db.write(batch).unwrap();
             db_tx.commit().unwrap();
 
-            let _ = block_read_service.get_block_by_hash(&header.hash).unwrap();
-            if height % 10 == 0 {
-                println!("Height {} ", height);
-            }
+            let block = block_read_service.get_block_by_hash(&header.hash).unwrap();
+            assert_eq!(block.unwrap().header.height.0, height)
         }
     }
 }

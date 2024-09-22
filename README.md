@@ -24,6 +24,13 @@ export ERGO__API_KEY="foo"
 cargo run -- --blockchain ergo
 ```
 
+Querying currently times out during historical indexing. So use it only at the chain tip sync phase 
+or when indexing is disabled `indexer.enable = false` and we only run http server to query over existing data :
+```
+curl -X GET http://127.0.0.1:3031/blocks/123 | jq
+curl -X GET http://127.0.0.1:3031/blocks/latest | jq
+```
+
 ### Data model
 
 ```

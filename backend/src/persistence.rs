@@ -126,9 +126,9 @@ impl Persistence<EutxoFamilies> {
                             db.cf_handle(ASSET_BIRTH_PK_BY_ASSET_ID_CF).unwrap(),
                         )
                     },
-                    asset_birth_pk_with_asset_pk_cf: unsafe {
+                    asset_birth_pk_relations_cf: unsafe {
                         transmute::<_, Arc<BoundColumnFamily<'static>>>(
-                            db.cf_handle(ASSET_BIRTH_PK_WITH_ASSET_PK_CF).unwrap(),
+                            db.cf_handle(ASSET_BIRTH_PK_RELATIONS_CF).unwrap(),
                         )
                     },
                 },
