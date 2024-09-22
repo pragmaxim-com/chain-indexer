@@ -12,7 +12,7 @@ pub type BlockWeight = usize;
 pub type BatchWeight = usize;
 use serde::de::Error as DeError;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct O2mIndexValue(pub Vec<u8>);
 impl fmt::Display for O2mIndexValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -20,7 +20,17 @@ impl fmt::Display for O2mIndexValue {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
+impl Serialize for O2mIndexValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let hex_string = hex::encode(&self.0);
+        serializer.serialize_str(&hex_string)
+    }
+}
+
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct O2oIndexValue(pub Vec<u8>);
 impl fmt::Display for O2oIndexValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -28,16 +38,36 @@ impl fmt::Display for O2oIndexValue {
     }
 }
 
+impl Serialize for O2oIndexValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let hex_string = hex::encode(&self.0);
+        serializer.serialize_str(&hex_string)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct TxIndex(pub u16);
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct TxHash(pub [u8; 32]);
 impl fmt::Display for TxHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(self.0))
     }
 }
+impl Serialize for TxHash {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let hex_string = hex::encode(self.0);
+        serializer.serialize_str(&hex_string)
+    }
+}
+
 impl AsRef<[u8]> for TxHash {
     fn as_ref(&self) -> &[u8] {
         &self.0
