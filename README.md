@@ -8,10 +8,24 @@ Chain tip is "eventually consistent" due to using pointers over hashes, ie. fork
 
 Currently `Bitcoin`, `Cardano` and `Ergo` are supported.
 
+### Installation (Debian/Ubuntu)
+
+```
+sudo apt-get install rustup, gcc, g++, libclang-dev, librocksdb-dev
+```
+
 ### Usage
 
 ```
-# Bitcoin node is expected to run locally at port 8332, see config/settings.toml
+cat bitcoin.conf | grep rpc
+rpcthreads=40
+rpcworkqueue=512
+rpcuser=foo
+rpcpassword=bar
+rpcallowip=10.0.1.0/24
+rpcport=8332
+rpcbind=0.0.0.0
+
 export BITCOIN__API_USERNAME="foo"
 export BITCOIN__API_PASSWORD="bar"
 cargo run -- --blockchain bitcoin
@@ -19,7 +33,7 @@ cargo run -- --blockchain bitcoin
 # Cardano node is expected to run locally at port 1337, set socket_path at config/settings.toml
 cargo run -- --blockchain cardano
 
-# Ergo node is expected to run locally at port 9053, 
+# Ergo node is expected to run locally at port 9053
 export ERGO__API_KEY="foo"
 cargo run -- --blockchain ergo
 ```
