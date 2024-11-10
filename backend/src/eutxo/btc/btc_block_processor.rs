@@ -1,3 +1,4 @@
+use super::btc_client::BtcBlock;
 use super::btc_io_processor::BtcIoProcessor;
 use crate::api::{BlockProcessor, IoProcessor, ServiceError};
 use crate::eutxo::eutxo_model::EuTx;
@@ -32,22 +33,27 @@ impl BtcBlockProcessor {
 }
 
 impl BlockProcessor for BtcBlockProcessor {
-    type FromBlock = bitcoin::Block;
+    type FromBlock = BtcBlock;
     type IntoTx = EuTx;
 
     fn process_block(&self, block: &Self::FromBlock) -> Result<Block<Self::IntoTx>, ServiceError> {
-        let height = block.bip34_block_height()?;
         let header = BlockHeader {
-            height: (height as u32).into(),
-            timestamp: block.header.time.into(),
-            hash: block.block_hash().to_byte_array().into(),
-            prev_hash: block.header.prev_blockhash.to_byte_array().into(),
+            height: block.height,
+            timestamp: block.underlying.header.time.into(),
+            hash: block.underlying.block_hash().to_byte_array().into(),
+            prev_hash: block
+                .underlying
+                .header
+                .prev_blockhash
+                .to_byte_array()
+                .into(),
         };
 
         let mut block_weight = 0;
         Ok(Block::new(
             header,
             block
+                .underlying
                 .txdata
                 .iter()
                 .enumerate()

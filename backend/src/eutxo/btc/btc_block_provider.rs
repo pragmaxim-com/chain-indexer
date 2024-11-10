@@ -12,7 +12,9 @@ use model::{BatchWeight, Block, BlockHeader, TxCount};
 use std::{pin::Pin, sync::Arc};
 
 use super::{
-    btc_block_processor::BtcBlockProcessor, btc_client::BtcClient, btc_io_processor::BtcIoProcessor,
+    btc_block_processor::BtcBlockProcessor,
+    btc_client::{BtcBlock, BtcClient},
+    btc_io_processor::BtcIoProcessor,
 };
 
 pub struct BtcBlockProvider {
@@ -30,7 +32,7 @@ impl BtcBlockProvider {
 
     pub fn process_batch(
         &self,
-        block_batch: &[bitcoin::Block],
+        block_batch: &[BtcBlock],
         tx_count: TxCount,
     ) -> Result<(Vec<Block<EuTx>>, TxCount), ServiceError> {
         self.processor.process_batch(block_batch, tx_count)
