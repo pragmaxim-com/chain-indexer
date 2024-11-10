@@ -19,7 +19,7 @@ pub enum Blockchain {
 impl fmt::Display for Blockchain {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = match self {
-            Blockchain::Bitcoin => "citcoin",
+            Blockchain::Bitcoin => "bitcoin",
             Blockchain::Cardano => "cardano",
             Blockchain::Ergo => "ergo",
         };
