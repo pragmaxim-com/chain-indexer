@@ -11,7 +11,7 @@ Currently `Bitcoin`, `Cardano` and `Ergo` are supported.
 ### Installation (Debian/Ubuntu)
 
 ```
-sudo apt-get install rustup, gcc, g++, libclang-dev, librocksdb-dev
+sudo apt-get install rustup gcc g++ libclang-dev librocksdb-dev
 ```
 
 ### Usage
