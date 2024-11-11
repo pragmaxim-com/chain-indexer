@@ -71,6 +71,8 @@ impl BlockProvider for CardanoBlockProvider {
         &self,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
+        _fetching_par: usize,
+        processing_par: usize,
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, BatchWeight)> + Send + 'life0>> {
         let last_point = last_header.clone().map_or(Point::Origin, |h| {
             Point::new(h.timestamp.0 as u64, h.hash.0.to_vec())
@@ -121,7 +123,7 @@ impl BlockProvider for CardanoBlockProvider {
                 let processor = Arc::clone(&self.processor);
                 tokio::task::spawn_blocking(move || processor.process_block(&cbor).unwrap())
             })
-            .buffered(num_cpus::get() / 2)
+            .buffered(processing_par)
             .map(|res| match res {
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),

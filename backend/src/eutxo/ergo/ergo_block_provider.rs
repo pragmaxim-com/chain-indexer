@@ -61,6 +61,8 @@ impl BlockProvider for ErgoBlockProvider {
         &self,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
+        fetching_par: usize,
+        processing_par: usize,
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, BatchWeight)> + Send + 'life0>> {
         let best_header = self.get_chain_tip().await.unwrap();
         let last_height = last_header.map_or(1, |h| h.height.0);
@@ -77,7 +79,7 @@ impl BlockProvider for ErgoBlockProvider {
                         .unwrap()
                 })
             })
-            .buffered(num_cpus::get() / 2)
+            .buffered(fetching_par)
             .map(|res| match res {
                 Ok(block) => {
                     let processor = Arc::clone(&self.processor);
@@ -85,7 +87,7 @@ impl BlockProvider for ErgoBlockProvider {
                 }
                 Err(e) => panic!("Error: {:?}", e),
             })
-            .buffered(num_cpus::get() / 2)
+            .buffered(processing_par)
             .map(|res| match res {
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),

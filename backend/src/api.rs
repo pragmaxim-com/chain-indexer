@@ -126,6 +126,8 @@ pub trait BlockProvider {
         &self,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
+        fetching_par: usize,
+        processing_par: usize,
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block<Self::OutTx>>, BatchWeight)> + Send + 'life0>>;
 }
 

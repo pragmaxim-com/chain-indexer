@@ -3,6 +3,8 @@ db_path = "/tmp/chain-indexer"
 enable = true
 tx_batch_size = 1000
 disable_wal = false
+fetching_parallelism = "mild"   # low / mild / high
+processing_parallelism = "mild" # low / mild / high
 
 [http]
 enable = true

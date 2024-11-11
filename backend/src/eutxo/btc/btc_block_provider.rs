@@ -70,6 +70,8 @@ impl BlockProvider for BtcBlockProvider {
         &self,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
+        fetching_par: usize,
+        processing_par: usize,
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block<EuTx>>, BatchWeight)> + Send + 'life0>> {
         let best_header = self.get_best_block_header().await.unwrap();
         let last_height = last_header.map_or(0, |h| h.height.0);
@@ -83,7 +85,7 @@ impl BlockProvider for BtcBlockProvider {
                     client.get_block_by_height(height.into()).unwrap()
                 })
             })
-            .buffered(num_cpus::get() / 2)
+            .buffered(fetching_par)
             .map(|res| match res {
                 Ok(block) => {
                     let processor = Arc::clone(&self.processor);
@@ -91,7 +93,7 @@ impl BlockProvider for BtcBlockProvider {
                 }
                 Err(e) => panic!("Error: {:?}", e),
             })
-            .buffered(num_cpus::get() / 2)
+            .buffered(processing_par)
             .map(|res| match res {
                 Ok(block) => block,
                 Err(e) => panic!("Error: {:?}", e),

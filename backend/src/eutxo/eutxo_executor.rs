@@ -87,7 +87,13 @@ pub async fn run_eutxo_indexing_and_http_server(
         async {
             let mut interval = time::interval(Duration::from_secs(1));
             loop {
-                syncer.sync(tx_batch_size).await;
+                syncer
+                    .sync(
+                        tx_batch_size,
+                        indexer_conf.fetching_parallelism.to_numeric(),
+                        indexer_conf.processing_parallelism.to_numeric(),
+                    )
+                    .await;
                 interval.tick().await;
             }
         }

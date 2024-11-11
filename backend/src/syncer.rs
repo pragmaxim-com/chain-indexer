@@ -35,10 +35,15 @@ impl<CF: CustomFamilies, OutTx: Send + 'static> ChainSyncer<CF, OutTx> {
         }
     }
 
-    pub async fn sync(&self, min_batch_size: usize) {
+    pub async fn sync(&self, min_batch_size: usize, fetching_par: usize, processing_par: usize) {
         let chain_tip_header = self.block_provider.get_chain_tip().await.unwrap();
         self.block_provider
-            .stream(self.indexer.get_last_header(), min_batch_size)
+            .stream(
+                self.indexer.get_last_header(),
+                min_batch_size,
+                fetching_par,
+                processing_par,
+            )
             .await
             .for_each(|(block_batch, batch_weight)| async move {
                 let chain_link = block_batch.last().is_some_and(|curr_block| {
