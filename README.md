@@ -38,6 +38,9 @@ export ERGO__API_KEY="foo"
 cargo run -- --blockchain ergo
 ```
 
+Indexing might crash especially on laptops with Node running locally and not being synced yet.
+In that case, set `fetching_parallelism = "low"` to not put the Node and Laptop under heavy pressure.
+
 Querying currently times out during historical indexing. So use it only at the chain tip sync phase 
 or when indexing is disabled `indexer.enable = false` and we only run http server to query over existing data :
 ```
