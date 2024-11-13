@@ -4,7 +4,7 @@ Chain indexer is a universal blockchain indexing tool on top of RocksDB that gen
 
 Indexer uses tiny `block_height/tx_index/box_index` pointers over big hashes, ie. not a single hash is duplicated, which allows for much better space efficiency and for ~ `6 000 / 12 000 Inputs+Outputs+Assets per second` throughput with just quad-core and the slowest SSD, depending on `WAL` being on/off. `WAL` disabling is currently useless as [rocksdb flushing does not work](https://github.com/rust-rocksdb/rust-rocksdb/issues/900).
 
-Chain tip is "eventually consistent" due to using pointers over hashes, ie. forks get settled eventually and superseded forks are deleted from DB.
+It is also a validator, ie. blocks are applied to utxo state which gives users guarantees of correctness. Chain tip is "eventually consistent" due to using pointers over hashes, ie. forks get settled eventually and superseded forks are deleted from DB.
 
 Currently `Bitcoin`, `Cardano` and `Ergo` are supported.
 
