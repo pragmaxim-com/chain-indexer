@@ -54,7 +54,7 @@ pub async fn run_eutxo_indexing_and_http_server(
     };
 
     let disable_wal = indexer_conf.disable_wal;
-    let tx_batch_size = indexer_conf.tx_batch_size;
+    let min_batch_size = indexer_conf.min_batch_size;
     let db_shema = block_provider.get_schema();
     let db = Arc::new(eutxo_storage::get_db(&db_shema, &db_path));
 
@@ -89,7 +89,7 @@ pub async fn run_eutxo_indexing_and_http_server(
             loop {
                 syncer
                     .sync(
-                        tx_batch_size,
+                        min_batch_size,
                         indexer_conf.fetching_parallelism.to_numeric(),
                         indexer_conf.processing_parallelism.to_numeric(),
                     )

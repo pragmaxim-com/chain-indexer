@@ -57,7 +57,7 @@ pub struct AppConfig {
 pub struct IndexerSettings {
     pub enable: bool,
     pub db_path: String,
-    pub tx_batch_size: usize,
+    pub min_batch_size: usize,
     pub disable_wal: bool,
     pub fetching_parallelism: Parallelism,
     pub processing_parallelism: Parallelism,
