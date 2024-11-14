@@ -17,7 +17,7 @@ pub fn get_db_options(
     opts.set_max_write_buffer_number(6); // Limit max buffers
     opts.set_min_write_buffer_number_to_merge(2); // Merge smaller buffers
     opts.set_target_file_size_base(128 * 1024 * 1024); // Reduce SSTable size
-    opts.set_max_bytes_for_level_base(1024 * 1024 * 1024); // Reduce compaction workload
+    opts.set_max_bytes_for_level_base(512 * 1024 * 1024); // Reduce compaction workload
     opts.set_allow_mmap_writes(false);
     opts.set_use_direct_io_for_flush_and_compaction(true); // Use direct I/O for better performance
     opts.set_disable_auto_compactions(disable_autocompaction);

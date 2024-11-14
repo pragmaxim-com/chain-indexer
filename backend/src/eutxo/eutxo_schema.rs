@@ -200,15 +200,15 @@ impl DbSchema {
             (ASSET_BY_ASSET_PK_CF, false, None),
             (ASSET_ID_BY_ASSET_BIRTH_PK_CF, false, None),
             (ASSET_BIRTH_PK_BY_ASSET_ID_CF, false, None),
-            (ASSET_BIRTH_PK_RELATIONS_CF, true, None),
+            (ASSET_BIRTH_PK_RELATIONS_CF, false, None),
         ];
         result.extend(
             static_cfs
                 .into_iter()
-                .map(|(cf, disable_autocompation, extractor)| {
+                .map(|(cf, disable_autocompaction, extractor)| {
                     (
                         cf,
-                        db_options::get_db_options(disable_autocompation, extractor),
+                        db_options::get_db_options(disable_autocompaction, extractor),
                     )
                 }),
         );
