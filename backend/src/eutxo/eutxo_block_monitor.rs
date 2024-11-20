@@ -1,7 +1,7 @@
 use std::{cell::RefCell, time::Instant};
 
+use crate::model::{BatchWeight, Block};
 use crate::{api::BlockMonitor, info};
-use model::{BatchWeight, Block};
 
 use super::eutxo_model::EuTx;
 

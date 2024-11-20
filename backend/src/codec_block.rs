@@ -1,5 +1,5 @@
+use crate::model::{BlockHash, BlockHeader, BlockHeight, BlockTimestamp};
 use byteorder::{BigEndian, ByteOrder};
-use model::{BlockHash, BlockHeader, BlockHeight, BlockTimestamp};
 
 use crate::codec::{EncodeDecode, NestedEncodeDecode, StreamingContext};
 
@@ -87,7 +87,7 @@ impl NestedEncodeDecode for BlockHeader {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use model::{BlockHash, BlockHeader, BlockHeight, BlockTimestamp};
+    use crate::model::{BlockHash, BlockHeader, BlockHeight, BlockTimestamp};
 
     #[test]
     fn test_block_height_roundtrip() {

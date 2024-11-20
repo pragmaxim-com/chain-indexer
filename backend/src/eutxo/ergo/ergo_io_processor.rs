@@ -10,16 +10,14 @@ use ergo_lib::{
     wallet::box_selector::ErgoBoxAssets,
 };
 
+use crate::model::{AssetAction, AssetId, AssetValue, BoxWeight, DbIndexNumber, O2oIndexValue};
 use crate::{
     api::IoProcessor,
     eutxo::{
         eutxo_model::{EuTxInput, EuUtxo},
         eutxo_schema::DbSchema,
     },
-};
-use model::{
-    eutxo_model::DbIndexNumber, AssetAction, AssetId, AssetValue, BoxWeight, O2mIndexValue,
-    O2oIndexValue,
+    model::O2mIndexValue,
 };
 
 pub struct ErgoIoProcessor {

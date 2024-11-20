@@ -1,11 +1,11 @@
 use ergo_lib::{chain::block::FullBlock, wallet::signing::ErgoTransaction};
 
 use super::ergo_io_processor::ErgoIoProcessor;
+use crate::model::{Block, BlockHeader, TxCount, TxIndex};
 use crate::{
     api::{BlockProcessor, IoProcessor, ServiceError},
     eutxo::eutxo_model::EuTx,
 };
-use model::{Block, BlockHeader, TxCount, TxIndex};
 
 pub type OutputAddress = Vec<u8>;
 pub type OutputErgoTreeHash = Vec<u8>;

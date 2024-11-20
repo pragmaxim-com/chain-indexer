@@ -1,11 +1,11 @@
 use crate::api::{BlockProcessor, ServiceError};
+use crate::model::{BatchWeight, Block, BlockHeader};
 use crate::{
     api::BlockProvider,
     eutxo::{eutxo_model::EuTx, eutxo_schema::DbSchema},
     settings::CardanoConfig,
 };
 use min_batch::ext::MinBatchExt;
-use model::{BatchWeight, Block, BlockHeader};
 use pallas::network::miniprotocols::chainsync::NextResponse;
 use pallas::network::miniprotocols::Point;
 use std::{pin::Pin, sync::Arc};

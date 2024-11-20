@@ -2,8 +2,8 @@ use super::btc_client::BtcBlock;
 use super::btc_io_processor::BtcIoProcessor;
 use crate::api::{BlockProcessor, IoProcessor, ServiceError};
 use crate::eutxo::eutxo_model::EuTx;
+use crate::model::{AssetAction, AssetId, AssetValue, Block, BlockHeader, TxCount, TxIndex};
 use bitcoin_hashes::Hash;
-use model::{AssetAction, AssetId, AssetValue, Block, BlockHeader, TxCount, TxIndex};
 
 pub const EMPTY_VEC: Vec<(AssetId, AssetValue, AssetAction)> = Vec::new();
 

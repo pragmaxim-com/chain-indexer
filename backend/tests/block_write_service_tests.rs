@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 #[cfg(test)]
 mod tests {
-    use model::{BlockHash, BlockHeader, BlockHeight, BlockTimestamp};
     use rocksdb::{
         MultiThreaded, OptimisticTransactionDB, OptimisticTransactionOptions, WriteOptions,
     };

@@ -1,5 +1,5 @@
+use crate::model::{BlockHeight, TxHash, TxIndex, TxPk};
 use byteorder::{BigEndian, ByteOrder};
-use model::{BlockHeight, TxHash, TxIndex, TxPk};
 
 use crate::codec::{EncodeDecode, StreamingContext};
 pub type TxPkBytes = [u8; 6];

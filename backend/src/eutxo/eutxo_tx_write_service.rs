@@ -7,13 +7,12 @@ use super::{
     eutxo_model::{EuTxInput, EuUtxo, UtxoValue},
 };
 use crate::codec::EncodeDecode;
+use crate::model::{
+    AssetAction, AssetId, AssetMinted, AssetValue, Block, BlockHeight, DbIndexNumber,
+    DbIndexValueSize, O2mIndexValue, O2oIndexValue, TxHash, TxPk, UtxoPk,
+};
 use crate::{
     api::TxWriteService, codec_tx::TxPkBytes, eutxo::eutxo_model::EuTx, rocks_db_batch::Families,
-};
-use model::{
-    eutxo_model::{DbIndexNumber, DbIndexValueSize},
-    AssetAction, AssetId, AssetMinted, AssetValue, Block, BlockHeight, O2mIndexValue,
-    O2oIndexValue, TxHash, TxPk,
 };
 
 use byteorder::{BigEndian, ByteOrder};

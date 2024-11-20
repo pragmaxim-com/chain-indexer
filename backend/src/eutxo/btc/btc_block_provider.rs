@@ -1,3 +1,4 @@
+use crate::model::{BatchWeight, Block, BlockHeader, TxCount};
 use crate::{
     api::{BlockProcessor, BlockProvider, ServiceError},
     eutxo::{eutxo_model::EuTx, eutxo_schema::DbSchema},
@@ -8,7 +9,6 @@ use async_trait::async_trait;
 use futures::stream::StreamExt;
 use futures::Stream;
 use min_batch::ext::MinBatchExt;
-use model::{BatchWeight, Block, BlockHeader, TxCount};
 use std::{pin::Pin, sync::Arc};
 
 use super::{

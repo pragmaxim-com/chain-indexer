@@ -1,6 +1,6 @@
+use crate::model::{BlockHash, BlockHeight};
 use crate::{api::ServiceError, error};
 use ergo_lib::chain::block::FullBlock;
-use model::{BlockHash, BlockHeight};
 use reqwest::{
     blocking,
     header::{ACCEPT, CONTENT_TYPE},

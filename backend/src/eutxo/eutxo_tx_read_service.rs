@@ -6,14 +6,13 @@ use super::{
     eutxo_model::{EuTxInput, EuUtxo, TxHashWithIndex},
 };
 use crate::codec::EncodeDecode;
+use crate::model::{
+    AssetAction, AssetId, AssetValue, BlockHeight, DbIndexNumber, O2mIndexValue, TxHash, TxPk,
+};
 use crate::{
     api::{ServiceError, TxReadService},
     eutxo::eutxo_model::EuTx,
     persistence::Persistence,
-};
-use model::{
-    eutxo_model::DbIndexNumber, AssetAction, AssetId, AssetValue, BlockHeight, O2mIndexValue,
-    TxHash, TxPk,
 };
 pub struct EuTxReadService {
     pub(crate) storage: Arc<Persistence<EutxoFamilies>>,

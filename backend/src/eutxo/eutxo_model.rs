@@ -1,13 +1,12 @@
 use derive_more::{AsRef, Display, From, Into};
 
-use model::{
-    eutxo_model::DbIndexNumber, AssetAction, AssetId, AssetValue, O2mIndexValue, O2oIndexValue,
-    TxHash, TxIndex,
+use crate::model::{
+    AssetAction, AssetId, AssetValue, DbIndexNumber, O2mIndexValue, O2oIndexValue, TxHash, TxIndex,
 };
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
-pub struct InputIndex(u16);
+pub struct InputIndex(pub u16);
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct UtxoValue(pub u64);

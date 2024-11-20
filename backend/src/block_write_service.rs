@@ -1,5 +1,6 @@
 use crate::codec::EncodeDecode;
 use crate::codec_tx::TxPkBytes;
+use crate::model::{AssetId, Block, BlockHeader, O2mIndexValue, O2oIndexValue, TxHash};
 use crate::{
     api::{ServiceError, TxWriteService},
     block_read_service::BlockReadService,
@@ -8,7 +9,6 @@ use crate::{
     rocks_db_batch::{CustomFamilies, Families},
 };
 use lru::LruCache;
-use model::{AssetId, Block, BlockHeader, O2mIndexValue, O2oIndexValue, TxHash};
 use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction};
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};

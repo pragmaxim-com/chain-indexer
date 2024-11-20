@@ -1,5 +1,3 @@
-pub mod eutxo_model;
-
 use chrono::DateTime;
 use core::fmt;
 use derive_more::{AsRef, Display, From, Into};
@@ -11,6 +9,13 @@ pub type BoxWeight = usize;
 pub type BlockWeight = usize;
 pub type BatchWeight = usize;
 use serde::de::Error as DeError;
+
+use crate::eutxo::eutxo_model::UtxoIndex;
+
+pub type DbIndexNumber = u8;
+pub type DbIndexValueSize = u16;
+pub type DbIndexName = String;
+pub type DbIndexEnabled = bool;
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct O2mIndexValue(pub Vec<u8>);
@@ -59,6 +64,22 @@ pub struct TxPk {
 impl fmt::Display for TxPk {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.block_height, self.tx_index)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, AsRef, Into, From)]
+pub struct UtxoPk {
+    pub block_height: BlockHeight,
+    pub tx_index: TxIndex,
+    pub utxo_index: UtxoIndex,
+}
+impl fmt::Display for UtxoPk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}",
+            self.block_height, self.tx_index, self.utxo_index
+        )
     }
 }
 

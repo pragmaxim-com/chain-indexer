@@ -1,12 +1,13 @@
 use crate::codec::EncodeDecode;
+use crate::model::BlockHeader;
 use crate::{
     api::{ServiceError, TxReadService},
     info,
+    model::{Block, BlockHash, BlockHeight},
     persistence::Persistence,
     rocks_db_batch::CustomFamilies,
 };
 use lru::LruCache;
-use model::{Block, BlockHash, BlockHeader, BlockHeight};
 use rocksdb::IteratorMode;
 use std::{
     num::NonZeroUsize,

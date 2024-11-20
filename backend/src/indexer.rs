@@ -1,5 +1,4 @@
-use model::Block;
-use model::BlockHeader;
+use crate::model::{Block, BlockHeader};
 use rocksdb::MultiThreaded;
 use rocksdb::OptimisticTransactionDB;
 use rocksdb::OptimisticTransactionOptions;

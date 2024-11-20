@@ -1,11 +1,13 @@
 use indexmap::IndexMap;
-use model::eutxo_model::{DbIndexEnabled, DbIndexName, DbIndexNumber};
 use rocksdb::{Options, SliceTransform};
 use serde::Deserialize;
 
 use std::{collections::HashMap, fs, mem::size_of};
 
-use crate::db_options;
+use crate::{
+    db_options,
+    model::{DbIndexEnabled, DbIndexName, DbIndexNumber},
+};
 
 use super::eutxo_codec_utxo::UtxoBirthPkBytes;
 

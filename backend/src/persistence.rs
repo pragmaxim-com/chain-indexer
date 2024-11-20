@@ -1,9 +1,9 @@
-use model::eutxo_model::DbIndexNumber;
 use rocksdb::{BoundColumnFamily, MultiThreaded, OptimisticTransactionDB};
 use std::{collections::HashMap, mem::transmute, sync::Arc};
 
 use crate::{
     eutxo::{eutxo_families::EutxoFamilies, eutxo_schema::*},
+    model::DbIndexNumber,
     rocks_db_batch::{CustomFamilies, Families, SharedFamilies},
 };
 

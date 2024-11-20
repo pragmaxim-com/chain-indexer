@@ -8,6 +8,7 @@ pub mod codec_tx;
 pub mod db_options;
 pub mod eutxo;
 pub mod http;
+pub mod model;
 pub mod http_server;
 pub mod indexer;
 pub mod logger;

@@ -1,10 +1,10 @@
 use crate::api::IoProcessor;
 use crate::eutxo::eutxo_model::{EuTxInput, EuUtxo, TxHashWithIndex};
 use crate::eutxo::eutxo_schema::DbSchema;
+use crate::model::{AssetAction, AssetId, AssetValue, BoxWeight, O2mIndexValue};
 use bitcoin::{Address, Network};
 use bitcoin_hashes::sha256;
 use bitcoin_hashes::Hash;
-use model::{AssetAction, AssetId, AssetValue, BoxWeight, O2mIndexValue};
 
 pub const EMPTY_ASSETS_VEC: Vec<(AssetId, AssetValue, AssetAction)> = Vec::new();
 

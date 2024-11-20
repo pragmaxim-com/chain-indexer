@@ -5,9 +5,8 @@ use byteorder::{BigEndian, ByteOrder};
 use crate::codec_tx::TxPkBytes;
 
 use super::eutxo_model::{UtxoIndex, UtxoValue};
-use model::{
-    eutxo_model::DbIndexNumber, AssetAction, AssetIndex, AssetValue, BlockHeight, O2oIndexValue,
-    TxIndex,
+use crate::model::{
+    AssetAction, AssetIndex, AssetValue, BlockHeight, DbIndexNumber, O2oIndexValue, TxIndex,
 };
 
 pub type UtxoValueWithIndexes = Vec<u8>;

@@ -1,11 +1,11 @@
 use pallas::ledger::traverse::MultiEraBlock;
 
 use super::{cardano_client::CBOR, cardano_io_processor::CardanoIoProcessor};
+use crate::model::{AssetId, AssetValue, Block, BlockHash, BlockHeader, TxCount, TxIndex};
 use crate::{
     api::{BlockProcessor, IoProcessor, ServiceError},
     eutxo::eutxo_model::EuTx,
 };
-use model::{AssetId, AssetValue, Block, BlockHash, BlockHeader, TxCount, TxIndex};
 
 pub const EMPTY_ASSETS_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
 

@@ -1,5 +1,9 @@
 use std::{fmt, pin::Pin};
 
+use crate::model::{
+    AssetId, BatchWeight, Block, BlockHeader, BlockHeight, BoxWeight, O2mIndexValue, O2oIndexValue,
+    TxCount, TxHash,
+};
 use crate::{
     codec_tx::TxPkBytes,
     eutxo::{eutxo_codec_utxo::UtxoPkBytes, eutxo_schema::DbSchema},
@@ -11,10 +15,6 @@ use bitcoin::block::Bip34Error;
 use futures::Stream;
 use hex::FromHexError;
 use lru::LruCache;
-use model::{
-    AssetId, BatchWeight, Block, BlockHeader, BlockHeight, BoxWeight, O2mIndexValue, O2oIndexValue,
-    TxCount, TxHash,
-};
 use pallas::network::miniprotocols;
 use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction};
 use serde::{Deserialize, Serialize};

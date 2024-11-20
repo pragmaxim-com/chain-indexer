@@ -1,3 +1,4 @@
+use crate::model::{AssetAction, AssetId, AssetValue, BoxWeight, O2mIndexValue};
 use crate::{
     api::IoProcessor,
     eutxo::{
@@ -5,7 +6,6 @@ use crate::{
         eutxo_schema::DbSchema,
     },
 };
-use model::{AssetAction, AssetId, AssetValue, BoxWeight, O2mIndexValue};
 use pallas::{
     codec::minicbor::{Encode, Encoder},
     ledger::traverse::{MultiEraInput, MultiEraOutput},

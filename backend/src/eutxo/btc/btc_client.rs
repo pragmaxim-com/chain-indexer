@@ -1,7 +1,7 @@
+use crate::model::{BlockHash, BlockHeight};
 use crate::{api::ServiceError, settings::BitcoinConfig};
 use bitcoin_hashes::Hash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
-use model::{BlockHash, BlockHeight};
 use std::sync::Arc;
 
 // Bitcoin block wrapper

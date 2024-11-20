@@ -1,9 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
-use model::eutxo_model::DbIndexNumber;
 use rocksdb::BoundColumnFamily;
 
-use crate::rocks_db_batch::CustomFamilies;
+use crate::{model::DbIndexNumber, rocks_db_batch::CustomFamilies};
 
 #[derive(Clone)]
 pub struct EutxoFamilies {

@@ -6,13 +6,13 @@ use futures::Stream;
 use min_batch::ext::MinBatchExt;
 use reqwest::Url;
 
+use crate::model::{BatchWeight, Block, BlockHeader};
 use crate::{
     api::{BlockProcessor, BlockProvider, ServiceError},
     eutxo::{eutxo_model::EuTx, eutxo_schema::DbSchema},
     info,
     settings::ErgoConfig,
 };
-use model::{BatchWeight, Block, BlockHeader};
 
 use super::{
     ergo_block_processor::ErgoBlockProcessor, ergo_client::ErgoClient,
