@@ -6,16 +6,14 @@ use super::{
     eutxo_families::EutxoFamilies,
     eutxo_model::{EuTxInput, EuUtxo, UtxoValue},
 };
+use crate::codec::EncodeDecode;
 use crate::{
-    api::TxWriteService,
-    codec_tx::{self, TxPkBytes},
-    eutxo::eutxo_model::EuTx,
-    rocks_db_batch::Families,
+    api::TxWriteService, codec_tx::TxPkBytes, eutxo::eutxo_model::EuTx, rocks_db_batch::Families,
 };
 use model::{
     eutxo_model::{DbIndexNumber, DbIndexValueSize},
     AssetAction, AssetId, AssetMinted, AssetValue, Block, BlockHeight, O2mIndexValue,
-    O2oIndexValue, TxHash,
+    O2oIndexValue, TxHash, TxPk,
 };
 
 use byteorder::{BigEndian, ByteOrder};
@@ -609,7 +607,11 @@ impl TxWriteService for EuTxWriteService {
         tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
         families: &Families<EutxoFamilies>,
     ) -> Result<(), rocksdb::Error> {
-        let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
+        let tx_pk_bytes: [u8; 6] = TxPk {
+            block_height: *block_height,
+            tx_index: tx.tx_index,
+        }
+        .encode_to_array();
         batch.put_cf(&families.shared.tx_hash_by_pk_cf, tx_pk_bytes, tx.tx_hash);
         db_tx.put_cf(&families.shared.tx_pk_by_hash_cf, tx.tx_hash, tx_pk_bytes)?;
         tx_pk_by_tx_hash_cache.put(tx.tx_hash, tx_pk_bytes);
@@ -625,8 +627,11 @@ impl TxWriteService for EuTxWriteService {
         utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
         families: &Families<EutxoFamilies>,
     ) -> Result<(), rocksdb::Error> {
-        let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, &tx.tx_index);
-
+        let tx_pk_bytes: [u8; 6] = TxPk {
+            block_height: *block_height,
+            tx_index: tx.tx_index,
+        }
+        .encode_to_array();
         if self.perist_coinbase_inputs {
             self.remove_inputs(
                 block_height,

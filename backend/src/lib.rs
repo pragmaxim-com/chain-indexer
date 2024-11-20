@@ -2,6 +2,7 @@ pub mod api;
 pub mod block_read_service;
 pub mod block_write_service;
 pub mod cli;
+pub mod codec;
 pub mod codec_block;
 pub mod codec_tx;
 pub mod db_options;

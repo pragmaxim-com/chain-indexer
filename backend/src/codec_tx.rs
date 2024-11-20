@@ -1,31 +1,62 @@
 use byteorder::{BigEndian, ByteOrder};
-use model::{BlockHeight, TxHash, TxIndex};
+use model::{BlockHeight, TxHash, TxIndex, TxPk};
 
+use crate::codec::{EncodeDecode, StreamingContext};
 pub type TxPkBytes = [u8; 6];
 
-pub fn tx_pk_bytes(block_height: &BlockHeight, tx_index: &TxIndex) -> TxPkBytes {
-    let mut bytes: TxPkBytes = [0u8; 6];
-    BigEndian::write_u32(&mut bytes[0..4], block_height.0);
-    BigEndian::write_u16(&mut bytes[4..6], tx_index.0);
-    bytes
+impl EncodeDecode for TxPk {
+    fn encode_internal(&self, buffer: &mut [u8], context: &mut StreamingContext) {
+        self.block_height.encode_internal(buffer, context);
+        self.tx_index.encode_internal(buffer, context);
+    }
+
+    fn decode_internal(bytes: &[u8], context: &mut StreamingContext) -> Self {
+        let block_height = BlockHeight::decode_internal(bytes, context);
+        let tx_index = TxIndex::decode_internal(bytes, context);
+
+        TxPk {
+            block_height,
+            tx_index,
+        }
+    }
+
+    fn size() -> usize {
+        BlockHeight::size() + TxIndex::size()
+    }
 }
 
-pub fn pk_bytes_to_pk(bytes: TxPkBytes) -> (BlockHeight, TxIndex) {
-    let block_height: BlockHeight = BigEndian::read_u32(&bytes[0..4]).into();
-    let tx_index: TxIndex = BigEndian::read_u16(&bytes[4..6]).into();
-    (block_height, tx_index)
-}
-pub fn pk_bytes_to_tx_index(bytes: &[u8]) -> TxIndex {
-    assert_eq!(bytes.len(), 6, "pk bytes must be 6 bytes long");
-    BigEndian::read_u16(&bytes[4..6]).into()
+impl EncodeDecode for TxIndex {
+    fn encode_internal(&self, buffer: &mut [u8], context: &mut StreamingContext) {
+        let slice = context.next_slice_mut(buffer, Self::size());
+        BigEndian::write_u16(slice, self.0);
+    }
+
+    fn decode_internal(bytes: &[u8], context: &mut StreamingContext) -> Self {
+        let slice = context.next_slice(bytes, Self::size());
+        TxIndex(BigEndian::read_u16(slice))
+    }
+
+    fn size() -> usize {
+        2
+    }
 }
 
-pub fn hash_bytes_to_tx_hash(bytes: &[u8]) -> TxHash {
-    assert_eq!(bytes.len(), 32, "tx hash bytes must be 32 bytes long");
-    assert_eq!(bytes.len(), 32, "Block hash bytes must be 32 bytes long");
-    let mut hash: [u8; 32] = [0u8; 32];
-    hash.copy_from_slice(bytes);
-    hash.into()
+impl EncodeDecode for TxHash {
+    fn encode_internal(&self, buffer: &mut [u8], context: &mut StreamingContext) {
+        let slice = context.next_slice_mut(buffer, Self::size());
+        slice.copy_from_slice(&self.0);
+    }
+
+    fn decode_internal(bytes: &[u8], context: &mut StreamingContext) -> Self {
+        let slice = context.next_slice(bytes, Self::size());
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(slice);
+        TxHash(hash)
+    }
+
+    fn size() -> usize {
+        32
+    }
 }
 
 #[cfg(test)]
@@ -33,12 +64,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_round_trip_conversion() {
-        let block_height: BlockHeight = 123456.into();
-        let tx_index: TxIndex = 7890.into();
-        let encoded: TxPkBytes = tx_pk_bytes(&block_height, &tx_index);
-        let (h, ti) = pk_bytes_to_pk(encoded);
-        assert_eq!(block_height, h);
-        assert_eq!(tx_index, ti);
+    fn test_tx_index_roundtrip() {
+        let original = TxIndex(12345);
+        let encoded = original.encode();
+        let decoded = TxIndex::decode(&encoded);
+        assert_eq!(original, decoded);
+    }
+
+    #[test]
+    fn test_tx_hash_roundtrip() {
+        let original = TxHash([3u8; 32]);
+        let encoded = original.encode();
+        let decoded = TxHash::decode(&encoded);
+        assert_eq!(original, decoded);
+    }
+    #[test]
+    fn test_tx_pk_roundtrip() {
+        let original = TxPk {
+            block_height: BlockHeight(42),
+            tx_index: TxIndex(12345),
+        };
+        let encoded = original.encode();
+        let decoded = TxPk::decode(&encoded);
+        assert_eq!(original, decoded);
     }
 }

@@ -5,17 +5,15 @@ use super::{
     eutxo_families::EutxoFamilies,
     eutxo_model::{EuTxInput, EuUtxo, TxHashWithIndex},
 };
+use crate::codec::EncodeDecode;
 use crate::{
     api::{ServiceError, TxReadService},
-    codec_block,
-    codec_tx::{self},
     eutxo::eutxo_model::EuTx,
     persistence::Persistence,
 };
-
 use model::{
     eutxo_model::DbIndexNumber, AssetAction, AssetId, AssetValue, BlockHeight, O2mIndexValue,
-    TxHash, TxIndex,
+    TxHash, TxPk,
 };
 pub struct EuTxReadService {
     pub(crate) storage: Arc<Persistence<EutxoFamilies>>,
@@ -73,17 +71,12 @@ impl EuTxReadService {
             .collect::<Result<Vec<(DbIndexNumber, O2mIndexValue)>, rocksdb::Error>>()
     }
 
-    fn get_outputs(
-        &self,
-        block_height: &BlockHeight,
-        tx_index: &TxIndex,
-    ) -> Result<Vec<EuUtxo>, rocksdb::Error> {
-        let tx_pk_bytes = codec_tx::tx_pk_bytes(block_height, tx_index);
+    fn get_outputs(&self, tx_pk: &TxPk) -> Result<Vec<EuUtxo>, rocksdb::Error> {
         self.storage
             .db
             .prefix_iterator_cf(
                 &self.storage.families.custom.utxo_value_by_pk_cf,
-                tx_pk_bytes,
+                tx_pk.encode(),
             )
             .map(|result| {
                 result.and_then(|(utxo_pk, utxo_value_bytes)| {
@@ -110,12 +103,8 @@ impl EuTxReadService {
             .collect()
     }
 
-    fn get_tx_inputs(
-        &self,
-        block_height: &BlockHeight,
-        tx_index: &TxIndex,
-    ) -> Result<Vec<EuTxInput>, rocksdb::Error> {
-        let pk_bytes = codec_tx::tx_pk_bytes(block_height, tx_index);
+    fn get_tx_inputs(&self, tx_pk: &TxPk) -> Result<Vec<EuTxInput>, rocksdb::Error> {
+        let pk_bytes = tx_pk.encode();
         self.storage
             .db
             .prefix_iterator_cf(
@@ -131,7 +120,7 @@ impl EuTxReadService {
                         .db
                         .get_cf(&self.storage.families.shared.tx_hash_by_pk_cf, tx_pk)?
                         .unwrap();
-                    let tx_hash = codec_tx::hash_bytes_to_tx_hash(&tx_hash_bytes);
+                    let tx_hash = TxHash::decode(&tx_hash_bytes);
                     Ok(EuTxInput::TxHashInput(TxHashWithIndex {
                         // TODO we are not returning OutputIndexInput here
                         tx_hash,
@@ -148,20 +137,20 @@ impl TxReadService for EuTxReadService {
     type Tx = EuTx;
 
     fn get_txs_by_height(&self, block_height: &BlockHeight) -> Result<Vec<EuTx>, ServiceError> {
-        let height_bytes = codec_block::block_height_to_bytes(block_height);
+        let height_bytes = block_height.encode();
         self.storage
             .db
             .prefix_iterator_cf(&self.storage.families.shared.tx_hash_by_pk_cf, height_bytes)
             .map(|result| {
                 result
-                    .and_then(|(tx_pk, tx_hash)| {
-                        let tx_index = codec_tx::pk_bytes_to_tx_index(&tx_pk);
-                        let tx_hash: TxHash = codec_tx::hash_bytes_to_tx_hash(&tx_hash);
-                        let tx_outputs = self.get_outputs(block_height, &tx_index)?;
-                        let tx_inputs = self.get_tx_inputs(block_height, &tx_index)?;
+                    .and_then(|(tx_pk_bytes, tx_hash_bytes)| {
+                        let tx_pk = TxPk::decode(&tx_pk_bytes);
+                        let tx_hash = TxHash::decode(&tx_hash_bytes);
+                        let tx_outputs = self.get_outputs(&tx_pk)?;
+                        let tx_inputs = self.get_tx_inputs(&tx_pk)?;
                         Ok(EuTx {
                             tx_hash,
-                            tx_index,
+                            tx_index: tx_pk.tx_index,
                             tx_inputs,
                             tx_outputs,
                         })

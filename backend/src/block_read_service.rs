@@ -1,6 +1,7 @@
+use crate::codec::EncodeDecode;
 use crate::{
     api::{ServiceError, TxReadService},
-    codec_block, info,
+    info,
     persistence::Persistence,
     rocks_db_batch::CustomFamilies,
 };
@@ -73,7 +74,7 @@ impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
                 result
                     .map_err(|err| ServiceError::new(&err.to_string()))
                     .and_then(|(_, hash_bytes)| {
-                        let block_hash = codec_block::bytes_to_block_hash(&hash_bytes);
+                        let block_hash = BlockHash::decode(&hash_bytes);
                         self.get_block_by_hash(&block_hash)
                     })
             })
@@ -87,12 +88,12 @@ impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
         &self,
         block_height: BlockHeight,
     ) -> Result<Option<Arc<Block<Tx>>>, ServiceError> {
-        let height_bytes = codec_block::block_height_to_bytes(&block_height);
+        let height_bytes = block_height.encode();
         let hash_bytes = self.storage.db.get_cf(
             &self.storage.families.shared.block_hash_by_pk_cf,
-            height_bytes,
+            &height_bytes,
         )?;
-        if let Some(hash) = hash_bytes.map(|bytes| codec_block::bytes_to_block_hash(&bytes)) {
+        if let Some(hash) = hash_bytes.map(|bytes| BlockHash::decode(&bytes)) {
             self.get_block_by_hash(&hash)
         } else {
             Ok(None)
@@ -105,8 +106,8 @@ impl<Tx, CF: CustomFamilies> BlockReadService<Tx, CF> {
     ) -> Result<Option<BlockHeader>, ServiceError> {
         let header_bytes = self.storage.db.get_cf(
             &self.storage.families.shared.block_header_by_hash_cf,
-            block_hash,
+            &block_hash.0,
         )?;
-        Ok(header_bytes.map(|bytes| codec_block::bytes_to_block_header(&bytes)))
+        Ok(header_bytes.map(|bytes| BlockHeader::decode(&bytes)))
     }
 }

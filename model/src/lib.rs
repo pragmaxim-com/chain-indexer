@@ -51,6 +51,17 @@ impl Serialize for O2oIndexValue {
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Display)]
 pub struct TxIndex(pub u16);
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, AsRef, Into, From)]
+pub struct TxPk {
+    pub block_height: BlockHeight,
+    pub tx_index: TxIndex,
+}
+impl fmt::Display for TxPk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.block_height, self.tx_index)
+    }
+}
+
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, AsRef, Into, From, Hash)]
 pub struct TxHash(pub [u8; 32]);
 impl fmt::Display for TxHash {

@@ -1,8 +1,8 @@
+use crate::codec::EncodeDecode;
+use crate::codec_tx::TxPkBytes;
 use crate::{
     api::{ServiceError, TxWriteService},
     block_read_service::BlockReadService,
-    codec_block,
-    codec_tx::TxPkBytes,
     eutxo::eutxo_codec_utxo::UtxoPkBytes,
     info,
     rocks_db_batch::{CustomFamilies, Families},
@@ -159,6 +159,7 @@ impl<Tx, CF: CustomFamilies> BlockWriteService<Tx, CF> {
 
         removed_blocks
     }
+
     pub(crate) fn persist_header(
         &self,
         block_header: &BlockHeader,
@@ -166,18 +167,18 @@ impl<Tx, CF: CustomFamilies> BlockWriteService<Tx, CF> {
         batch: &mut WriteBatchWithTransaction<true>,
         families: &Families<CF>,
     ) -> Result<(), rocksdb::Error> {
-        let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
+        let height_bytes = block_header.height.encode();
+        let header_bytes = block_header.encode();
 
-        let header_bytes = codec_block::block_header_to_bytes(block_header);
         batch.put_cf(
             &families.shared.block_hash_by_pk_cf,
-            height_bytes,
-            block_header.hash.0,
+            &height_bytes,
+            &block_header.hash.0,
         );
         db_tx.put_cf(
             &families.shared.block_header_by_hash_cf,
-            block_header.hash.0,
-            header_bytes,
+            &block_header.hash.0,
+            &header_bytes,
         )?;
 
         Ok(())
@@ -189,13 +190,12 @@ impl<Tx, CF: CustomFamilies> BlockWriteService<Tx, CF> {
         db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
         families: &Families<CF>,
     ) -> Result<(), ServiceError> {
-        let height_bytes = codec_block::block_height_to_bytes(&block_header.height);
+        let height_bytes = block_header.height.encode();
 
-        db_tx.delete_cf(&families.shared.block_hash_by_pk_cf, height_bytes)?;
-
+        db_tx.delete_cf(&families.shared.block_hash_by_pk_cf, &height_bytes)?;
         db_tx.delete_cf(
             &families.shared.block_header_by_hash_cf,
-            block_header.hash.0,
+            &block_header.hash.0,
         )?;
 
         Ok(())

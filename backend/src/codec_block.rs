@@ -1,111 +1,128 @@
 use byteorder::{BigEndian, ByteOrder};
 use model::{BlockHash, BlockHeader, BlockHeight, BlockTimestamp};
 
-type BlockHeightBytes = [u8; 4];
-type BlockHeaderBytes = [u8; 72];
+use crate::codec::{EncodeDecode, NestedEncodeDecode, StreamingContext};
 
-pub fn block_header_to_bytes(block_header: &BlockHeader) -> BlockHeaderBytes {
-    let mut bytes = [0u8; 72];
-    BigEndian::write_u32(&mut bytes[0..4], block_header.height.0);
-    BigEndian::write_u32(&mut bytes[4..8], block_header.timestamp.0);
-    bytes[8..40].copy_from_slice(&block_header.hash.0);
-    bytes[40..72].copy_from_slice(&block_header.prev_hash.0);
-    bytes
-}
+// Implementation for simple types
+impl EncodeDecode for BlockHeight {
+    fn encode_internal(&self, buffer: &mut [u8], context: &mut StreamingContext) {
+        let slice = context.next_slice_mut(buffer, Self::size());
+        BigEndian::write_u32(slice, self.0);
+    }
 
-pub fn bytes_to_block_header(header_bytes: &[u8]) -> BlockHeader {
-    assert_eq!(header_bytes.len(), 72, "header slice must be 40 bytes long");
+    fn decode_internal(bytes: &[u8], context: &mut StreamingContext) -> Self {
+        let slice = context.next_slice(bytes, Self::size());
+        BlockHeight(BigEndian::read_u32(slice))
+    }
 
-    let height: BlockHeight = BigEndian::read_u32(&header_bytes[0..4]).into();
-    let timestamp: BlockTimestamp = BigEndian::read_u32(&header_bytes[4..8]).into();
-
-    let mut hash = [0u8; 32];
-    hash.copy_from_slice(&header_bytes[8..40]);
-
-    let mut prev_hash = [0u8; 32];
-    prev_hash.copy_from_slice(&header_bytes[40..72]);
-
-    BlockHeader {
-        height,
-        timestamp,
-        hash: hash.into(),
-        prev_hash: prev_hash.into(),
+    fn size() -> usize {
+        4
     }
 }
 
-pub fn block_height_to_bytes(block_height: &BlockHeight) -> BlockHeightBytes {
-    let mut bytes = [0u8; 4];
-    BigEndian::write_u32(&mut bytes, block_height.0);
-    bytes
+impl EncodeDecode for BlockTimestamp {
+    fn encode_internal(&self, buffer: &mut [u8], context: &mut StreamingContext) {
+        let slice = context.next_slice_mut(buffer, Self::size());
+        BigEndian::write_u32(slice, self.0);
+    }
+
+    fn decode_internal(bytes: &[u8], context: &mut StreamingContext) -> Self {
+        let slice = context.next_slice(bytes, Self::size());
+        BlockTimestamp(BigEndian::read_u32(slice))
+    }
+
+    fn size() -> usize {
+        4
+    }
 }
 
-pub fn bytes_to_block_height(block_height_bytes: &[u8]) -> BlockHeight {
-    assert_eq!(
-        block_height_bytes.len(),
-        4,
-        "block height must be 4 bytes long"
-    );
-    BigEndian::read_u32(&block_height_bytes[0..4]).into()
+impl EncodeDecode for BlockHash {
+    fn encode_internal(&self, buffer: &mut [u8], context: &mut StreamingContext) {
+        let slice = context.next_slice_mut(buffer, Self::size());
+        slice.copy_from_slice(&self.0);
+    }
+
+    fn decode_internal(bytes: &[u8], context: &mut StreamingContext) -> Self {
+        let slice = context.next_slice(bytes, Self::size());
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(slice);
+        BlockHash(hash)
+    }
+
+    fn size() -> usize {
+        32
+    }
 }
 
-pub fn bytes_to_block_hash(block_hash_bytes: &[u8]) -> BlockHash {
-    assert_eq!(
-        block_hash_bytes.len(),
-        32,
-        "Block hash bytes must be 32 bytes long"
-    );
-    let mut hash: [u8; 32] = [0u8; 32];
-    hash.copy_from_slice(block_hash_bytes);
-    hash.into()
+// Implementation for nested type BlockHeader
+impl EncodeDecode for BlockHeader {
+    fn encode_internal(&self, buffer: &mut [u8], context: &mut StreamingContext) {
+        self.height.encode_internal(buffer, context);
+        self.timestamp.encode_internal(buffer, context);
+        self.hash.encode_internal(buffer, context);
+        self.prev_hash.encode_internal(buffer, context);
+    }
+
+    fn decode_internal(bytes: &[u8], context: &mut StreamingContext) -> Self {
+        let height = BlockHeight::decode_internal(bytes, context);
+        let timestamp = BlockTimestamp::decode_internal(bytes, context);
+        let hash = BlockHash::decode_internal(bytes, context);
+        let prev_hash = BlockHash::decode_internal(bytes, context);
+
+        BlockHeader {
+            height,
+            timestamp,
+            hash,
+            prev_hash,
+        }
+    }
+
+    fn size() -> usize {
+        BlockHeight::size() + BlockTimestamp::size() + 2 * BlockHash::size()
+    }
 }
+
+impl NestedEncodeDecode for BlockHeader {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use model::{BlockHash, BlockHeader, BlockHeight, BlockTimestamp};
 
     #[test]
-    fn block_height_to_bytesround_trip() {
-        let block_height = 123456;
-        let encoded = block_height_to_bytes(&block_height.into());
-        let decoded = bytes_to_block_height(&encoded);
-        assert_eq!(block_height, decoded.0);
+    fn test_block_height_roundtrip() {
+        let original = BlockHeight(42);
+        let encoded = original.encode();
+        let decoded = BlockHeight::decode(&encoded);
+        assert_eq!(original, decoded);
     }
 
     #[test]
-    fn vector_to_block_height_round_trip() {
-        let block_height = 654321;
-        let encoded = block_height_to_bytes(&block_height.into()).to_vec();
-        let decoded = bytes_to_block_height(&encoded);
-        assert_eq!(block_height, decoded.0);
+    fn test_block_timestamp_roundtrip() {
+        let original = BlockTimestamp(1629394872);
+        let encoded = original.encode();
+        let decoded = BlockTimestamp::decode(&encoded);
+        assert_eq!(original, decoded);
     }
 
     #[test]
-    fn vector_to_block_hash_round_trip() {
-        let block_hash: BlockHash = [
-            0u8, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-            24, 25, 26, 27, 28, 29, 30, 31,
-        ]
-        .into();
-        let encoded: Vec<u8> = block_hash.0.to_vec();
-        let decoded = bytes_to_block_hash(&encoded);
-        assert_eq!(block_hash, decoded);
+    fn test_block_hash_roundtrip() {
+        let original = BlockHash([1u8; 32]);
+        let encoded = original.encode();
+        let decoded = BlockHash::decode(&encoded);
+        assert_eq!(original, decoded);
     }
 
     #[test]
     fn test_block_header_roundtrip() {
-        let original_block_header = BlockHeader {
-            height: 42.into(),
-            timestamp: 1625156400.into(),
-            hash: [0xaa; 32].into(),
-            prev_hash: [0xbb; 32].into(),
+        let original = BlockHeader {
+            height: BlockHeight(42),
+            timestamp: BlockTimestamp(1629394872),
+            hash: BlockHash([1u8; 32]),
+            prev_hash: BlockHash([2u8; 32]),
         };
-
-        // Convert to bytes
-        let bytes = block_header_to_bytes(&original_block_header);
-
-        // Convert back to BlockHeader
-        let decoded_block_header = bytes_to_block_header(&bytes);
-
-        assert_eq!(decoded_block_header, original_block_header);
+        let encoded = original.encode();
+        let decoded = BlockHeader::decode(&encoded);
+        assert_eq!(original, decoded);
     }
 }

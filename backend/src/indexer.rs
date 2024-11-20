@@ -8,11 +8,10 @@ use rocksdb::WriteOptions;
 use crate::api::BlockProvider;
 use crate::api::ServiceError;
 use crate::block_write_service::BlockWriteService;
-use crate::codec_block;
+use crate::codec::EncodeDecode;
 use crate::info;
 use crate::persistence::Persistence;
 use crate::rocks_db_batch::CustomFamilies;
-
 use std::sync::Arc;
 
 pub const LAST_HEADER_KEY: &[u8] = b"last_header";
@@ -47,7 +46,7 @@ impl<CF: CustomFamilies, OutTx: Send> Indexer<CF, OutTx> {
         db_tx.put_cf(
             &self.storage.families.shared.meta_cf,
             LAST_HEADER_KEY,
-            codec_block::block_header_to_bytes(header),
+            header.encode(),
         )?;
         Ok(())
     }
@@ -57,7 +56,7 @@ impl<CF: CustomFamilies, OutTx: Send> Indexer<CF, OutTx> {
             .db
             .get_cf(&self.storage.families.shared.meta_cf, LAST_HEADER_KEY)
             .unwrap()
-            .map(|header_bytes| codec_block::bytes_to_block_header(&header_bytes))
+            .map(|header_bytes| BlockHeader::decode(&header_bytes))
     }
 
     fn chain_link(
