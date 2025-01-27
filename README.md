@@ -1,10 +1,13 @@
 ## Chain Indexer
 
-Chain indexer is a universal blockchain indexing tool on top of RocksDB that generates `one-to-many` and `one-to-one` output-based indexes to be able to answer all sorts of explorer queries.
+Chain indexer is a universal blockchain indexing tool on top of RocksDB that generates `one-to-many` and `one-to-one` output-based indexes with dictionaries to be able to answer all sorts of explorer queries.
 
-Indexer uses tiny `block_height/tx_index/box_index` pointers over big hashes, ie. not a single hash is duplicated, which allows for much better space efficiency and for ~ `6 000 / 12 000 Inputs+Outputs+Assets per second` throughput with just quad-core and the slowest SSD, depending on `WAL` being on/off. `WAL` disabling is currently useless as [rocksdb flushing does not work](https://github.com/rust-rocksdb/rust-rocksdb/issues/900).
+Indexer uses tiny `block_height/tx_index/utxo_index/[asset_index]` dictionary pointers to big hashes, ie. not a single hash is duplicated, 
+which allows for much better space efficiency and for ~ `6 000 - 12 000 Utxos+Assets / second` throughput with just quad-core and an old SSD,
+depending on `WAL` being on/off. `WAL` disabling is currently useless as [rocksdb flushing does not work](https://github.com/rust-rocksdb/rust-rocksdb/issues/900).
 
-It is also a validator, ie. blocks are applied to utxo state which gives users guarantees of correctness. Chain tip is "eventually consistent" due to using pointers over hashes, ie. forks get settled eventually and superseded forks are deleted from DB.
+It is also a validator, ie. blocks are applied to utxo state which gives users guarantees of correctness. 
+Chain tip is "eventually consistent" through fork competition, ie. forks get settled eventually and superseded forks are deleted from DB.
 
 Currently `Bitcoin`, `Cardano` and `Ergo` are supported.
 
@@ -69,7 +72,7 @@ AssetBirthPk = block_height|tx_index|utxo_index|asset_index
 
 **Meta column family** keeps track of last block header we indexed. Indexing is completely idempotent and blocks are persited atomicly (in a db transaction).
 
-**one_to_many** seconary indexes keep entity like (`asset/address/script_hash/etc...`) under small-size `UtxoBirthPk/AssetBirthPk`
+**one_to_many** secondary indexes keep entity like (`asset/address/script_hash/etc...`) under small-size `UtxoBirthPk/AssetBirthPk`
 and references/relations to all further occurences to them.
 
 > Note, that there can be 0-x of either one-to-many or one-to-one UtxoIndexes, while AssetIndex is curently only 1 one-to-many for all assets together
