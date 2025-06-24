@@ -1,11 +1,10 @@
+use redbit::*;
 use ergo_lib::{chain::block::FullBlock, wallet::signing::ErgoTransaction};
-
+use redb::ReadTransaction;
 use super::ergo_io_processor::ErgoIoProcessor;
-use crate::model::{Block, BlockHeader, TxCount, TxIndex};
-use crate::{
-    api::{BlockProcessor, IoProcessor, ServiceError},
-    eutxo::eutxo_model::EuTx,
-};
+use crate::model::TxCount;
+use crate::api::{BlockProcessor, IoProcessor, ServiceError};
+use crate::eutxo::eutxo_model::{Block, BlockHash, BlockHeader, BlockHeight, BlockTimestamp, Transaction, TxHash, TxPointer};
 
 pub type OutputAddress = Vec<u8>;
 pub type OutputErgoTreeHash = Vec<u8>;
@@ -23,46 +22,45 @@ impl ErgoBlockProcessor {
 
 impl BlockProcessor for ErgoBlockProcessor {
     type FromBlock = FullBlock;
-    type IntoTx = EuTx;
 
-    fn process_batch(
-        &self,
-        block_batch: &[Self::FromBlock],
-        tx_count: TxCount,
-    ) -> Result<(Vec<Block<Self::IntoTx>>, TxCount), ServiceError> {
-        let blocks: Result<Vec<Block<Self::IntoTx>>, ServiceError> = block_batch
+    fn process_batch(&self, block_batch: &[Self::FromBlock], tx_count: TxCount, read_tx: &ReadTransaction) -> Result<(Vec<Block>, TxCount), ServiceError> {
+        let blocks: Result<Vec<Block>, ServiceError> = block_batch
             .iter()
-            .map(|btc_block| self.process_block(btc_block))
+            .map(|btc_block| self.process_block(btc_block, read_tx))
             .collect();
         blocks.map(|blocks| (blocks, tx_count))
     }
 
-    fn process_block(&self, b: &Self::FromBlock) -> Result<Block<Self::IntoTx>, ServiceError> {
-        let mut block_weight = 0;
+    fn process_block(&self, b: &Self::FromBlock, read_tx: &ReadTransaction) -> Result<Block, ServiceError> {
+        let mut block_weight: usize = 0;
         let mut result_txs = Vec::with_capacity(b.block_transactions.transactions.len());
 
-        for (tx_index, tx) in b.block_transactions.transactions.iter().enumerate() {
-            let tx_hash: [u8; 32] = tx.id().0 .0;
-            let inputs = self.io_processor.process_inputs(&tx.inputs_ids().to_vec());
-            let (box_weight, outputs) = self.io_processor.process_outputs(&tx.outputs().to_vec()); //TODO perf check
-            block_weight += box_weight;
-            block_weight += inputs.len();
-            result_txs.push(EuTx {
-                tx_hash: tx_hash.into(),
-                tx_index: TxIndex(tx_index as u16),
-                tx_inputs: inputs,
-                tx_outputs: outputs, //TODO perf check
-            })
-        }
         let block_hash: [u8; 32] = b.header.id.0.into();
         let prev_block_hash: [u8; 32] = b.header.parent_id.0.into();
 
+        let id = BlockHeight(b.header.height);
         let header = BlockHeader {
-            height: b.header.height.into(),
-            timestamp: ((b.header.timestamp / 1000) as u32).into(),
-            hash: block_hash.into(),
-            prev_hash: prev_block_hash.into(),
+            id: id.clone(),
+            timestamp: BlockTimestamp((b.header.timestamp / 1000) as u32),
+            hash: BlockHash(block_hash),
+            prev_hash: BlockHash(prev_block_hash),
         };
-        Ok(Block::new(header, result_txs, block_weight))
+        
+        for (tx_index, tx) in b.block_transactions.transactions.iter().enumerate() {
+            let tx_hash: [u8; 32] = tx.id().0.0;
+            let tx_id = TxPointer::from_parent(header.id.clone(), tx_index as u16);
+            let inputs = self.io_processor.process_inputs(&tx.inputs_ids().to_vec(), read_tx);
+            let (box_weight, outputs) = self.io_processor.process_outputs(&tx.outputs().to_vec(), tx_id.clone()); //TODO perf check
+            block_weight += box_weight;
+            block_weight += inputs.len();
+            result_txs.push(Transaction {
+                id: tx_id.clone(),
+                hash: TxHash(tx_hash),
+                utxos: outputs,
+                inputs
+            })
+        }
+
+        Ok(Block  { id: id.clone(), header, transactions: result_txs, weight: block_weight as u16 })
     }
 }

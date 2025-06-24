@@ -1,7 +1,11 @@
+use crate::api::IoProcessor;
+use crate::eutxo::eutxo_model;
+use crate::eutxo::eutxo_model::{Address, Asset, AssetAction, AssetName, AssetPointer, Box, InputPointer, InputRef, PolicyId, TxPointer, Utxo, UtxoPointer};
+use crate::model::{AssetType, BoxWeight};
 use ergo_lib::{
     ergotree_ir::{
         chain::{
-            address::Address,
+            address,
             ergo_box::{BoxId, ErgoBox},
             token::TokenId,
         },
@@ -9,51 +13,30 @@ use ergo_lib::{
     },
     wallet::box_selector::ErgoBoxAssets,
 };
+use redb::ReadTransaction;
+use redbit::IndexedPointer;
+use redbit::*;
 
-use crate::model::{AssetAction, AssetId, AssetValue, BoxWeight, DbIndexNumber, O2oIndexValue};
-use crate::{
-    api::IoProcessor,
-    eutxo::{
-        eutxo_model::{EuTxInput, EuUtxo},
-        eutxo_schema::DbSchema,
-    },
-    model::O2mIndexValue,
-};
+pub struct ErgoIoProcessor {}
 
-pub struct ErgoIoProcessor {
-    pub db_schema: DbSchema,
-    pub box_id_index_number: DbIndexNumber,
-}
-
-impl ErgoIoProcessor {
-    pub fn new(db_schema: DbSchema) -> Self {
-        let schema = db_schema.clone();
-        ErgoIoProcessor {
-            db_schema,
-            box_id_index_number: schema
-                .clone()
-                .o2o_index_number_by_name
-                .get("BOX_ID")
-                .unwrap()
-                .to_owned(),
-        }
-    }
-}
-
-impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
-    fn process_inputs(&self, ins: &[BoxId]) -> Vec<EuTxInput> {
+impl IoProcessor<BoxId, InputRef, ErgoBox, Utxo> for ErgoIoProcessor {
+    fn process_inputs(&self, ins: &[BoxId], read_tx: &ReadTransaction) -> Vec<InputRef> {
         ins.iter()
             .map(|input| {
                 let box_id_slice: &[u8] = input.as_ref();
-                EuTxInput::OutputIndexInput(
-                    self.box_id_index_number,
-                    O2oIndexValue(box_id_slice.to_vec()),
-                )
+                let box_id_bytes: Vec<u8> = box_id_slice.into();
+                let utxos =
+                    Utxo::get_by_address(read_tx, &Address(box_id_bytes)) // TODO boxID temporarily in Address
+                        .expect("Failed to get Utxo by ErgoBox");
+                let first_utxo = utxos.first().expect("No Utxo found for InputRef");
+                InputRef {
+                    id: InputPointer::from_parent(first_utxo.id.parent.clone(), first_utxo.id.index())
+                }
             })
             .collect()
     }
 
-    fn process_outputs(&self, outs: &[ErgoBox]) -> (BoxWeight, Vec<EuUtxo>) {
+    fn process_outputs(&self, outs: &[ErgoBox], tx_pointer: TxPointer) -> (BoxWeight, Vec<Utxo>) {
         let mut result_outs = Vec::with_capacity(outs.len());
         let mut asset_count = 0;
         for (out_index, out) in outs.iter().enumerate() {
@@ -62,48 +45,30 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
             let box_id_bytes: Vec<u8> = box_id_slice.into();
             let ergo_tree_opt = out.ergo_tree.sigma_serialize_bytes().ok();
             let ergo_tree_t8_opt = out.ergo_tree.template_bytes().ok();
-            let address_opt = Address::recreate_from_ergo_tree(&out.ergo_tree)
+            let address_opt = address::Address::recreate_from_ergo_tree(&out.ergo_tree)
                 .map(|a| a.content_bytes())
                 .ok();
 
-            let mut o2o_db_indexes: Vec<(DbIndexNumber, O2oIndexValue)> = Vec::with_capacity(2);
-            if let Some(index_number) = self.db_schema.o2o_index_number_by_name.get("BOX_ID") {
-                o2o_db_indexes.push((*index_number, box_id_bytes.into()));
-            } else {
-                panic!("Ergo BOX_ID index is missing in schema.yaml")
-            }
-
-            let mut o2m_db_indexes: Vec<(DbIndexNumber, O2mIndexValue)> = Vec::with_capacity(3);
-            if let Some(index_number) = self
-                .db_schema
-                .o2m_index_number_by_name
-                .get("ERGO_TREE_HASH")
-            {
-                if let Some(ergo_tree) = ergo_tree_opt {
-                    o2m_db_indexes.push((*index_number, ergo_tree.into()));
+            let utxo_pointer = UtxoPointer::from_parent(tx_pointer.clone(), out_index as u16);
+            let address = address_opt.map(|a| a.to_vec());
+            let ergo_box = match address {
+                Some(addr) => {
+                    Some(Box {
+                        id: utxo_pointer.clone(),
+                        box_id: eutxo_model::BoxId(box_id_bytes.clone()),
+                        tree: eutxo_model::Tree(ergo_tree_opt.unwrap_or(vec![])),
+                        tree_t8: eutxo_model::TreeT8(ergo_tree_t8_opt.unwrap_or(vec![])),
+                    })
                 }
-            }
-
-            if let Some(index_number) = self
-                .db_schema
-                .o2m_index_number_by_name
-                .get("ERGO_TREE_T8_HASH")
-            {
-                if let Some(ergo_tree_t8) = ergo_tree_t8_opt {
-                    o2m_db_indexes.push((*index_number, ergo_tree_t8.into()));
+                None => {
+                    None
                 }
-            }
+            };
 
-            if let Some(index_number) = self.db_schema.o2m_index_number_by_name.get("ADDRESS") {
-                if let Some(address) = address_opt {
-                    o2m_db_indexes.push((*index_number, address.into()));
-                }
-            }
-
-            let result_assets: Vec<(AssetId, AssetValue, AssetAction)> =
+            let result_assets: Vec<Asset> =
                 if let Some(assets) = out.tokens() {
                     let mut result = Vec::with_capacity(assets.len());
-                    for asset in assets {
+                    for (index, asset) in assets.enumerated() {
                         let asset_id: Vec<u8> = asset.token_id.into();
                         let amount = asset.amount;
                         let amount_u64: u64 = amount.into();
@@ -113,23 +78,31 @@ impl IoProcessor<BoxId, EuTxInput, ErgoBox, EuUtxo> for ErgoIoProcessor {
                         });
 
                         let action = match is_mint {
-                            true => AssetAction::Mint, // TODO!! for Minting it might not be enough to check first boxId
-                            _ => AssetAction::Transfer,
+                            true => AssetType::Mint, // TODO!! for Minting it might not be enough to check first boxId
+                            _ => AssetType::Transfer,
                         };
-                        result.push((asset_id.into(), amount_u64, action));
+                        let asset_pointer = AssetPointer::from_parent(utxo_pointer.clone(), index as u8);
+                        result.push(Asset {
+                            id: asset_pointer,
+                            name: AssetName(asset_id),
+                            amount: amount_u64,
+                            policy_id: PolicyId(vec![]),
+                            asset_action: AssetAction(action.into()),
+                        });
                     }
                     result
                 } else {
                     vec![]
                 };
 
+
             asset_count += result_assets.len();
-            result_outs.push(EuUtxo {
-                utxo_index: (out_index as u16).into(),
-                o2m_db_indexes,
-                o2o_db_indexes,
+            result_outs.push(Utxo {
+                id: utxo_pointer.clone(),
                 assets: result_assets,
-                utxo_value: (*out.value.as_u64()).into(),
+                address: Address(box_id_bytes.clone()),
+                amount: (*out.value.as_u64()).into(),
+                ergo_box,
             })
         }
         (asset_count + result_outs.len(), result_outs)

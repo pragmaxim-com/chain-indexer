@@ -1,4 +1,3 @@
-use crate::model::{BlockHash, BlockHeight};
 use crate::{api::ServiceError, error};
 use ergo_lib::chain::block::FullBlock;
 use reqwest::{
@@ -8,6 +7,7 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use crate::eutxo::eutxo_model::{BlockHash, BlockHeight};
 
 #[derive(Default, Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 #[repr(C)]
@@ -80,7 +80,7 @@ impl ErgoClient {
         } else {
             let node_info = response.json::<NodeInfo>().await?;
 
-            self.get_block_by_height_async(node_info.full_height.into())
+            self.get_block_by_height_async(BlockHeight(node_info.full_height))
                 .await
         }
     }
@@ -152,9 +152,7 @@ impl ErgoClient {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-
     use super::*;
-    use serde_json;
 
     #[tokio::test]
     async fn test_info_request() {
@@ -235,7 +233,7 @@ mod tests {
         }"#;
 
         // Deserialize the JSON data
-        let node_info: NodeInfo = serde_json::from_str(json_data).expect("Failed to deserialize");
+        let node_info: NodeInfo = redbit::serde_json::from_str(json_data).expect("Failed to deserialize");
 
         // Expected NodeInfo struct
         let expected_node_info = NodeInfo {

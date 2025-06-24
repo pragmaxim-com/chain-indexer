@@ -1,9 +1,7 @@
-use crate::block_read_service::BlockReadService;
 use crate::cli::Blockchain;
 use crate::cli::CliConfig;
 use crate::http_server;
 use crate::indexer::Indexer;
-use crate::persistence::Persistence;
 use crate::settings::HttpSettings;
 use crate::settings::IndexerSettings;
 
@@ -12,28 +10,24 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::block_write_service::BlockWriteService;
 use crate::eutxo::eutxo_block_monitor::EuBlockMonitor;
-use crate::eutxo::eutxo_model::EuTx;
 use crate::info;
 use crate::syncer::ChainSyncer;
-use crate::{api::BlockProvider, eutxo::eutxo_storage};
+use crate::{api::BlockProvider};
 use actix_web::dev::Server;
 use futures::future::join;
 use futures::future::ready;
+use redb::Database;
 use tokio::signal::unix::signal;
 use tokio::signal::unix::SignalKind;
 use tokio::time;
-
-use super::eutxo_tx_read_service::EuTxReadService;
-use super::eutxo_tx_write_service::EuTxWriteService;
 
 async fn maybe_run_server(http_conf: &HttpSettings, server: Server) -> io::Result<()> {
     if http_conf.enable {
         info!("Starting http server at {}", http_conf.bind_address);
         server.await
     } else {
-        ready(io::Result::Ok(())).await
+        ready(Ok(())).await
     }
 }
 
@@ -41,49 +35,26 @@ pub async fn run_eutxo_indexing_and_http_server(
     indexer_conf: IndexerSettings,
     http_conf: HttpSettings,
     cli_config: CliConfig,
-    block_provider: Arc<dyn BlockProvider<OutTx = EuTx>>,
+    indexer: Indexer,
+    block_provider: Arc<dyn BlockProvider>,
+    db: Arc<Database>
 ) {
-    let db_path: String = format!(
-        "{}/{}/{}",
-        indexer_conf.db_path, "main", cli_config.blockchain
-    );
     let perist_coinbase_inputs: bool = match cli_config.blockchain {
         Blockchain::Bitcoin => false,
         Blockchain::Cardano => true,
         Blockchain::Ergo => false,
     };
 
-    let disable_wal = indexer_conf.disable_wal;
     let min_batch_size = indexer_conf.min_batch_size;
-    let db_shema = block_provider.get_schema();
-    let db = Arc::new(eutxo_storage::get_db(&db_shema, &db_path));
-
-    let storage = Arc::new(Persistence::new(Arc::clone(&db), &db_shema));
-
-    let tx_read_service = Arc::new(EuTxReadService::new(Arc::clone(&storage)));
-
-    let block_read_service = Arc::new(BlockReadService::new(Arc::clone(&storage), tx_read_service));
-    let block_write_service = Arc::new(BlockWriteService::new(
-        Arc::new(EuTxWriteService::new(perist_coinbase_inputs)),
-        Arc::clone(&block_read_service),
-    ));
-
-    let indexer = Indexer::new(
-        Arc::clone(&storage),
-        block_write_service,
-        Arc::clone(&block_provider),
-        disable_wal,
-    );
     let syncer = ChainSyncer::new(block_provider, Rc::new(EuBlockMonitor::new(1000)), indexer);
 
-    let server = http_server::run(http_conf.clone(), block_read_service);
+    let server = http_server::run(http_conf.clone(), Arc::clone(&db));
 
     let server_handle = server.handle();
 
     let server_fut = maybe_run_server(&http_conf, server);
 
     let indexing_fut = if indexer_conf.enable {
-        info!("Starting Indexing into {}", db_path);
         async {
             let mut interval = time::interval(Duration::from_secs(1));
             loop {

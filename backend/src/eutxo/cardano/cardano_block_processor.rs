@@ -1,13 +1,11 @@
-use pallas::ledger::traverse::MultiEraBlock;
+pub use redbit::*;
 
 use super::{cardano_client::CBOR, cardano_io_processor::CardanoIoProcessor};
-use crate::model::{AssetId, AssetValue, Block, BlockHash, BlockHeader, TxCount, TxIndex};
-use crate::{
-    api::{BlockProcessor, IoProcessor, ServiceError},
-    eutxo::eutxo_model::EuTx,
-};
-
-pub const EMPTY_ASSETS_VEC: Vec<(AssetId, AssetValue)> = Vec::new();
+use crate::api::{BlockProcessor, IoProcessor, ServiceError};
+use crate::eutxo::eutxo_model::{Block, BlockHash, BlockHeader, BlockHeight, BlockTimestamp, Transaction, TxHash, TxPointer};
+use crate::model::TxCount;
+use pallas::ledger::traverse::MultiEraBlock;
+use redb::ReadTransaction;
 
 pub type OutputAddress = Option<Vec<u8>>;
 pub type OutputScriptHash = Option<Vec<u8>>;
@@ -26,9 +24,8 @@ impl CardanoBlockProcessor {
 
 impl BlockProcessor for CardanoBlockProcessor {
     type FromBlock = CBOR;
-    type IntoTx = EuTx;
 
-    fn process_block(&self, block: &CBOR) -> Result<Block<EuTx>, ServiceError> {
+    fn process_block(&self, block: &CBOR, read_tx: &ReadTransaction) -> Result<Block, ServiceError> {
         let b = MultiEraBlock::decode(block)?;
 
         let hash: [u8; 32] = *b.header().hash();
@@ -38,8 +35,8 @@ impl BlockProcessor for CardanoBlockProcessor {
             .unwrap_or(pallas::crypto::hash::Hash::new([0u8; 32]));
         let prev_hash: [u8; 32] = *prev_h;
         let header = BlockHeader {
-            height: (b.header().number() as u32).into(),
-            timestamp: (b.header().slot() as u32 + GENESIS_START_TIME).into(),
+            id: BlockHeight(b.header().number() as u32),
+            timestamp: BlockTimestamp(b.header().slot() as u32 + GENESIS_START_TIME),
             hash: BlockHash(hash),
             prev_hash: BlockHash(prev_hash),
         };
@@ -50,29 +47,31 @@ impl BlockProcessor for CardanoBlockProcessor {
 
         for (tx_index, tx) in txs.iter().enumerate() {
             let tx_hash: [u8; 32] = *tx.hash();
-            let inputs = self.io_processor.process_inputs(&tx.inputs());
-            let (box_weight, outputs) = self.io_processor.process_outputs(&tx.outputs().to_vec()); //TODO perf check
+            let tx_id = TxPointer::from_parent(header.id.clone(), tx_index as u16);
+            let inputs = self.io_processor.process_inputs(&tx.inputs(), read_tx);
+            let (box_weight, outputs) = self.io_processor.process_outputs(&tx.outputs().to_vec(), tx_id.clone()); //TODO perf check
             block_weight += box_weight;
             block_weight += inputs.len();
-            result_txs.push(EuTx {
-                tx_hash: tx_hash.into(),
-                tx_index: TxIndex(tx_index as u16),
-                tx_inputs: inputs,
-                tx_outputs: outputs,
+            result_txs.push(Transaction {
+                id: tx_id.clone(),
+                hash: TxHash(tx_hash),
+                utxos: outputs,
+                inputs
             })
         }
 
-        Ok(Block::new(header, result_txs, block_weight))
+        Ok(Block { id: header.id.clone(), header, transactions: result_txs, weight: block_weight as u16 }) // usize
     }
 
     fn process_batch(
         &self,
         block_batch: &[Self::FromBlock],
         tx_count: TxCount,
-    ) -> Result<(Vec<Block<Self::IntoTx>>, TxCount), ServiceError> {
-        let blocks: Result<Vec<Block<Self::IntoTx>>, ServiceError> = block_batch
+        read_tx: &ReadTransaction
+    ) -> Result<(Vec<Block>, TxCount), ServiceError> {
+        let blocks: Result<Vec<Block>, ServiceError> = block_batch
             .iter()
-            .map(|btc_block| self.process_block(btc_block))
+            .map(|btc_block| self.process_block(btc_block, read_tx))
             .collect();
         blocks.map(|blocks| (blocks, tx_count))
     }

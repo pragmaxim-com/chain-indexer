@@ -1,12 +1,7 @@
 pub mod btc;
-pub mod cardano;
 pub mod ergo;
+pub mod cardano;
 pub mod eutxo_block_monitor;
-pub mod eutxo_codec_utxo;
 pub mod eutxo_executor;
-pub mod eutxo_families;
 pub mod eutxo_model;
-pub mod eutxo_schema;
 pub mod eutxo_storage;
-pub mod eutxo_tx_read_service;
-pub mod eutxo_tx_write_service;

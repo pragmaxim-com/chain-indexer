@@ -3,8 +3,8 @@ db_path = "/tmp/chain-indexer"
 enable = true
 min_batch_size = 1000           # Sum of : inputs + outputs + assets/tokens 
 disable_wal = false
-fetching_parallelism = "mild"   # low / mild / high
-processing_parallelism = "mild" # low / mild / high
+fetching_parallelism = "low"   # low / mild / high
+processing_parallelism = "low" # low / mild / high
 
 [http]
 enable = true

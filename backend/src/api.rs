@@ -1,23 +1,16 @@
-use std::{fmt, pin::Pin};
 
-use crate::model::{
-    AssetId, BatchWeight, Block, BlockHeader, BlockHeight, BoxWeight, O2mIndexValue, O2oIndexValue,
-    TxCount, TxHash,
-};
-use crate::{
-    codec_tx::TxPkBytes,
-    eutxo::{eutxo_codec_utxo::UtxoPkBytes, eutxo_schema::DbSchema},
-    rocks_db_batch::{CustomFamilies, Families},
-};
+use crate::model::{BatchWeight, BoxWeight, TxCount, };
+use std::{fmt, pin::Pin};
 use actix_web::{HttpResponse, ResponseError};
 use async_trait::async_trait;
 use bitcoin::block::Bip34Error;
 use futures::Stream;
 use hex::FromHexError;
-use lru::LruCache;
 use pallas::network::miniprotocols;
-use rocksdb::{MultiThreaded, OptimisticTransactionDB, WriteBatchWithTransaction};
+use redb::ReadTransaction;
+use redbit::AppError;
 use serde::{Deserialize, Serialize};
+use crate::eutxo::eutxo_model::{Block, BlockHeader, TxPointer};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServiceError {
@@ -35,11 +28,13 @@ impl ResponseError for ServiceError {
         HttpResponse::InternalServerError().json(self)
     }
 }
-impl From<rocksdb::Error> for ServiceError {
-    fn from(err: rocksdb::Error) -> Self {
+
+impl From<redb::Error> for ServiceError {
+    fn from(err: redb::Error) -> Self {
         ServiceError::new(&err.to_string())
     }
 }
+
 impl From<reqwest::Error> for ServiceError {
     fn from(err: reqwest::Error) -> Self {
         ServiceError::new(&err.to_string())
@@ -47,6 +42,11 @@ impl From<reqwest::Error> for ServiceError {
 }
 impl From<url::ParseError> for ServiceError {
     fn from(err: url::ParseError) -> Self {
+        ServiceError::new(&err.to_string())
+    }
+}
+impl From<AppError> for ServiceError {
+    fn from(err: AppError) -> Self {
         ServiceError::new(&err.to_string())
     }
 }
@@ -96,31 +96,28 @@ impl ServiceError {
 
 pub trait BlockProcessor {
     type FromBlock: Send;
-    type IntoTx: Send;
 
-    fn process_block(&self, block: &Self::FromBlock) -> Result<Block<Self::IntoTx>, ServiceError>;
+    fn process_block(&self, block: &Self::FromBlock, read_tx: &ReadTransaction) -> Result<Block, ServiceError>;
 
     fn process_batch(
         &self,
         block_batch: &[Self::FromBlock],
         tx_count: TxCount,
-    ) -> Result<(Vec<Block<Self::IntoTx>>, TxCount), ServiceError>;
+        read_tx: &ReadTransaction
+    ) -> Result<(Vec<Block>, TxCount), ServiceError>;
 }
 
 pub trait IoProcessor<FromInput, IntoInput, FromOutput, IntoOutput> {
-    fn process_inputs(&self, ins: &[FromInput]) -> Vec<IntoInput>;
-    fn process_outputs(&self, outs: &[FromOutput]) -> (BoxWeight, Vec<IntoOutput>);
+    fn process_inputs(&self, ins: &[FromInput], tx: &ReadTransaction) -> Vec<IntoInput>;
+    fn process_outputs(&self, outs: &[FromOutput], tx_pointer: TxPointer) -> (BoxWeight, Vec<IntoOutput>);
 }
 
 #[async_trait]
 pub trait BlockProvider {
-    type OutTx: Send;
 
-    fn get_schema(&self) -> DbSchema;
+    fn get_processed_block(&self, header: BlockHeader, read_tx: &ReadTransaction) -> Result<Block, ServiceError>;
 
-    fn get_processed_block(&self, header: BlockHeader) -> Result<Block<Self::OutTx>, ServiceError>;
-
-    async fn get_chain_tip(&self) -> Result<BlockHeader, ServiceError>;
+    async fn get_chain_tip(&self, read_tx: &ReadTransaction) -> Result<BlockHeader, ServiceError>;
 
     async fn stream(
         &self,
@@ -128,54 +125,9 @@ pub trait BlockProvider {
         min_batch_size: usize,
         fetching_par: usize,
         processing_par: usize,
-    ) -> Pin<Box<dyn Stream<Item = (Vec<Block<Self::OutTx>>, BatchWeight)> + Send + 'life0>>;
+    ) -> Pin<Box<dyn Stream<Item = (Vec<Block>, BatchWeight)> + Send + 'life0>>;
 }
 
-pub trait TxReadService: Sync + Sync {
-    type CF: CustomFamilies;
-    type Tx;
-
-    fn get_txs_by_height(&self, block_height: &BlockHeight) -> Result<Vec<Self::Tx>, ServiceError>;
-}
-
-pub trait TxWriteService: Sync + Sync {
-    type CF: CustomFamilies;
-    type Tx;
-
-    #[warn(clippy::too_many_arguments)]
-    fn persist_txs(
-        &self,
-        block: &Block<Self::Tx>,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        batch: &mut WriteBatchWithTransaction<true>,
-        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
-        utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
-        utxo_birth_pk_by_index_cache: &mut LruCache<O2mIndexValue, Vec<u8>>,
-        asset_birth_pk_by_asset_id_cache: &mut LruCache<AssetId, Vec<u8>>,
-        families: &Families<Self::CF>,
-    ) -> Result<(), rocksdb::Error>;
-
-    fn persist_tx(
-        &self,
-        block_height: &BlockHeight,
-        tx: &Self::Tx,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        batch: &mut WriteBatchWithTransaction<true>,
-        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
-        families: &Families<Self::CF>,
-    ) -> Result<(), rocksdb::Error>;
-
-    fn remove_tx(
-        &self,
-        block_height: &BlockHeight,
-        tx: &Self::Tx,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-        tx_pk_by_tx_hash_cache: &mut LruCache<TxHash, TxPkBytes>,
-        utxo_pk_by_index_cache: &mut LruCache<O2oIndexValue, UtxoPkBytes>,
-        families: &Families<Self::CF>,
-    ) -> Result<(), rocksdb::Error>;
-}
-
-pub trait BlockMonitor<Tx> {
-    fn monitor(&self, block_batch: &[Block<Tx>], batch_weight: &BatchWeight);
+pub trait BlockMonitor {
+    fn monitor(&self, block_batch: &[Block], batch_weight: &BatchWeight);
 }
