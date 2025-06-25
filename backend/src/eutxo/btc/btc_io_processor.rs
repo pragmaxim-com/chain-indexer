@@ -1,9 +1,10 @@
 use crate::api::IoProcessor;
-use crate::eutxo::eutxo_model::{Address, InputPointer, InputRef, Transaction, TxHash, TxPointer, Utxo, UtxoPointer};
+use crate::eutxo::eutxo_model::{Address, BlockHeight, InputPointer, InputRef, Transaction, TxHash, TxPointer, Utxo, UtxoPointer};
 use crate::model::BoxWeight;
 use bitcoin_hashes::Hash;
 use redb::ReadTransaction;
 pub use redbit::*;
+use crate::info;
 
 pub struct BtcIoProcessor { }
 
@@ -12,10 +13,22 @@ impl IoProcessor<bitcoin::TxIn, InputRef, bitcoin::TxOut, Utxo> for BtcIoProcess
         ins.iter()
             .map(|input| {
                 let tx_hash = TxHash(input.previous_output.txid.to_byte_array());
-                let tx_pointer = Transaction::get_by_hash(tx, &tx_hash.into()).unwrap().first().unwrap().clone().id;
-                InputRef {
-                    id: InputPointer::from_parent(tx_pointer, input.previous_output.vout as u16),
+                let txs = Transaction::get_by_hash(tx, &tx_hash).expect("Failed to get Transaction by TxHash");
+
+                match txs.first() {
+                    Some(first_tx) => {
+                        InputRef {
+                            id: InputPointer::from_parent(first_tx.id.clone(), input.previous_output.vout as u16),
+                        }
+                    }
+                    None => {
+                        info!("Tx {:?} not found, it should be coinbase", tx_hash.clone());
+                        InputRef {
+                            id: InputPointer::from_parent(TxPointer::from_parent(BlockHeight(0), 0), 0)
+                        }
+                    }
                 }
+
             })
             .collect()
     }

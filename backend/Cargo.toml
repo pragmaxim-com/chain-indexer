@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 bitcoin = "0.32.0"
-bitcoincore-rpc = "0.19.0"
+bitcoincore-rpc = {git = "https://github.com/clarkmoody/rust-bitcoincore-rpc", branch = "support-core-22-and-23"}
 bitcoin_hashes = "0.14.0"
 base16 = "0.2.1"
 rand = "0.8.5"

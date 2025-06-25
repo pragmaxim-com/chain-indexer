@@ -36,10 +36,12 @@ impl ChainSyncer {
     pub async fn sync(&self, min_batch_size: usize, fetching_par: usize, processing_par: usize) {
         let read_tx = self.indexer.db.begin_read().unwrap();
         let chain_tip_header = self.block_provider.get_chain_tip(&read_tx).await.unwrap();
-        let tx = self.indexer.db.begin_read().unwrap();
+        let last_header = self.indexer.get_last_header(&read_tx);
+        read_tx.close().expect("Failed to close read transaction");
         self.block_provider
             .stream(
-                self.indexer.get_last_header(&tx),
+                chain_tip_header.clone(),
+                last_header,
                 min_batch_size,
                 fetching_par,
                 processing_par,

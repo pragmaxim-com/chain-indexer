@@ -1,10 +1,9 @@
-use redbit::*;
-use ergo_lib::{chain::block::FullBlock, wallet::signing::ErgoTransaction};
-use redb::ReadTransaction;
 use super::ergo_io_processor::ErgoIoProcessor;
-use crate::model::TxCount;
 use crate::api::{BlockProcessor, IoProcessor, ServiceError};
 use crate::eutxo::eutxo_model::{Block, BlockHash, BlockHeader, BlockHeight, BlockTimestamp, Transaction, TxHash, TxPointer};
+use ergo_lib::{chain::block::FullBlock, wallet::signing::ErgoTransaction};
+use redb::ReadTransaction;
+use redbit::*;
 
 pub type OutputAddress = Vec<u8>;
 pub type OutputErgoTreeHash = Vec<u8>;

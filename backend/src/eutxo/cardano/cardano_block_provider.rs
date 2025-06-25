@@ -61,6 +61,7 @@ impl BlockProvider for CardanoBlockProvider {
 
     async fn stream(
         &self,
+        chain_tip_header: BlockHeader,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
         _fetching_par: usize,

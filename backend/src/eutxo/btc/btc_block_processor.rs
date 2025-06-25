@@ -2,7 +2,6 @@ use super::btc_client::BtcBlock;
 use super::btc_io_processor::BtcIoProcessor;
 use crate::api::{BlockProcessor, IoProcessor, ServiceError};
 use crate::eutxo::eutxo_model::{Block, BlockHash, BlockHeader, BlockHeight, BlockTimestamp, Transaction, TxHash, TxPointer};
-use crate::model::TxCount;
 use bitcoin_hashes::Hash;
 use redb::ReadTransaction;
 pub use redbit::*;

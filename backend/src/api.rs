@@ -1,5 +1,4 @@
-
-use crate::model::{BatchWeight, BoxWeight, TxCount, };
+use crate::model::{BatchWeight, BoxWeight};
 use std::{fmt, pin::Pin};
 use actix_web::{HttpResponse, ResponseError};
 use async_trait::async_trait;
@@ -36,6 +35,16 @@ impl From<redb::Error> for ServiceError {
 
 impl From<reqwest::Error> for ServiceError {
     fn from(err: reqwest::Error) -> Self {
+        ServiceError::new(&err.to_string())
+    }
+}
+impl From<redb::TransactionError> for ServiceError {
+    fn from(err: redb::TransactionError) -> Self {
+        ServiceError::new(&err.to_string())
+    }
+}
+impl From<redb::CommitError> for ServiceError {
+    fn from(err: redb::CommitError) -> Self {
         ServiceError::new(&err.to_string())
     }
 }
@@ -104,6 +113,7 @@ pub trait BlockProvider {
 
     async fn stream(
         &self,
+        chain_tip_header: BlockHeader,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
         fetching_par: usize,

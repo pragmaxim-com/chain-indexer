@@ -50,16 +50,15 @@ impl BlockProvider for BtcBlockProvider {
 
     async fn stream(
         &self,
+        chain_tip_header: BlockHeader,
         last_header: Option<BlockHeader>,
         min_batch_size: usize,
         fetching_par: usize,
         processing_par: usize,
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block>, BatchWeight)> + Send + 'life0>> {
-        let read_tx = self.db.begin_read().unwrap();
-        let best_header = self.get_chain_tip(&read_tx).await.unwrap();
         let last_height = last_header.map_or(0, |h| h.id.0);
-        info!("Indexing from {:?} to {:?}", last_height, best_header);
-        let heights = last_height..=best_header.id.0;
+        info!("Indexing from {:?} to {:?}", last_height, chain_tip_header);
+        let heights = last_height..=chain_tip_header.id.0;
 
         tokio_stream::iter(heights)
             .map(|height| {

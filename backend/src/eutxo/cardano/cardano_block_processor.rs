@@ -3,7 +3,6 @@ pub use redbit::*;
 use super::{cardano_client::CBOR, cardano_io_processor::CardanoIoProcessor};
 use crate::api::{BlockProcessor, IoProcessor, ServiceError};
 use crate::eutxo::eutxo_model::{Block, BlockHash, BlockHeader, BlockHeight, BlockTimestamp, Transaction, TxHash, TxPointer};
-use crate::model::TxCount;
 use pallas::ledger::traverse::MultiEraBlock;
 use redb::ReadTransaction;
 

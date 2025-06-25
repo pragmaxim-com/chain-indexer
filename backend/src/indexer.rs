@@ -40,12 +40,7 @@ impl Indexer {
         winning_fork: &mut Vec<Arc<Block>>, // Use Rc for the vector as well
         tx: &ReadTransaction
     ) -> Result<Vec<Arc<Block>>, ServiceError> {
-        let prev_header = BlockHeader::get_by_hash(tx, &block.header.prev_hash).map_err(|e| {
-            ServiceError::new(&format!(
-                "Failed to get previous block header: {}",
-                e
-            ))
-        })?;
+        let prev_header = BlockHeader::get_by_hash(tx, &block.header.prev_hash)?;
 
         if block.header.id.0 == 1 {
             winning_fork.insert(0, Arc::clone(&block)); // Clone the Rc, not the block
@@ -60,9 +55,7 @@ impl Indexer {
                 "Fork detected at {}@{}, downloading parent {}",
                 block.header.id, block.header.hash, block.header.prev_hash,
             );
-            let read_tx = self.db.begin_read().map_err(|e| {
-                ServiceError::new(&format!("Failed to begin read transaction: {}", e))
-            })?;
+            let read_tx = self.db.begin_read()?;
             let downloaded_prev_block = Arc::new(
                 self.block_provider
                     .get_processed_block(block.header.clone(), &read_tx)?,
@@ -80,10 +73,8 @@ impl Indexer {
         blocks: Vec<Block>,
         chain_link: bool,
     ) -> Result<(), ServiceError> {
-        let write_tx = self.db.begin_write().map_err(|e| {
-            ServiceError::new(&format!("Failed to begin write transaction: {}", e))
-        })?;
-        let read_tx = self.db.begin_read().unwrap();
+        let write_tx = self.db.begin_write()?;
+        let read_tx = self.db.begin_read()?;
         let last_block_header = blocks
             .into_iter()
             .map(|block| {
@@ -115,12 +106,9 @@ impl Indexer {
 
         // persist last height to db_tx and commit
         if let Some(header) = last_block_header {
-            self.persist_last_block(&header, &write_tx)
-                .map_err(|e| ServiceError::new(&e.to_string()))?;
+            self.persist_last_block(&header, &write_tx)?;
         }
-        write_tx.commit().map_err(|e| {
-            ServiceError::new(&format!("Failed to commit write transaction: {}", e))
-        })?;
+        write_tx.commit()?;
         Ok(())
     }
 }
