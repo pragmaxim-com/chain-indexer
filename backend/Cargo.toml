@@ -45,7 +45,7 @@ actix-web = "4.8.0"
 url = "2.5.2"
 env_logger = "0.11.5"
 # Add dependency on redbit from local path
-redbit = { path = "../../redbit/redbit", version = "0.1.0" }
+redbit = { git = "https://github.com/pragmaxim-com/redbit" }
 redb = "2.6.0"
 tokio-stream = { version = "0.1.17", features = ["sync"] }
 axum = {  version = "0.8.4", features = ["default", "macros"] }
