@@ -20,14 +20,11 @@ impl IoProcessor<MultiEraInput<'_>, InputRef, MultiEraOutput<'_>, Utxo> for Card
         ins.iter()
             .map(|input| {
                 let tx_hash: [u8; 32] = **input.hash();
-                let tx_pointer = Transaction::get_by_hash(tx, &TxHash(tx_hash))
-                    .unwrap()
-                    .first()
-                    .unwrap()
-                    .clone()
-                    .id;
+                let tx_pointers = Transaction::get_ids_by_hash(tx, &TxHash(tx_hash))
+                    .expect("Failed to get Transaction by TxHash");
+                let tx_pointer = tx_pointers.first().expect("Failed to get Transaction pointer");
                 InputRef {
-                    id: InputPointer::from_parent(tx_pointer, input.index() as u16),
+                    id: InputPointer::from_parent(tx_pointer.clone(), input.index() as u16),
                 }
             })
             .collect()

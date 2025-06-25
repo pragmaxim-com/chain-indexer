@@ -16,7 +16,6 @@ use ergo_lib::{
 use redb::ReadTransaction;
 use redbit::IndexedPointer;
 use redbit::*;
-use crate::info;
 
 pub struct ErgoIoProcessor {}
 
@@ -27,16 +26,17 @@ impl IoProcessor<BoxId, InputRef, ErgoBox, Utxo> for ErgoIoProcessor {
                 let box_id_slice: &[u8] = input.as_ref();
                 let box_id_bytes: Vec<u8> = box_id_slice.into();
                 let box_id = eutxo_model::BoxId(box_id_bytes);
-                let utxos =
-                    Box::get_by_box_id(read_tx, &box_id)
+                let utxo_pointers =
+                    Box::get_ids_by_box_id(read_tx, &box_id)
                         .expect("Failed to get Utxo by ErgoBox");
-                match utxos.first() {
-                    Some(first_utxo) => {
+                match utxo_pointers.first() {
+                    Some(utxo_pointer) => {
                         InputRef {
-                            id: InputPointer::from_parent(first_utxo.id.parent.clone(), first_utxo.id.index())
+                            id: InputPointer::from_parent(utxo_pointer.parent.clone(), utxo_pointer.index())
                         }
                     }
                     None => {
+                        // foundation/genesis box
                         InputRef {
                             id: InputPointer::from_parent(TxPointer::from_parent(BlockHeight(0), 0), 0)
                         }

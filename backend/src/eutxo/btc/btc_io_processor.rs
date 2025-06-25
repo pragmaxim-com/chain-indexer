@@ -13,16 +13,16 @@ impl IoProcessor<bitcoin::TxIn, InputRef, bitcoin::TxOut, Utxo> for BtcIoProcess
         ins.iter()
             .map(|input| {
                 let tx_hash = TxHash(input.previous_output.txid.to_byte_array());
-                let txs = Transaction::get_by_hash(tx, &tx_hash).expect("Failed to get Transaction by TxHash");
+                let tx_pointers = Transaction::get_ids_by_hash(tx, &tx_hash).expect("Failed to get Transaction by TxHash");
 
-                match txs.first() {
-                    Some(first_tx) => {
+                match tx_pointers.first() {
+                    Some(tx_pointer) => {
                         InputRef {
-                            id: InputPointer::from_parent(first_tx.id.clone(), input.previous_output.vout as u16),
+                            id: InputPointer::from_parent(tx_pointer.clone(), input.previous_output.vout as u16),
                         }
                     }
                     None => {
-                        info!("Tx {:?} not found, it should be coinbase", tx_hash.clone());
+                        // coinbase tx
                         InputRef {
                             id: InputPointer::from_parent(TxPointer::from_parent(BlockHeight(0), 0), 0)
                         }
