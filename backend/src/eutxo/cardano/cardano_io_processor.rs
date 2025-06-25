@@ -48,12 +48,12 @@ impl IoProcessor<MultiEraInput<'_>, InputRef, MultiEraOutput<'_>, Utxo> for Card
             });
             let utxo_pointer = UtxoPointer::from_parent(tx_pointer.clone(), out_index as u16);
 
-            let mut result_assets = Vec::with_capacity(out.non_ada_assets().iter().map(|p| p.assets().len()).sum());
+            let mut result_assets = Vec::with_capacity(out.value().assets().iter().map(|p| p.assets().len()).sum());
 
             // start your pointer index at 0
             let mut idx: u8 = 0;
 
-            for policy_assets in out.non_ada_assets() {
+            for policy_assets in out.value().assets() {
                 // clone the policy‐id bytes once
                 let pid_bytes = policy_assets.policy().to_vec();
 
@@ -80,7 +80,7 @@ impl IoProcessor<MultiEraInput<'_>, InputRef, MultiEraOutput<'_>, Utxo> for Card
             asset_count += result_assets.len();
             result_outs.push(Utxo {
                 id: utxo_pointer,
-                amount: out.lovelace_amount().into(),
+                amount: out.value().coin().into(),
                 address: Address(address_opt.unwrap_or_default()),
                 assets: vec![], // TODO
                 ergo_box: None,

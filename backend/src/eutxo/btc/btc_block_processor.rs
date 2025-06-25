@@ -2,7 +2,6 @@ use super::btc_client::BtcBlock;
 use super::btc_io_processor::BtcIoProcessor;
 use crate::api::{BlockProcessor, IoProcessor, ServiceError};
 use crate::eutxo::eutxo_model::{Block, BlockHash, BlockHeader, BlockHeight, BlockTimestamp, Transaction, TxHash, TxPointer};
-use bitcoin_hashes::Hash;
 use redb::ReadTransaction;
 pub use redbit::*;
 
@@ -22,7 +21,7 @@ impl BtcBlockProcessor {
         let (_, outputs) = self.io_processor.process_outputs(&tx.output, tx_pointer.clone());
         Transaction {
             id: tx_pointer.clone(),
-            hash: TxHash(tx.compute_txid().to_byte_array().into()),
+            hash: TxHash(*tx.compute_txid().as_ref()),
             utxos: outputs,
             inputs: self.io_processor.process_inputs(&tx.input, read_tx),
         }
@@ -36,12 +35,8 @@ impl BlockProcessor for BtcBlockProcessor {
         let header = BlockHeader {
             id: block.height.clone(),
             timestamp: BlockTimestamp(block.underlying.header.time),
-            hash: BlockHash(block.underlying.block_hash().to_byte_array()),
-            prev_hash: BlockHash(block
-                .underlying
-                .header
-                .prev_blockhash
-                .to_byte_array()),
+            hash: BlockHash(*block.underlying.block_hash().as_ref()),
+            prev_hash: BlockHash(*block.underlying.header.prev_blockhash.as_ref()),
         };
 
         let mut block_weight = 0;

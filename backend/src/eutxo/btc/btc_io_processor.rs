@@ -1,10 +1,8 @@
 use crate::api::IoProcessor;
 use crate::eutxo::eutxo_model::{Address, BlockHeight, InputPointer, InputRef, Transaction, TxHash, TxPointer, Utxo, UtxoPointer};
 use crate::model::BoxWeight;
-use bitcoin_hashes::Hash;
 use redb::ReadTransaction;
 pub use redbit::*;
-use crate::info;
 
 pub struct BtcIoProcessor { }
 
@@ -12,7 +10,7 @@ impl IoProcessor<bitcoin::TxIn, InputRef, bitcoin::TxOut, Utxo> for BtcIoProcess
     fn process_inputs(&self, ins: &[bitcoin::TxIn], tx: &ReadTransaction) -> Vec<InputRef> {
         ins.iter()
             .map(|input| {
-                let tx_hash = TxHash(input.previous_output.txid.to_byte_array());
+                let tx_hash = TxHash(*input.previous_output.txid.as_ref());
                 let tx_pointers = Transaction::get_ids_by_hash(tx, &tx_hash).expect("Failed to get Transaction by TxHash");
 
                 match tx_pointers.first() {

@@ -1,8 +1,8 @@
 use crate::{api::ServiceError, settings::BitcoinConfig};
-use bitcoin_hashes::Hash;
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use std::sync::Arc;
 use bitcoin::block::Bip34Error;
+use bitcoin::hashes::Hash;
 use crate::eutxo::eutxo_model::{BlockHash, BlockHeight};
 
 // Bitcoin block wrapper
@@ -51,7 +51,7 @@ impl BtcClient {
     }
 
     pub fn get_block_by_hash(&self, hash: BlockHash) -> Result<BtcBlock, ServiceError> {
-        let bitcoin_hash = bitcoin::BlockHash::from_slice(&hash.0).unwrap();
+        let bitcoin_hash = bitcoin::BlockHash::from_raw_hash(Hash::from_byte_array(hash.0));
         let block = self.rpc_client.get_block(&bitcoin_hash)?;
         let height = self.get_block_height(&block)?;
         Ok(BtcBlock {

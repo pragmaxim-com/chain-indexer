@@ -3,49 +3,32 @@ name = "backend"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 bitcoin = "0.32.0"
 bitcoincore-rpc = {git = "https://github.com/clarkmoody/rust-bitcoincore-rpc", branch = "support-core-22-and-23"}
-bitcoin_hashes = "0.14.0"
-base16 = "0.2.1"
-rand = "0.8.5"
+bitcoin_hashes = "0.16.0"
+rand = "0.9.1"
 min-batch = { git = "https://github.com/pragmaxim-com/min-batch.rs" }
-broadcast-sink = { git = "https://github.com/pragmaxim-com/broadcast-sink.rs" }
-pin-project-lite = "0.2"
 futures = "0.3.30"
 chrono = "0.4.38"
-bincode = "1.3.3"
-serde_yaml = "0.9.34"
 num_cpus = "1.16.0"
-crossbeam = "0.8.4"
-lru = "0.12.3"
-byteorder = "1.5.0"
-config = "0.14.0"
-toml = "0.8.14"
+config = "0.15.11"
 dotenv = "0.15.0"
 hex = "0.4.3"
-signal-hook = "0.3.17"
-ouroboros = "0.18.4"
-derive_more = "0.99.18"
-proptest = "1.5.0"
 ergo-lib = "0.27.1"
 reqwest = { version = "0.12.5", default-features = false, features = [
     "json",
     "blocking",
 ] }
 async-trait = "0.1.81"
-pallas = "0.29.0"
+pallas = "0.32.1"
 num_enum = "0.7.3"
 clap = { version = "4.5.15", features = ["derive"] }
-lazy_static = "1.5.0"
-indexmap = { version = "2.4.0", features = ["serde"] }
 actix-web = "4.8.0"
 url = "2.5.2"
 env_logger = "0.11.5"
-# Add dependency on redbit from local path
 redbit = { git = "https://github.com/pragmaxim-com/redbit" }
+# redbit = { path = "../../redbit/redbit", version = "0.1.0" }
 redb = "2.6.0"
 tokio-stream = { version = "0.1.17", features = ["sync"] }
 axum = {  version = "0.8.4", features = ["default", "macros"] }
@@ -53,7 +36,7 @@ serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.45.1", features = ["full"] }
 
 [dev-dependencies]
-criterion = { version = "0.5.1", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.6.0", features = ["html_reports", "async_tokio"] }
 
 [[bench]]
 name = "btc_processor_benchmark"

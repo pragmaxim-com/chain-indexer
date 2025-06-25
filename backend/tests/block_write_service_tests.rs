@@ -8,7 +8,6 @@ mod tests {
     use backend::eutxo::btc::btc_block_provider::BtcBlockProvider;
     use backend::eutxo::eutxo_model::{Block, BlockHash, BlockHeader, BlockHeight, BlockTimestamp};
     use backend::eutxo::eutxo_storage;
-    use bitcoin_hashes::Hash;
     use std::env::temp_dir;
 
     #[test]
@@ -25,8 +24,8 @@ mod tests {
 
             let header = BlockHeader {
                 id: BlockHeight(height),
-                hash: BlockHash(block.underlying.block_hash().to_byte_array()),
-                prev_hash: BlockHash(block.underlying.header.prev_blockhash.to_byte_array()),
+                hash: BlockHash(*block.underlying.block_hash().as_ref()),
+                prev_hash: BlockHash(*block.underlying.header.prev_blockhash.as_ref()),
                 timestamp: BlockTimestamp(111),
             };
             let read_tx = db.begin_read().unwrap();
