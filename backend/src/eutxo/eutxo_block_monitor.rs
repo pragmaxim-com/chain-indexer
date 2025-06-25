@@ -1,9 +1,9 @@
 use std::{cell::RefCell, time::Instant};
 
-use crate::model::{BatchWeight, Block};
+use crate::model::BatchWeight;
 use crate::{api::BlockMonitor, info};
 
-use super::eutxo_model::EuTx;
+use super::eutxo_model::Block;
 
 pub struct EuBlockMonitor {
     min_weight_report: usize,
@@ -21,8 +21,8 @@ impl EuBlockMonitor {
     }
 }
 
-impl BlockMonitor<EuTx> for EuBlockMonitor {
-    fn monitor(&self, block_batch: &[Block<EuTx>], batch_weight: &BatchWeight) {
+impl BlockMonitor for EuBlockMonitor {
+    fn monitor(&self, block_batch: &[Block], batch_weight: &BatchWeight) {
         let mut total_weight = self.total_and_last_report_weight.borrow_mut();
         let new_total_weight = total_weight.0 + batch_weight;
         if new_total_weight > total_weight.1 + self.min_weight_report {
@@ -33,7 +33,7 @@ impl BlockMonitor<EuTx> for EuBlockMonitor {
             info!(
                 "{} Blocks @ {} from {} at {} ins+outs+assets per second, total {}",
                 block_batch.len(),
-                last_block.header.height,
+                last_block.header.id,
                 last_block.header.timestamp,
                 txs_per_sec,
                 new_total_weight

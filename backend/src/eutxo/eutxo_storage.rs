@@ -1,35 +1,19 @@
-use rocksdb::{ColumnFamilyDescriptor, MultiThreaded, OptimisticTransactionDB};
+use crate::eutxo::eutxo_model::Block;
+use redb::Database;
+use redbit::*;
+use std::path::PathBuf;
 
-use crate::db_options;
-
-use super::eutxo_schema::DbSchema;
-
-pub fn get_db(db_schema: &DbSchema, db_path: &str) -> OptimisticTransactionDB<MultiThreaded> {
-    let options = db_options::get_db_options(false, None);
-    let existing_cfs =
-        OptimisticTransactionDB::<MultiThreaded>::list_cf(&options, db_path).unwrap_or_default();
-
-    if !existing_cfs.is_empty() {
-        let cf_descriptors = db_schema
-            .get_cf_names_with_options()
-            .into_iter()
-            .map(|(cf, options)| ColumnFamilyDescriptor::new(cf, options));
-
-        OptimisticTransactionDB::<MultiThreaded>::open_cf_descriptors(
-            &options,
-            db_path,
-            cf_descriptors,
-        )
-        .unwrap()
+pub fn get_db(db_dir: PathBuf) -> redb::Result<Database, AppError> {
+    if !db_dir.exists() {
+        std::fs::create_dir_all(db_dir.clone()).map_err(|e| {
+            AppError::Internal(format!("Failed to create database directory: {}", e))
+        })?;
+        let db = Database::create(db_dir.join("chain_indexer.db"))?;
+        let sample_block = Block::sample();
+        Block::store_and_commit(&db, &sample_block)?;
+        Block::delete_and_commit(&db, &sample_block.id)?;
+        Ok(db)
     } else {
-        let db =
-            OptimisticTransactionDB::<MultiThreaded>::open_cf(&options, db_path, &existing_cfs)
-                .unwrap();
-
-        db_schema
-            .get_cf_names_with_options()
-            .iter()
-            .for_each(|(cf, options)| db.create_cf(cf, options).unwrap());
-        db
+        Database::open(db_dir.join("chain_indexer.db")).map_err(|e| e.into())
     }
 }

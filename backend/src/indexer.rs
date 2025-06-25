@@ -1,95 +1,68 @@
-use crate::model::{Block, BlockHeader};
-use rocksdb::MultiThreaded;
-use rocksdb::OptimisticTransactionDB;
-use rocksdb::OptimisticTransactionOptions;
-use rocksdb::WriteOptions;
 
 use crate::api::BlockProvider;
 use crate::api::ServiceError;
-use crate::block_write_service::BlockWriteService;
-use crate::codec::EncodeDecode;
 use crate::info;
-use crate::persistence::Persistence;
-use crate::rocks_db_batch::CustomFamilies;
 use std::sync::Arc;
+use redb::{Database, ReadTransaction, WriteTransaction};
+use redbit::AppError;
+use crate::eutxo::eutxo_model::{Block, BlockHeader};
 
 pub const LAST_HEADER_KEY: &[u8] = b"last_header";
 
-pub struct Indexer<CF: CustomFamilies, OutTx: Send> {
-    pub storage: Arc<Persistence<CF>>,
-    block_write_service: Arc<BlockWriteService<OutTx, CF>>,
-    block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
-    disable_wal: bool,
+pub struct Indexer {
+    pub db: Arc<Database>,
+    block_provider: Arc<dyn BlockProvider>,
 }
 
-impl<CF: CustomFamilies, OutTx: Send> Indexer<CF, OutTx> {
-    pub fn new(
-        storage: Arc<Persistence<CF>>,
-        block_write_service: Arc<BlockWriteService<OutTx, CF>>,
-        block_provider: Arc<dyn BlockProvider<OutTx = OutTx>>,
-        disable_wal: bool,
-    ) -> Self {
+impl Indexer {
+    pub fn new(db: Arc<Database>, block_provider: Arc<dyn BlockProvider>) -> Self {
         Indexer {
-            storage,
-            block_write_service,
+            db,
             block_provider,
-            disable_wal,
         }
     }
 
     fn persist_last_block(
         &self,
         header: &BlockHeader,
-        db_tx: &rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>>,
-    ) -> Result<(), rocksdb::Error> {
-        db_tx.put_cf(
-            &self.storage.families.shared.meta_cf,
-            LAST_HEADER_KEY,
-            header.encode(),
-        )?;
-        Ok(())
+        tx: &WriteTransaction,
+    ) -> Result<(), AppError> {
+        BlockHeader::store(tx, header)
     }
 
-    pub fn get_last_header(&self) -> Option<BlockHeader> {
-        self.storage
-            .db
-            .get_cf(&self.storage.families.shared.meta_cf, LAST_HEADER_KEY)
-            .unwrap()
-            .map(|header_bytes| BlockHeader::decode(&header_bytes))
+    pub fn get_last_header(&self, tx: &ReadTransaction) -> Option<BlockHeader> {
+        BlockHeader::last(tx).unwrap()
     }
 
     fn chain_link(
         &self,
-        block: Arc<Block<OutTx>>, // Use Arc to manage ownership and avoid lifetimes issues
-        winning_fork: &mut Vec<Arc<Block<OutTx>>>, // Use Rc for the vector as well
-    ) -> Result<Vec<Arc<Block<OutTx>>>, ServiceError> {
-        let prev_header: Option<BlockHeader> = self
-            .block_write_service
-            .block_service
-            .get_block_header_by_hash(&block.header.prev_hash)
-            .unwrap();
+        block: Arc<Block>, // Use Arc to manage ownership and avoid lifetimes issues
+        winning_fork: &mut Vec<Arc<Block>>, // Use Rc for the vector as well
+        tx: &ReadTransaction
+    ) -> Result<Vec<Arc<Block>>, ServiceError> {
+        let prev_header = BlockHeader::get_by_hash(tx, &block.header.prev_hash)?;
 
-        if block.header.height.0 == 1 {
+        if block.header.id.0 == 1 {
             winning_fork.insert(0, Arc::clone(&block)); // Clone the Rc, not the block
             Ok(winning_fork.clone())
-        } else if prev_header
-            .as_ref()
-            .is_some_and(|ph| ph.height.0 == block.header.height.0 - 1)
+        } else if prev_header.first()
+            .is_some_and(|ph| ph.id.0 == block.header.id.0 - 1)
         {
             winning_fork.insert(0, Arc::clone(&block));
             Ok(winning_fork.clone())
-        } else if prev_header.is_none() {
+        } else if prev_header.first().is_none() {
             info!(
                 "Fork detected at {}@{}, downloading parent {}",
-                block.header.height, block.header.hash, block.header.prev_hash,
+                block.header.id, block.header.hash, block.header.prev_hash,
             );
+            let read_tx = self.db.begin_read()?;
             let downloaded_prev_block = Arc::new(
                 self.block_provider
-                    .get_processed_block(block.header.clone())?,
+                    .get_processed_block(block.header.clone(), &read_tx)?,
             );
 
             winning_fork.insert(0, Arc::clone(&block));
-            self.chain_link(downloaded_prev_block, winning_fork)
+            self.chain_link(downloaded_prev_block, winning_fork, tx)
         } else {
             panic!("Unexpected condition") // todo pretty print blocks
         }
@@ -97,24 +70,16 @@ impl<CF: CustomFamilies, OutTx: Send> Indexer<CF, OutTx> {
 
     pub fn persist_blocks(
         &self,
-        blocks: Vec<Block<OutTx>>,
+        blocks: Vec<Block>,
         chain_link: bool,
     ) -> Result<(), ServiceError> {
-        let mut write_options = WriteOptions::default();
-        write_options.disable_wal(self.disable_wal);
-
-        let db_tx: rocksdb::Transaction<OptimisticTransactionDB<MultiThreaded>> = self
-            .storage
-            .db
-            .transaction_opt(&write_options, &OptimisticTransactionOptions::default());
-
-        let mut batch = db_tx.get_writebatch();
-
+        let write_tx = self.db.begin_write()?;
+        let read_tx = self.db.begin_read()?;
         let last_block_header = blocks
             .into_iter()
             .map(|block| {
                 if chain_link {
-                    self.chain_link(Arc::new(block), &mut vec![]).unwrap()
+                    self.chain_link(Arc::new(block), &mut vec![], &read_tx).unwrap()
                 } else {
                     vec![Arc::new(block)]
                 }
@@ -123,16 +88,17 @@ impl<CF: CustomFamilies, OutTx: Send> Indexer<CF, OutTx> {
                 0 => panic!("Blocks vector is empty"),
                 1 => {
                     let last_header = linked_blocks.last().unwrap().header.clone();
-                    self.block_write_service
-                        .persist_blocks(linked_blocks, &db_tx, &mut batch, &self.storage.families)
-                        .unwrap();
+                    for linked_block in &linked_blocks {
+                        Block::store(&write_tx, linked_block).unwrap();
+                    }
                     last_header
                 }
                 _ => {
                     let last_header = linked_blocks.last().unwrap().header.clone();
-                    self.block_write_service
-                        .update_blocks(linked_blocks, &db_tx, &mut batch, &self.storage.families)
-                        .unwrap();
+                    for linked_block in &linked_blocks {
+                        // TODO remove block
+                        Block::store(&write_tx, linked_block).unwrap();
+                    }
                     last_header
                 }
             })
@@ -140,10 +106,9 @@ impl<CF: CustomFamilies, OutTx: Send> Indexer<CF, OutTx> {
 
         // persist last height to db_tx and commit
         if let Some(header) = last_block_header {
-            self.persist_last_block(&header, &db_tx)?;
-            self.storage.db.write_opt(batch, &write_options)?;
-            db_tx.commit()?;
+            self.persist_last_block(&header, &write_tx)?;
         }
+        write_tx.commit()?;
         Ok(())
     }
 }
