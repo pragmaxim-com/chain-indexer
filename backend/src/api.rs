@@ -3,7 +3,6 @@ use crate::model::{BatchWeight, BoxWeight, TxCount, };
 use std::{fmt, pin::Pin};
 use actix_web::{HttpResponse, ResponseError};
 use async_trait::async_trait;
-use bitcoin::block::Bip34Error;
 use futures::Stream;
 use hex::FromHexError;
 use pallas::network::miniprotocols;
@@ -70,18 +69,8 @@ impl From<miniprotocols::localstate::ClientError> for ServiceError {
         ServiceError::new(&err.to_string())
     }
 }
-impl From<bitcoincore_rpc::Error> for ServiceError {
-    fn from(err: bitcoincore_rpc::Error) -> Self {
-        ServiceError::new(&err.to_string())
-    }
-}
 impl From<pallas::ledger::traverse::Error> for ServiceError {
     fn from(err: pallas::ledger::traverse::Error) -> Self {
-        ServiceError::new(&err.to_string())
-    }
-}
-impl From<Bip34Error> for ServiceError {
-    fn from(err: Bip34Error) -> Self {
         ServiceError::new(&err.to_string())
     }
 }
@@ -99,12 +88,6 @@ pub trait BlockProcessor {
 
     fn process_block(&self, block: &Self::FromBlock, read_tx: &ReadTransaction) -> Result<Block, ServiceError>;
 
-    fn process_batch(
-        &self,
-        block_batch: &[Self::FromBlock],
-        tx_count: TxCount,
-        read_tx: &ReadTransaction
-    ) -> Result<(Vec<Block>, TxCount), ServiceError>;
 }
 
 pub trait IoProcessor<FromInput, IntoInput, FromOutput, IntoOutput> {

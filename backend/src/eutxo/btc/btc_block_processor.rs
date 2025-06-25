@@ -9,9 +9,6 @@ pub use redbit::*;
 
 // pub static GENESIS_START_TIME: u32 = 1231006505;
 
-pub type OutputAddress = Option<Vec<u8>>;
-pub type OutputScriptHash = Vec<u8>;
-
 pub struct BtcBlockProcessor {
     pub io_processor: BtcIoProcessor,
 }
@@ -63,16 +60,4 @@ impl BlockProcessor for BtcBlockProcessor {
         })
     }
 
-    fn process_batch(
-        &self,
-        block_batch: &[Self::FromBlock],
-        tx_count: TxCount,
-        read_tx: &ReadTransaction
-    ) -> Result<(Vec<Block>, TxCount), ServiceError> {
-        let blocks: Result<Vec<Block>, ServiceError> = block_batch
-            .iter()
-            .map(|btc_block| self.process_block(btc_block, read_tx))
-            .collect();
-        blocks.map(|blocks| (blocks, tx_count))
-    }
 }

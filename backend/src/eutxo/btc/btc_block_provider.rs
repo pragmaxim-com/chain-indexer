@@ -1,4 +1,10 @@
-use crate::model::{BatchWeight, TxCount};
+use super::{
+    btc_block_processor::BtcBlockProcessor,
+    btc_client::BtcClient,
+    btc_io_processor::BtcIoProcessor,
+};
+use crate::eutxo::eutxo_model::{Block, BlockHeader, BlockHeight};
+use crate::model::BatchWeight;
 use crate::{
     api::{BlockProcessor, BlockProvider, ServiceError},
     info,
@@ -8,14 +14,8 @@ use async_trait::async_trait;
 use futures::stream::StreamExt;
 use futures::Stream;
 use min_batch::ext::MinBatchExt;
-use std::{pin::Pin, sync::Arc};
 use redb::ReadTransaction;
-use crate::eutxo::eutxo_model::{Block, BlockHeader, BlockHeight};
-use super::{
-    btc_block_processor::BtcBlockProcessor,
-    btc_client::{BtcBlock, BtcClient},
-    btc_io_processor::BtcIoProcessor,
-};
+use std::{pin::Pin, sync::Arc};
 
 pub struct BtcBlockProvider {
     pub client: Arc<BtcClient>,
@@ -30,22 +30,6 @@ impl BtcBlockProvider {
             processor: Arc::new(BtcBlockProcessor::new(BtcIoProcessor { } )),
             db
         }
-    }
-
-    pub fn process_batch(
-        &self,
-        block_batch: &[BtcBlock],
-        tx_count: TxCount,
-        read_tx: &ReadTransaction
-    ) -> Result<(Vec<Block>, TxCount), ServiceError> {
-        self.processor.process_batch(block_batch, tx_count, read_tx)
-    }
-
-    pub(crate) async fn get_best_block_header(&self, read_tx: &ReadTransaction) -> Result<BlockHeader, ServiceError> {
-        self.client
-            .get_best_block()
-            .and_then(|b| self.processor.process_block(&b, read_tx))
-            .map(|b| b.header)
     }
 }
 
@@ -72,7 +56,7 @@ impl BlockProvider for BtcBlockProvider {
         processing_par: usize,
     ) -> Pin<Box<dyn Stream<Item = (Vec<Block>, BatchWeight)> + Send + 'life0>> {
         let read_tx = self.db.begin_read().unwrap();
-        let best_header = self.get_best_block_header(&read_tx).await.unwrap();
+        let best_header = self.get_chain_tip(&read_tx).await.unwrap();
         let last_height = last_header.map_or(0, |h| h.id.0);
         info!("Indexing from {:?} to {:?}", last_height, best_header);
         let heights = last_height..=best_header.id.0;

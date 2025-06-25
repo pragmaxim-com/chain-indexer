@@ -63,16 +63,4 @@ impl BlockProcessor for CardanoBlockProcessor {
         Ok(Block { id: header.id.clone(), header, transactions: result_txs, weight: block_weight as u16 }) // usize
     }
 
-    fn process_batch(
-        &self,
-        block_batch: &[Self::FromBlock],
-        tx_count: TxCount,
-        read_tx: &ReadTransaction
-    ) -> Result<(Vec<Block>, TxCount), ServiceError> {
-        let blocks: Result<Vec<Block>, ServiceError> = block_batch
-            .iter()
-            .map(|btc_block| self.process_block(btc_block, read_tx))
-            .collect();
-        blocks.map(|blocks| (blocks, tx_count))
-    }
 }

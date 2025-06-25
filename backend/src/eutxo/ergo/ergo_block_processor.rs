@@ -23,14 +23,6 @@ impl ErgoBlockProcessor {
 impl BlockProcessor for ErgoBlockProcessor {
     type FromBlock = FullBlock;
 
-    fn process_batch(&self, block_batch: &[Self::FromBlock], tx_count: TxCount, read_tx: &ReadTransaction) -> Result<(Vec<Block>, TxCount), ServiceError> {
-        let blocks: Result<Vec<Block>, ServiceError> = block_batch
-            .iter()
-            .map(|btc_block| self.process_block(btc_block, read_tx))
-            .collect();
-        blocks.map(|blocks| (blocks, tx_count))
-    }
-
     fn process_block(&self, b: &Self::FromBlock, read_tx: &ReadTransaction) -> Result<Block, ServiceError> {
         let mut block_weight: usize = 0;
         let mut result_txs = Vec::with_capacity(b.block_transactions.transactions.len());
