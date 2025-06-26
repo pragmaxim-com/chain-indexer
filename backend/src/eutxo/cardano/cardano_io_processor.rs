@@ -1,16 +1,14 @@
 pub use redbit::*;
 
 use crate::api::IoProcessor;
-use crate::eutxo::eutxo_model::{
-    Address, Asset, AssetAction, AssetName, AssetPointer, InputPointer, InputRef, PolicyId,
-    Transaction, TxHash, TxPointer, Utxo, UtxoPointer,
-};
+use crate::eutxo::eutxo_model::{Address, Asset, AssetAction, AssetName, AssetPointer, BlockHeight, InputPointer, InputRef, PolicyId, Transaction, TxHash, TxPointer, Utxo, UtxoPointer};
 use crate::model::{AssetType, BoxWeight};
 use pallas::{
     codec::minicbor::{Encode, Encoder},
     ledger::traverse::{MultiEraInput, MultiEraOutput},
 };
 use redb::ReadTransaction;
+use crate::info;
 
 pub struct CardanoIoProcessor {}
 
@@ -20,11 +18,17 @@ impl IoProcessor<MultiEraInput<'_>, InputRef, MultiEraOutput<'_>, Utxo> for Card
         ins.iter()
             .map(|input| {
                 let tx_hash: [u8; 32] = **input.hash();
-                let tx_pointers = Transaction::get_ids_by_hash(tx, &TxHash(tx_hash))
-                    .expect("Failed to get Transaction by TxHash");
-                let tx_pointer = tx_pointers.first().expect("Failed to get Transaction pointer");
-                InputRef {
-                    id: InputPointer::from_parent(tx_pointer.clone(), input.index() as u16),
+                let tx_pointers = Transaction::get_ids_by_hash(tx, &TxHash(tx_hash)).expect("Failed to get Transaction by TxHash");
+                match tx_pointers.first() {
+                    Some(tx_pointer) => InputRef {
+                        id: InputPointer::from_parent(tx_pointer.clone(), input.index() as u16),
+                    },
+                    None => {
+                        info!("Coinbase transaction detected, using genesis block height and index 0 for input reference.");
+                        InputRef {
+                            id: InputPointer::from_parent(TxPointer::from_parent(BlockHeight(0), 0), 0)
+                        }
+                    }
                 }
             })
             .collect()
@@ -48,7 +52,8 @@ impl IoProcessor<MultiEraInput<'_>, InputRef, MultiEraOutput<'_>, Utxo> for Card
             });
             let utxo_pointer = UtxoPointer::from_parent(tx_pointer.clone(), out_index as u16);
 
-            let mut result_assets = Vec::with_capacity(out.value().assets().iter().map(|p| p.assets().len()).sum());
+            let mut result_assets =
+                Vec::with_capacity(out.value().assets().iter().map(|p| p.assets().len()).sum());
 
             // start your pointer index at 0
             let mut idx: u8 = 0;
@@ -60,16 +65,16 @@ impl IoProcessor<MultiEraInput<'_>, InputRef, MultiEraOutput<'_>, Utxo> for Card
                 for asset in policy_assets.assets() {
                     let any_coin = asset.any_coin();
                     let action = match (asset.is_mint(), any_coin < 0) {
-                        (true, _)   => AssetType::Mint,
-                        (_, true)   => AssetType::Burn,
-                        _           => AssetType::Transfer,
+                        (true, _) => AssetType::Mint,
+                        (_, true) => AssetType::Burn,
+                        _ => AssetType::Transfer,
                     };
 
-                    result_assets.push( Asset {
-                        id:           AssetPointer::from_parent(utxo_pointer.clone(), idx),
-                        amount:       any_coin.abs() as u64,
-                        name:         AssetName(asset.name().to_vec()),
-                        policy_id:    PolicyId(pid_bytes.clone()),
+                    result_assets.push(Asset {
+                        id: AssetPointer::from_parent(utxo_pointer.clone(), idx),
+                        amount: any_coin.abs() as u64,
+                        name: AssetName(asset.name().to_vec()),
+                        policy_id: PolicyId(pid_bytes.clone()),
                         asset_action: AssetAction(action.into()),
                     });
 

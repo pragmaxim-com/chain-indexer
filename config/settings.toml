@@ -14,7 +14,7 @@ bind_address = "127.0.0.1:3031"
 api_host = "http://127.0.0.1:8332"
 
 [cardano]
-api_host = "localhost:1337"
+api_host = "localhost:3001"
 socket_path = "/var/lib/cardano-node/db/node.socket"
 
 [ergo]
