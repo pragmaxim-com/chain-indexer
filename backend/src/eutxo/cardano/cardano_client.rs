@@ -47,14 +47,13 @@ impl CardanoClient {
 
     pub async fn get_block_by_point(&self, point: Point) -> Result<CBOR, ServiceError> {
         info!("Getting block from Cardano peer client");
-        let block_str = self
+        let block = self
             .peer_client
             .lock()
             .await
             .blockfetch()
             .fetch_single(point)
             .await?;
-        let block = hex::decode(block_str)?;
         Ok(block)
     }
 }
