@@ -38,7 +38,10 @@ impl CardanoClient {
     pub async fn get_best_block(&self) -> Result<CBOR, ServiceError> {
         let mut client = self.node_client.lock().await;
         info!("Getting chain tip from Cardano node client");
-        let tip = queries_v16::get_chain_point(client.statequery()).await?;
+        let c = client.statequery();
+        c.acquire(None).await?;
+        let tip = queries_v16::get_chain_point(c).await?;
+        c.send_release().await?;
         self.get_block_by_point(tip).await
     }
 
