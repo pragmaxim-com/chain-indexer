@@ -6,7 +6,7 @@ use pallas::network::{
     miniprotocols::{localstate::queries_v16, Point, MAINNET_MAGIC},
 };
 
-use crate::{api::ServiceError, settings::CardanoConfig};
+use crate::{api::ServiceError, info, settings::CardanoConfig};
 
 pub type CBOR = Vec<u8>;
 
@@ -20,12 +20,12 @@ impl CardanoClient {
         let peer_client = Arc::new(Mutex::new(
             PeerClient::connect(cardano_config.api_host.clone(), MAINNET_MAGIC)
                 .await
-                .unwrap(),
+                .expect("Failed to connect to Cardano peer client"),
         ));
         let node_client = Arc::new(Mutex::new(
             NodeClient::connect(cardano_config.socket_path.clone(), MAINNET_MAGIC)
                 .await
-                .unwrap(),
+                .expect("Failed to connect to Cardano node client"),
         ));
         CardanoClient {
             peer_client,
@@ -37,11 +37,13 @@ impl CardanoClient {
 impl CardanoClient {
     pub async fn get_best_block(&self) -> Result<CBOR, ServiceError> {
         let mut client = self.node_client.lock().await;
+        info!("Getting chain tip from Cardano node client");
         let tip = queries_v16::get_chain_point(client.statequery()).await?;
         self.get_block_by_point(tip).await
     }
 
     pub async fn get_block_by_point(&self, point: Point) -> Result<CBOR, ServiceError> {
+        info!("Getting block from Cardano peer client");
         let block_str = self
             .peer_client
             .lock()
