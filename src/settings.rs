@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use config::{Config, ConfigError, Environment, File};
 use dotenv::dotenv;
 use serde::Deserialize;
@@ -48,9 +49,6 @@ impl<'de> serde::Deserialize<'de> for Parallelism {
 pub struct AppConfig {
     pub indexer: IndexerSettings,
     pub http: HttpSettings,
-    pub bitcoin: BitcoinConfig,
-    pub cardano: CardanoConfig,
-    pub ergo: ErgoConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -58,7 +56,6 @@ pub struct IndexerSettings {
     pub enable: bool,
     pub db_path: String,
     pub min_batch_size: usize,
-    pub disable_wal: bool,
     pub fetching_parallelism: Parallelism,
     pub processing_parallelism: Parallelism,
 }
@@ -66,14 +63,7 @@ pub struct IndexerSettings {
 #[derive(Debug, Deserialize, Clone)]
 pub struct HttpSettings {
     pub enable: bool,
-    pub bind_address: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct BitcoinConfig {
-    pub api_host: String,
-    pub api_username: String,
-    pub api_password: String,
+    pub bind_address: SocketAddr,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -1,18 +1,10 @@
 use std::env;
-use backend::cli::{Blockchain, CliConfig};
-use backend::eutxo::cardano::cardano_block_provider::CardanoBlockProvider;
-use backend::eutxo::{eutxo_executor, eutxo_storage};
 use clap::Parser;
 use std::sync::Arc;
-use backend::api::BlockProvider;
-use backend::eutxo::btc::btc_block_provider::BtcBlockProvider;
-use backend::eutxo::ergo::ergo_block_provider::ErgoBlockProvider;
-use backend::indexer::Indexer;
-use backend::settings::AppConfig;
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    let config = AppConfig::new("config/settings");
+/*    let config = AppConfig::new("config/settings");
     let cli_config: CliConfig = CliConfig::parse();
     match config {
         Ok(app_config) => {
@@ -73,4 +65,6 @@ async fn main() -> Result<(), std::io::Error> {
             Err(std::io::Error::new(std::io::ErrorKind::Other, "Error"))
         }
     }
+*/
+    Ok(())
 }
