@@ -1,5 +1,5 @@
 [indexer]
-db_path = "/tmp/chain-indexer"
+db_path = "/tmp/chain-syncer"
 enable = true
 min_batch_size = 1000           # Sum of : inputs + outputs + assets/tokens
 disable_wal = false
@@ -9,13 +9,3 @@ processing_parallelism = "mild" # low / mild / high
 [http]
 enable = true
 bind_address = "127.0.0.1:3031"
-
-[bitcoin]
-api_host = "http://127.0.0.1:8332"
-
-[cardano]
-api_host = "localhost:3001"
-socket_path = "/var/lib/cardano-node/db/node.socket"
-
-[ergo]
-api_host = "http://127.0.0.1:9053"

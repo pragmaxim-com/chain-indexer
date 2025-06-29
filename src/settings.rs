@@ -1,7 +1,6 @@
-use std::net::SocketAddr;
-use config::{Config, ConfigError, Environment, File};
-use dotenv::dotenv;
+use config::{Config, ConfigError, File};
 use serde::Deserialize;
+use std::net::SocketAddr;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -24,9 +23,9 @@ impl FromStr for Parallelism {
     }
 }
 
-impl Parallelism {
-    pub fn to_numeric(&self) -> usize {
-        match self {
+impl From<Parallelism> for usize {
+    fn from(parallelism: Parallelism) -> Self {
+        match parallelism {
             Parallelism::Low => num_cpus::get() / 8,
             Parallelism::Mild => num_cpus::get() / 4,
             Parallelism::High => num_cpus::get() / 2,
@@ -66,42 +65,11 @@ pub struct HttpSettings {
     pub bind_address: SocketAddr,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-pub struct ErgoConfig {
-    pub api_host: String,
-    pub api_key: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct CardanoConfig {
-    pub api_host: String,
-    pub socket_path: String,
-}
-
 impl AppConfig {
     pub fn new(path: &str) -> Result<Self, ConfigError> {
-        match dotenv() {
-            Ok(_) => {
-                let builder = Config::builder()
-                    .add_source(File::with_name(path).required(true))
-                    .add_source(File::with_name("local-settings").required(false))
-                    .add_source(
-                        Environment::with_prefix("BITCOIN")
-                            .try_parsing(true)
-                            .keep_prefix(true)
-                            .separator("__"),
-                    )
-                    .add_source(
-                        Environment::with_prefix("ERGO")
-                            .try_parsing(true)
-                            .keep_prefix(true)
-                            .separator("__"),
-                    );
-                let config = builder.build()?.try_deserialize();
-                println!("{:#?}", config);
-                config
-            }
-            Err(_) => panic!("Error loading .env file"),
-        }
+        let builder = Config::builder().add_source(File::with_name(path).required(true));
+        let config = builder.build()?.try_deserialize();
+        println!("{:#?}", config);
+        config
     }
 }

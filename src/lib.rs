@@ -1,9 +1,7 @@
 pub mod api;
-pub mod cli;
-pub mod model;
 pub mod logger;
 pub mod settings;
 pub mod syncer;
-pub mod block_monitor;
+pub mod monitor;
 pub mod scheduler;
 pub mod combine;
