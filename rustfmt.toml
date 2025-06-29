@@ -1,0 +1,6 @@
+max_width = 150
+use_small_heuristics = "Max"
+fn_call_width = 150
+struct_lit_width = 150
+array_width = 150
+chain_width = 150
